@@ -1,0 +1,28 @@
+sql hotfii_sql {
+    dialect = "postgresql"
+    driver = "rlm_sql_${dialect}"
+
+    server = "HOTFII_POSTGRES_HOST"
+    port = 5432
+    login = "hotfii_radius"
+    password = "REPLACE_ME"
+    database = "hotfii"
+
+    radius_db = "radius"
+    read_clients = yes
+    client_table = "nas"
+    group_attribute = "SQL-Group"
+
+    pool {
+        start = 3
+        min = 2
+        max = 16
+        spare = 3
+        uses = 0
+        retry_delay = 30
+        lifetime = 0
+        idle_timeout = 60
+    }
+
+    $INCLUDE ${modconf_dir}/sql/main/${dialect}/queries.conf
+}

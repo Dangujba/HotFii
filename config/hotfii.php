@@ -1,0 +1,33 @@
+<?php
+
+return [
+    'currency' => 'NGN',
+    'timezone' => env('APP_TIMEZONE', 'Africa/Lagos'),
+    'commerce' => [
+        'platform_fee_bps' => (int) env('HOTFII_PLATFORM_FEE_BPS', 200),
+        'standard_minimum_kobo' => (int) env('HOTFII_STANDARD_MINIMUM_KOBO', 250000),
+        'micro_sales_limit_kobo' => (int) env('HOTFII_MICRO_SALES_LIMIT_KOBO', 5000000),
+        'trial_sales_cap_kobo' => (int) env('HOTFII_TRIAL_SALES_CAP_KOBO', 10000000),
+        'trial_days' => (int) env('HOTFII_TRIAL_DAYS', 14),
+        'grace_days' => 7,
+    ],
+    'radius' => [
+        'host' => env('HOTFII_RADIUS_HOST', '127.0.0.1'),
+        'auth_port' => (int) env('HOTFII_RADIUS_AUTH_PORT', 1812),
+        'accounting_port' => (int) env('HOTFII_RADIUS_ACCT_PORT', 1813),
+        'coa_port' => (int) env('HOTFII_COA_PORT', 3799),
+    ],
+    'wireguard' => [
+        'server_public_key' => env('HOTFII_WIREGUARD_SERVER_PUBLIC_KEY'),
+        'endpoint' => env('HOTFII_WIREGUARD_ENDPOINT'),
+        'port' => (int) env('HOTFII_WIREGUARD_PORT', 51820),
+        'allowed_addresses' => env('HOTFII_WIREGUARD_ALLOWED_ADDRESSES', '10.77.0.0/16'),
+    ],
+    'supported_vendors' => ['generic', 'mikrotik', 'unifi', 'omada', 'ruijie', 'cambium', 'cisco', 'huawei', 'dlink'],
+    'internal_plans' => [
+        'organization_20' => ['price_kobo' => 500000, 'sites' => 1, 'active_identities' => 20],
+        'organization_50' => ['price_kobo' => 750000, 'sites' => 1, 'active_identities' => 50],
+        'organization_250' => ['price_kobo' => 2000000, 'sites' => 3, 'active_identities' => 250],
+        'institution_1000' => ['price_kobo' => 5000000, 'sites' => 10, 'active_identities' => 1000],
+    ],
+];

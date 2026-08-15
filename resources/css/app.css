@@ -1,0 +1,34 @@
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+@import 'overlayscrollbars/styles/overlayscrollbars.css';
+@import 'admin-lte/dist/css/adminlte.css';
+
+:root {
+    --hotfii-primary: #146c43;
+    --hotfii-accent: #f4b942;
+    --hotfii-ink: #17221d;
+    --hotfii-surface: #f4f7f5;
+}
+
+body { background: var(--hotfii-surface); color: var(--hotfii-ink); }
+.app-sidebar { background: #10271e; }
+.brand-link { text-decoration: none; }
+.brand-mark { width: 2rem; height: 2rem; display: inline-grid; place-items: center; border-radius: .65rem; background: var(--hotfii-accent); color: #17221d; font-weight: 800; }
+.text-hotfii { color: var(--hotfii-primary) !important; }
+.bg-hotfii { background: var(--hotfii-primary) !important; color: #fff; }
+.btn-hotfii { --bs-btn-bg: var(--hotfii-primary); --bs-btn-border-color: var(--hotfii-primary); --bs-btn-color: #fff; --bs-btn-hover-bg: #0f5735; --bs-btn-hover-border-color: #0f5735; }
+.metric-card { border: 0; border-radius: 1rem; box-shadow: 0 .35rem 1.5rem rgba(20, 50, 37, .08); }
+.status-dot { width: .55rem; height: .55rem; display: inline-block; border-radius: 50%; margin-right: .4rem; }
+.status-online { background: #20c997; }
+.status-offline { background: #dc3545; }
+.status-pending { background: #ffc107; }
+.portal-shell { min-height: 100vh; background: radial-gradient(circle at top left, #d8f3e7, #f8faf9 50%, #fff); }
+.portal-card { max-width: 520px; border: 0; border-radius: 1.4rem; box-shadow: 0 1.2rem 3.5rem rgba(16, 39, 30, .14); }
+.auth-shell { min-height: 100vh; background: linear-gradient(135deg, #10271e 0%, #146c43 58%, #d99b20 100%); }
+.table > :not(caption) > * > * { vertical-align: middle; }
+.provisioning-script { max-height: 34rem; overflow: auto; border-radius: .75rem; padding: 1rem; background: #0c1813; color: #c8f5df; white-space: pre-wrap; }
+.plan-option { display: flex; align-items: center; gap: .35rem; border: 1px solid #d9e3de; border-radius: .85rem; padding: .9rem; cursor: pointer; }
+.plan-option:has(input:checked) { border-color: var(--hotfii-primary); background: #eef8f3; }
+.plan-option small { display: block; color: #68756e; font-weight: 400; }
+.success-ring { width: 5rem; height: 5rem; border-radius: 50%; background: #d9f5e7; color: #146c43; display: grid; place-items: center; font-size: 2.5rem; }
+.font-monospace { font-variant-ligatures: none; }
