@@ -15,7 +15,7 @@
 <div class="row g-4">
     <div class="col-lg-7">
         <div class="card metric-card">
-            <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between"><h2 class="h5 mb-0">Network health</h2><a href="{{ route('network.devices.index') }}">View all</a></div>
+            <div class="card-header border-0 pt-4 px-4 d-flex justify-content-between"><h2 class="h5 mb-0">Network health</h2><a href="{{ route('network.devices.index') }}">View all</a></div>
             <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
                 <thead><tr><th>Device</th><th>Location</th><th>Vendor</th><th>Status</th></tr></thead>
                 <tbody>@forelse($devices as $device)
@@ -26,7 +26,7 @@
     </div>
     <div class="col-lg-5">
         <div class="card metric-card">
-            <div class="card-header bg-white border-0 pt-4 px-4"><h2 class="h5 mb-0">Recent transactions</h2></div>
+            <div class="card-header border-0 pt-4 px-4"><h2 class="h5 mb-0">Recent transactions</h2></div>
             <div class="list-group list-group-flush">@forelse($transactions as $transaction)
                 <div class="list-group-item px-4 py-3 d-flex justify-content-between"><div><strong>{{ $transaction->reference }}</strong><div class="small text-secondary">{{ $transaction->created_at->diffForHumans() }}</div></div><div class="text-end"><strong>₦{{ number_format($transaction->gross_amount_kobo / 100, 0) }}</strong><div class="small text-secondary">{{ ucfirst($transaction->status->value) }}</div></div></div>
             @empty<div class="p-5 text-center text-secondary">Transactions will appear here.</div>@endforelse</div>

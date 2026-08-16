@@ -3,32 +3,589 @@
 @import 'overlayscrollbars/styles/overlayscrollbars.css';
 @import 'admin-lte/dist/css/adminlte.css';
 
-:root {
-    --hotfii-primary: #146c43;
-    --hotfii-accent: #f4b942;
-    --hotfii-ink: #17221d;
-    --hotfii-surface: #f4f7f5;
+/* ───────────────────────────────────────────────
+   HotFii Theme System
+   3 modes: daylight · dusk · midnight
+   ─────────────────────────────────────────────── */
+
+/* ── Smooth theme transitions ─────────────────── */
+*,
+*::before,
+*::after {
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.3s ease,
+        fill 0.3s ease;
 }
 
-body { background: var(--hotfii-surface); color: var(--hotfii-ink); }
-.app-sidebar { background: #10271e; }
-.brand-link { text-decoration: none; }
-.brand-mark { width: 2rem; height: 2rem; display: inline-grid; place-items: center; border-radius: .65rem; background: var(--hotfii-accent); color: #17221d; font-weight: 800; }
-.text-hotfii { color: var(--hotfii-primary) !important; }
-.bg-hotfii { background: var(--hotfii-primary) !important; color: #fff; }
-.btn-hotfii { --bs-btn-bg: var(--hotfii-primary); --bs-btn-border-color: var(--hotfii-primary); --bs-btn-color: #fff; --bs-btn-hover-bg: #0f5735; --bs-btn-hover-border-color: #0f5735; }
-.metric-card { border: 0; border-radius: 1rem; box-shadow: 0 .35rem 1.5rem rgba(20, 50, 37, .08); }
-.status-dot { width: .55rem; height: .55rem; display: inline-block; border-radius: 50%; margin-right: .4rem; }
-.status-online { background: #20c997; }
+/* ── DAYLIGHT theme (default) ─────────────────── */
+[data-hotfii-theme="daylight"],
+:root {
+    --hf-primary:       #146c43;
+    --hf-primary-hover: #0f5735;
+    --hf-primary-soft:  #d9f5e7;
+    --hf-accent:        #f4b942;
+    --hf-accent-soft:   #fef4dd;
+
+    --hf-ink:           #1c2b23;
+    --hf-ink-secondary: #5c6e63;
+    --hf-surface:       #faf8f5;
+    --hf-surface-card:  #ffffff;
+    --hf-surface-raised:#f2efea;
+    --hf-border:        #e2ddd5;
+    --hf-border-subtle: #ebe7e0;
+
+    --hf-sidebar-bg:    #f5f3ef;
+    --hf-sidebar-ink:   #3d4a42;
+    --hf-sidebar-active-bg: var(--hf-primary);
+    --hf-sidebar-active-ink: #fff;
+    --hf-sidebar-header: #a3ac9f;
+    --hf-sidebar-dot:   rgba(20, 108, 67, 0.06);
+    --hf-sidebar-border: #e2ddd5;
+
+    --hf-header-bg:     #ffffff;
+    --hf-header-border: #e8e3dc;
+    --hf-footer-bg:     #f5f3ef;
+    --hf-footer-ink:    #7a8580;
+
+    --hf-card-shadow:   0 2px 12px rgba(28, 43, 35, 0.06);
+    --hf-card-stripe:   var(--hf-primary);
+    --hf-card-glow:     none;
+
+    --hf-scrollbar-track: #f0ede8;
+    --hf-scrollbar-thumb: #c9c3b9;
+
+    --hf-code-bg:       #f4f1ec;
+    --hf-alert-bg:      #fef9f0;
+
+    --hf-toggle-icon-color: #b08c32;
+}
+
+/* ── DUSK theme ───────────────────────────────── */
+[data-hotfii-theme="dusk"] {
+    --hf-primary:       #1e9e5e;
+    --hf-primary-hover: #18855a;
+    --hf-primary-soft:  rgba(30, 158, 94, 0.12);
+    --hf-accent:        #e8a830;
+    --hf-accent-soft:   rgba(232, 168, 48, 0.1);
+
+    --hf-ink:           #d4d6db;
+    --hf-ink-secondary: #8d919a;
+    --hf-surface:       #24272c;
+    --hf-surface-card:  #2d3037;
+    --hf-surface-raised:#33363d;
+    --hf-border:        #3c3f47;
+    --hf-border-subtle: #353840;
+
+    --hf-sidebar-bg:    #1e2025;
+    --hf-sidebar-ink:   #a0a4ad;
+    --hf-sidebar-active-bg: var(--hf-primary);
+    --hf-sidebar-active-ink: #fff;
+    --hf-sidebar-header: #5f636c;
+    --hf-sidebar-dot:   rgba(30, 158, 94, 0.04);
+    --hf-sidebar-border: #2c2f36;
+
+    --hf-header-bg:     #2a2d33;
+    --hf-header-border: #3a3d45;
+    --hf-footer-bg:     #1e2025;
+    --hf-footer-ink:    #6b6f78;
+
+    --hf-card-shadow:   0 2px 16px rgba(0, 0, 0, 0.2);
+    --hf-card-stripe:   var(--hf-primary);
+    --hf-card-glow:     0 0 0 1px rgba(30, 158, 94, 0.08);
+
+    --hf-scrollbar-track: #2a2d33;
+    --hf-scrollbar-thumb: #4a4e58;
+
+    --hf-code-bg:       #1a1c21;
+    --hf-alert-bg:      #2a2d33;
+
+    --hf-toggle-icon-color: #e8a830;
+}
+
+/* ── MIDNIGHT theme ───────────────────────────── */
+[data-hotfii-theme="midnight"] {
+    --hf-primary:       #26c070;
+    --hf-primary-hover: #20a861;
+    --hf-primary-soft:  rgba(38, 192, 112, 0.1);
+    --hf-accent:        #f4b942;
+    --hf-accent-soft:   rgba(244, 185, 66, 0.08);
+
+    --hf-ink:           #e2e4e9;
+    --hf-ink-secondary: #7c8090;
+    --hf-surface:       #0e1014;
+    --hf-surface-card:  #161820;
+    --hf-surface-raised:#1c1e28;
+    --hf-border:        #262a35;
+    --hf-border-subtle: #1f2230;
+
+    --hf-sidebar-bg:    #0a0c10;
+    --hf-sidebar-ink:   #8990a3;
+    --hf-sidebar-active-bg: var(--hf-primary);
+    --hf-sidebar-active-ink: #fff;
+    --hf-sidebar-header: #4c5166;
+    --hf-sidebar-dot:   rgba(38, 192, 112, 0.03);
+    --hf-sidebar-border: #181b24;
+
+    --hf-header-bg:     #12141a;
+    --hf-header-border: #222530;
+    --hf-footer-bg:     #0a0c10;
+    --hf-footer-ink:    #4a4f60;
+
+    --hf-card-shadow:   0 4px 24px rgba(0, 0, 0, 0.35);
+    --hf-card-stripe:   var(--hf-accent);
+    --hf-card-glow:     0 0 0 1px rgba(244, 185, 66, 0.06);
+
+    --hf-scrollbar-track: #0e1014;
+    --hf-scrollbar-thumb: #2e3240;
+
+    --hf-code-bg:       #08090d;
+    --hf-alert-bg:      #161820;
+
+    --hf-toggle-icon-color: #8990a3;
+}
+
+/* ───────────────────────────────────────────────
+   Base Surfaces
+   ─────────────────────────────────────────────── */
+body {
+    background: var(--hf-surface) !important;
+    color: var(--hf-ink) !important;
+}
+
+/* ───────────────────────────────────────────────
+   Top Header / Navbar
+   ─────────────────────────────────────────────── */
+.app-header.navbar {
+    background: var(--hf-header-bg) !important;
+    border-bottom: 1px solid var(--hf-header-border) !important;
+    box-shadow: none !important;
+}
+.app-header .nav-link {
+    color: var(--hf-ink-secondary) !important;
+}
+.app-header .nav-link:hover {
+    color: var(--hf-ink) !important;
+}
+.app-header .dropdown-menu {
+    background: var(--hf-surface-card);
+    border: 1px solid var(--hf-border);
+}
+.app-header .dropdown-item {
+    color: var(--hf-ink);
+}
+.app-header .dropdown-item:hover,
+.app-header .dropdown-item:focus {
+    background: var(--hf-surface-raised);
+    color: var(--hf-ink);
+}
+.app-header .dropdown-item.active {
+    background: var(--hf-primary);
+    color: #fff;
+}
+
+/* ───────────────────────────────────────────────
+   Sidebar — Unique HotFii identity
+   ─────────────────────────────────────────────── */
+.app-sidebar {
+    background: var(--hf-sidebar-bg) !important;
+    border-right: 1px solid var(--hf-sidebar-border) !important;
+    box-shadow: none !important;
+}
+
+/* Dot-grid texture overlay — subtle geometric identity */
+.app-sidebar .sidebar-wrapper {
+    background-image: radial-gradient(
+        circle,
+        var(--hf-sidebar-dot) 1px,
+        transparent 1px
+    );
+    background-size: 18px 18px;
+}
+
+.sidebar-brand {
+    border-bottom: 1px solid var(--hf-sidebar-border);
+    padding: .85rem 1rem;
+}
+.brand-link {
+    text-decoration: none;
+    color: var(--hf-ink) !important;
+}
+.brand-mark {
+    width: 2.1rem;
+    height: 2.1rem;
+    display: inline-grid;
+    place-items: center;
+    border-radius: .6rem;
+    background: var(--hf-accent);
+    color: #1c2b23;
+    font-weight: 800;
+    font-size: .95rem;
+}
+
+/* Sidebar nav items */
+.sidebar-menu .nav-link {
+    color: var(--hf-sidebar-ink) !important;
+    border-radius: .55rem;
+    margin: 1px .65rem;
+    padding: .55rem .75rem;
+    font-weight: 500;
+    font-size: .875rem;
+}
+.sidebar-menu .nav-link:hover {
+    color: var(--hf-ink) !important;
+    background: var(--hf-surface-raised);
+}
+
+/* Glowing pill active state */
+.sidebar-menu .nav-link.active {
+    background: var(--hf-sidebar-active-bg) !important;
+    color: var(--hf-sidebar-active-ink) !important;
+    box-shadow: 0 2px 12px rgba(20, 108, 67, 0.25);
+    font-weight: 600;
+}
+
+.sidebar-menu .nav-header {
+    color: var(--hf-sidebar-header) !important;
+    font-size: .7rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 1.1rem .75rem .35rem;
+    margin: 0 .65rem;
+}
+
+.sidebar-menu .nav-icon {
+    width: 1.3rem;
+    text-align: center;
+    margin-right: .55rem;
+    font-size: 1rem;
+}
+
+/* ───────────────────────────────────────────────
+   Content Area
+   ─────────────────────────────────────────────── */
+.app-content-header {
+    background: transparent;
+    border-bottom: 1px solid var(--hf-border-subtle);
+    padding: 1.25rem 0;
+}
+.app-content-header h3 {
+    color: var(--hf-ink);
+    font-weight: 700;
+}
+.app-content-header p {
+    color: var(--hf-ink-secondary) !important;
+}
+
+/* ───────────────────────────────────────────────
+   Cards — Accent Stripe + themed surfaces
+   ─────────────────────────────────────────────── */
+.card {
+    background: var(--hf-surface-card) !important;
+    border: 1px solid var(--hf-border-subtle) !important;
+    color: var(--hf-ink);
+}
+
+.metric-card {
+    border: none !important;
+    border-radius: 1rem;
+    border-left: 3.5px solid var(--hf-card-stripe) !important;
+    box-shadow: var(--hf-card-shadow), var(--hf-card-glow);
+    background: var(--hf-surface-card) !important;
+    overflow: hidden;
+}
+
+.card-header {
+    background: transparent !important;
+    border-bottom: 1px solid var(--hf-border-subtle) !important;
+    color: var(--hf-ink) !important;
+}
+
+.card-body {
+    color: var(--hf-ink);
+}
+
+/* ───────────────────────────────────────────────
+   HotFii Buttons
+   ─────────────────────────────────────────────── */
+.text-hotfii { color: var(--hf-primary) !important; }
+.bg-hotfii { background: var(--hf-primary) !important; color: #fff; }
+.btn-hotfii {
+    --bs-btn-bg: var(--hf-primary);
+    --bs-btn-border-color: var(--hf-primary);
+    --bs-btn-color: #fff;
+    --bs-btn-hover-bg: var(--hf-primary-hover);
+    --bs-btn-hover-border-color: var(--hf-primary-hover);
+    --bs-btn-hover-color: #fff;
+}
+
+/* ───────────────────────────────────────────────
+   Tables
+   ─────────────────────────────────────────────── */
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--hf-ink);
+    --bs-table-border-color: var(--hf-border-subtle);
+}
+.table > :not(caption) > * > * {
+    vertical-align: middle;
+    background-color: transparent;
+    color: var(--hf-ink);
+    border-bottom-color: var(--hf-border-subtle);
+}
+.table thead th {
+    color: var(--hf-ink-secondary);
+    font-weight: 600;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+/* ───────────────────────────────────────────────
+   List Groups
+   ─────────────────────────────────────────────── */
+.list-group-item {
+    background: transparent;
+    border-color: var(--hf-border-subtle);
+    color: var(--hf-ink);
+}
+
+/* ───────────────────────────────────────────────
+   Alerts
+   ─────────────────────────────────────────────── */
+.alert {
+    border-radius: .75rem;
+}
+
+/* ───────────────────────────────────────────────
+   Status dots
+   ─────────────────────────────────────────────── */
+.status-dot {
+    width: .55rem;
+    height: .55rem;
+    display: inline-block;
+    border-radius: 50%;
+    margin-right: .4rem;
+}
+.status-online  { background: #20c997; }
 .status-offline { background: #dc3545; }
 .status-pending { background: #ffc107; }
-.portal-shell { min-height: 100vh; background: radial-gradient(circle at top left, #d8f3e7, #f8faf9 50%, #fff); }
-.portal-card { max-width: 520px; border: 0; border-radius: 1.4rem; box-shadow: 0 1.2rem 3.5rem rgba(16, 39, 30, .14); }
-.auth-shell { min-height: 100vh; background: linear-gradient(135deg, #10271e 0%, #146c43 58%, #d99b20 100%); }
-.table > :not(caption) > * > * { vertical-align: middle; }
-.provisioning-script { max-height: 34rem; overflow: auto; border-radius: .75rem; padding: 1rem; background: #0c1813; color: #c8f5df; white-space: pre-wrap; }
-.plan-option { display: flex; align-items: center; gap: .35rem; border: 1px solid #d9e3de; border-radius: .85rem; padding: .9rem; cursor: pointer; }
-.plan-option:has(input:checked) { border-color: var(--hotfii-primary); background: #eef8f3; }
-.plan-option small { display: block; color: #68756e; font-weight: 400; }
-.success-ring { width: 5rem; height: 5rem; border-radius: 50%; background: #d9f5e7; color: #146c43; display: grid; place-items: center; font-size: 2.5rem; }
+
+/* ───────────────────────────────────────────────
+   Auth shell — themed gradient
+   ─────────────────────────────────────────────── */
+.auth-shell {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #10271e 0%, var(--hf-primary) 58%, #d99b20 100%);
+}
+
+/* ───────────────────────────────────────────────
+   Portal shell
+   ─────────────────────────────────────────────── */
+.portal-shell {
+    min-height: 100vh;
+    background: radial-gradient(circle at top left, var(--hf-primary-soft), var(--hf-surface) 50%, var(--hf-surface-card));
+}
+.portal-card {
+    max-width: 520px;
+    border: 0;
+    border-radius: 1.4rem;
+    box-shadow: var(--hf-card-shadow);
+}
+
+/* ───────────────────────────────────────────────
+   Provisioning script block
+   ─────────────────────────────────────────────── */
+.provisioning-script {
+    max-height: 34rem;
+    overflow: auto;
+    border-radius: .75rem;
+    padding: 1rem;
+    background: var(--hf-code-bg);
+    color: #c8f5df;
+    white-space: pre-wrap;
+    border: 1px solid var(--hf-border-subtle);
+}
+
+/* ───────────────────────────────────────────────
+   Plan option selector
+   ─────────────────────────────────────────────── */
+.plan-option {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    border: 1px solid var(--hf-border);
+    border-radius: .85rem;
+    padding: .9rem;
+    cursor: pointer;
+    background: var(--hf-surface-card);
+}
+.plan-option:has(input:checked) {
+    border-color: var(--hf-primary);
+    background: var(--hf-primary-soft);
+}
+.plan-option small {
+    display: block;
+    color: var(--hf-ink-secondary);
+    font-weight: 400;
+}
+
+/* ───────────────────────────────────────────────
+   Success ring
+   ─────────────────────────────────────────────── */
+.success-ring {
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    background: var(--hf-primary-soft);
+    color: var(--hf-primary);
+    display: grid;
+    place-items: center;
+    font-size: 2.5rem;
+}
+
 .font-monospace { font-variant-ligatures: none; }
+
+/* ───────────────────────────────────────────────
+   Footer
+   ─────────────────────────────────────────────── */
+.app-footer {
+    background: var(--hf-footer-bg) !important;
+    color: var(--hf-footer-ink) !important;
+    border-top: 1px solid var(--hf-border-subtle) !important;
+}
+
+/* ───────────────────────────────────────────────
+   Theme Toggle Button
+   ─────────────────────────────────────────────── */
+#theme-toggle {
+    position: relative;
+    cursor: pointer;
+    color: var(--hf-toggle-icon-color) !important;
+    font-size: 1.15rem;
+    padding: .35rem .55rem;
+    border-radius: .5rem;
+}
+#theme-toggle:hover {
+    background: var(--hf-surface-raised);
+}
+#theme-toggle i {
+    transition: transform 0.4s cubic-bezier(.34, 1.56, .64, 1);
+}
+#theme-toggle:active i {
+    transform: rotate(30deg) scale(0.85);
+}
+
+/* ───────────────────────────────────────────────
+   Custom Scrollbar
+   ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+}
+::-webkit-scrollbar-track {
+    background: var(--hf-scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--hf-scrollbar-thumb);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--hf-ink-secondary);
+}
+
+/* ───────────────────────────────────────────────
+   Form controls (theme-aware)
+   ─────────────────────────────────────────────── */
+.form-control,
+.form-select {
+    background-color: var(--hf-surface-card);
+    border-color: var(--hf-border);
+    color: var(--hf-ink);
+}
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--hf-surface-card);
+    border-color: var(--hf-primary);
+    color: var(--hf-ink);
+    box-shadow: 0 0 0 .2rem rgba(20, 108, 67, .18);
+}
+.form-control::placeholder {
+    color: var(--hf-ink-secondary);
+    opacity: .65;
+}
+.form-label {
+    color: var(--hf-ink);
+    font-weight: 500;
+}
+.input-group-text {
+    background: var(--hf-surface-raised);
+    border-color: var(--hf-border);
+    color: var(--hf-ink-secondary);
+}
+
+/* ───────────────────────────────────────────────
+   Badges (subtle tinting in dark modes)
+   ─────────────────────────────────────────────── */
+.badge {
+    font-weight: 600;
+}
+
+/* ───────────────────────────────────────────────
+   Pagination
+   ─────────────────────────────────────────────── */
+.page-link {
+    background: var(--hf-surface-card);
+    border-color: var(--hf-border);
+    color: var(--hf-ink);
+}
+.page-link:hover {
+    background: var(--hf-surface-raised);
+    border-color: var(--hf-border);
+    color: var(--hf-ink);
+}
+.page-item.active .page-link {
+    background: var(--hf-primary);
+    border-color: var(--hf-primary);
+}
+
+/* ───────────────────────────────────────────────
+   Modal
+   ─────────────────────────────────────────────── */
+.modal-content {
+    background: var(--hf-surface-card);
+    border: 1px solid var(--hf-border);
+    color: var(--hf-ink);
+}
+.modal-header {
+    border-color: var(--hf-border-subtle);
+}
+.modal-footer {
+    border-color: var(--hf-border-subtle);
+}
+.btn-close {
+    filter: var(--hf-ink-secondary);
+}
+
+/* ───────────────────────────────────────────────
+   Text helpers (theme-aware)
+   ─────────────────────────────────────────────── */
+.text-secondary {
+    color: var(--hf-ink-secondary) !important;
+}
+a {
+    color: var(--hf-primary);
+}
+a:hover {
+    color: var(--hf-primary-hover);
+}
+
+/* ───────────────────────────────────────────────
+   AdminLTE overrides for bg-body-tertiary
+   ─────────────────────────────────────────────── */
+.bg-body-tertiary {
+    background-color: var(--hf-surface) !important;
+}

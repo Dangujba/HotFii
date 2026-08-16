@@ -16,7 +16,7 @@
         </tr>@empty<tr><td colspan="6" class="text-center py-5 text-secondary">Create the first access plan.</td></tr>@endforelse</tbody>
     </table></div></div></div><div class="mt-3">{{ $plans->links() }}</div></div>
 
-    <div class="col-xl-4"><div class="card metric-card"><div class="card-header bg-white"><h2 class="h5 mb-0">Create plan</h2></div><div class="card-body">
+    <div class="col-xl-4"><div class="card metric-card"><div class="card-header"><h2 class="h5 mb-0">Create plan</h2></div><div class="card-body">
         <form method="POST" action="{{ route('plans.store') }}">@csrf
             <div class="mb-3"><label class="form-label">Plan name</label><input class="form-control" name="name" value="{{ old('name') }}" required placeholder="e.g. 2 Hours"></div>
             <div class="row g-3"><div class="col-6"><label class="form-label">Access type</label><select class="form-select" name="access_type"><option value="paid">Paid</option><option value="free">Free</option><option value="internal">Internal</option></select></div><div class="col-6"><label class="form-label">Price (₦)</label><input class="form-control" type="number" min="0" step="0.01" name="price_naira" value="{{ old('price_naira', 0) }}" required></div></div>

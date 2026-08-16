@@ -4,12 +4,12 @@
 @section('subheading', 'Organization, captive portal, payment activation, security, and audit history')
 @section('content')
 <div class="row g-4"><div class="col-xl-7">
-<div class="card metric-card mb-4"><div class="card-header bg-white"><h2 class="h5 mb-0">Organization & captive portal</h2></div><div class="card-body"><form method="POST" action="{{ route('settings.update') }}">@csrf @method('PATCH')
+<div class="card metric-card mb-4"><div class="card-header"><h2 class="h5 mb-0">Organization & captive portal</h2></div><div class="card-body"><form method="POST" action="{{ route('settings.update') }}">@csrf @method('PATCH')
 <div class="row g-3"><div class="col-md-6"><label class="form-label">Organization name</label><input class="form-control" name="name" value="{{ old('name', $currentOrganization->name) }}" required></div><div class="col-md-6"><label class="form-label">Timezone</label><input class="form-control" name="timezone" value="{{ old('timezone', $currentOrganization->timezone) }}" required></div><div class="col-md-6"><label class="form-label">Portal display name</label><input class="form-control" name="portal_name" value="{{ old('portal_name', $currentOrganization->branding['portal_name'] ?? $currentOrganization->name) }}"></div><div class="col-md-6"><label class="form-label">Brand colour</label><input class="form-control form-control-color w-100" type="color" name="portal_primary_color" value="{{ old('portal_primary_color', $currentOrganization->branding['primary_color'] ?? '#146c43') }}"></div></div>
 <button class="btn btn-hotfii mt-4">Save settings</button></form></div></div>
 
 @if($currentOrganization->sellsAccess())
-<div class="card metric-card"><div class="card-header bg-white d-flex justify-content-between"><h2 class="h5 mb-0">Live payment profile</h2><span class="badge text-bg-{{ ($paymentProfile?->status) === 'approved' ? 'success' : 'warning' }}">{{ ucfirst($paymentProfile?->status ?? 'not submitted') }}</span></div><div class="card-body">
+<div class="card metric-card"><div class="card-header d-flex justify-content-between"><h2 class="h5 mb-0">Live payment profile</h2><span class="badge text-bg-{{ ($paymentProfile?->status) === 'approved' ? 'success' : 'warning' }}">{{ ucfirst($paymentProfile?->status ?? 'not submitted') }}</span></div><div class="card-body">
 @if($paymentProfile?->review_notes)<div class="alert alert-{{ $paymentProfile->status === 'rejected' ? 'danger' : 'info' }}"><strong>Review note:</strong> {{ $paymentProfile->review_notes }}</div>@endif
 <p class="text-secondary">Only payment information is reviewed. Router, plan, RADIUS, voucher, and Paystack test-mode work remains available in sandbox.</p>
 <form method="POST" action="{{ route('settings.payment-profile') }}">@csrf
@@ -17,5 +17,5 @@
 <button class="btn btn-hotfii mt-4">Submit for payment review</button></form></div></div>
 @endif
 </div>
-<div class="col-xl-5"><div class="card metric-card"><div class="card-header bg-white"><h2 class="h5 mb-0">Audit history</h2></div><div class="list-group list-group-flush">@forelse($auditLogs as $log)<div class="list-group-item"><strong>{{ str_replace('.', ' · ', $log->action) }}</strong><div class="small text-secondary">{{ $log->user?->name ?? 'System' }} · {{ $log->created_at->diffForHumans() }}</div>@if($log->reason)<div class="small mt-1">{{ $log->reason }}</div>@endif</div>@empty<div class="p-5 text-center text-secondary">No audited changes yet.</div>@endforelse</div></div></div></div>
+<div class="col-xl-5"><div class="card metric-card"><div class="card-header"><h2 class="h5 mb-0">Audit history</h2></div><div class="list-group list-group-flush">@forelse($auditLogs as $log)<div class="list-group-item"><strong>{{ str_replace('.', ' · ', $log->action) }}</strong><div class="small text-secondary">{{ $log->user?->name ?? 'System' }} · {{ $log->created_at->diffForHumans() }}</div>@if($log->reason)<div class="small mt-1">{{ $log->reason }}</div>@endif</div>@empty<div class="p-5 text-center text-secondary">No audited changes yet.</div>@endforelse</div></div></div></div>
 @endsection

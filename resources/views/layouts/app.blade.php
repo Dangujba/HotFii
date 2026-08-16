@@ -1,17 +1,29 @@
 <!doctype html>
-<html lang="en" data-bs-theme="light">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') · HotFii</title>
+    {{-- Prevent flash of wrong theme before JS loads --}}
+    <script>
+        (function(){
+            var t = localStorage.getItem('hotfii-theme');
+            if (!t || !['daylight','dusk','midnight'].includes(t)) {
+                t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'midnight' : 'daylight';
+            }
+            var bs = t === 'daylight' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-hotfii-theme', t);
+            document.documentElement.setAttribute('data-bs-theme', bs);
+        })();
+    </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
     @stack('styles')
 </head>
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary" data-organization-uuid="{{ $currentOrganization->uuid }}">
+<body class="layout-fixed sidebar-expand-lg" data-organization-uuid="{{ $currentOrganization->uuid }}">
 <div class="app-wrapper">
-    <nav class="app-header navbar navbar-expand bg-body shadow-sm">
+    <nav class="app-header navbar navbar-expand">
         <div class="container-fluid">
             <ul class="navbar-nav">
                 <li class="nav-item"><a class="nav-link" data-lte-toggle="sidebar" href="#"><i class="bi bi-list"></i></a></li>
@@ -30,6 +42,11 @@
                 </li>
             </ul>
             <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <button class="nav-link border-0 bg-transparent" id="theme-toggle" title="Switch theme">
+                        <i class="bi bi-sun"></i>
+                    </button>
+                </li>
                 <li class="nav-item">
                     <a class="nav-link position-relative" href="{{ route('notifications.index') }}">
                         <i class="bi bi-bell"></i>
@@ -50,7 +67,7 @@
         </div>
     </nav>
 
-    <aside class="app-sidebar shadow" data-bs-theme="dark">
+    <aside class="app-sidebar">
         <div class="sidebar-brand"><a href="{{ route('dashboard') }}" class="brand-link"><span class="brand-mark me-2">H</span><span class="brand-text fw-semibold">HotFii</span></a></div>
         <div class="sidebar-wrapper">
             <nav class="mt-2">

@@ -21,7 +21,7 @@
     <div class="row g-4">
         <div class="col-xl-8">
             <div class="card metric-card mb-4">
-                <div class="card-header bg-white">
+                <div class="card-header">
                     <h2 class="h5 mb-0">Live payment requests</h2>
                 </div>
                 <div class="card-body p-0">@forelse($paymentRequests as $organization)
@@ -71,7 +71,7 @@
                 </div>
             </div>
             <div class="card metric-card">
-                <div class="card-header bg-white">
+                <div class="card-header">
                     <h2 class="h5 mb-0">Recent organizations</h2>
                 </div>
                 <div class="card-body p-0">
@@ -106,7 +106,7 @@
         </div>
         <div class="col-xl-4">
             <div class="card metric-card">
-                <div class="card-header bg-white">
+                <div class="card-header">
                     <h2 class="h5 mb-0">System & queue health</h2>
                 </div>
                 <div class="list-group list-group-flush">
