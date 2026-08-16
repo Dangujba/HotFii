@@ -1,0 +1,135 @@
+# HotFii nginx site.
+#
+# The nginx image's entrypoint runs envsubst over /etc/nginx/templates/*.template
+# and writes the result into /etc/nginx/conf.d/. envsubst is invoked with an
+# explicit list of the environment variables that exist, so only ${APP_DOMAIN} is
+# replaced here — nginx's own $uri, $host and friends pass through untouched.
+
+# Anything arriving on port 80 either completes an ACME challenge, answers the
+# container healthcheck, or gets redirected to HTTPS.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    # The web container's own healthcheck. Kept on port 80 so it does not depend
+    # on a certificate already existing.
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    http2 on;
+    server_name ${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    root /var/www/html/public;
+    index index.php;
+
+    charset utf-8;
+
+    # Voucher PDFs and CSV report exports stream through PHP.
+    client_max_body_size 24m;
+
+    access_log /var/log/nginx/hotfii-access.log;
+    error_log  /var/log/nginx/hotfii-error.log warn;
+
+    # ── Reverb ──────────────────────────────────────────────────────────────
+    # /app is the WebSocket handshake, /apps is the server-side event API. Both
+    # are proxied so the browser only ever talks 443 and inherits this
+    # certificate — Reverb is not published on the host at all.
+    location ~ ^/(app|apps)(/|$) {
+        proxy_pass http://reverb:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # An operator dashboard can sit open all day; do not cut idle sockets.
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
+    }
+
+    # ── Static files ────────────────────────────────────────────────────────
+    # Vite writes content-hashed filenames under /build, so they are immutable.
+    location /build/ {
+        expires 1y;
+        access_log off;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # Mounted read-only from the app_public volume, not a Laravel symlink.
+    location /storage/ {
+        expires 7d;
+        access_log off;
+        try_files $uri =404;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    # Never serve dotfiles: no .env, no stray .git.
+    location ~ /\. {
+        deny all;
+        return 404;
+    }
+
+    # ── Application ─────────────────────────────────────────────────────────
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ ^/index\.php(/|$) {
+        fastcgi_pass app:9000;
+        include fastcgi_params;
+
+        # fastcgi_params deliberately omits SCRIPT_FILENAME. The path is the one
+        # inside the app container, which uses the same /var/www/html layout.
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public/index.php;
+        fastcgi_param DOCUMENT_ROOT /var/www/html/public;
+
+        # Makes $request->isSecure() true and url() emit https:// without having
+        # to trust any client-supplied X-Forwarded-* header. REMOTE_ADDR already
+        # carries the real client IP because nginx is the edge.
+        fastcgi_param HTTPS on;
+
+        fastcgi_hide_header X-Powered-By;
+        fastcgi_read_timeout 120s;
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
+    }
+
+    # No other .php file is an entry point.
+    location ~ \.php$ {
+        return 404;
+    }
+}

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Operator\AccessGroupController;
 use App\Http\Controllers\Operator\AccessPlanController;
@@ -24,8 +25,6 @@ use App\Http\Controllers\Platform\DashboardController as PlatformDashboardContro
 use App\Http\Controllers\Platform\ImpersonationController;
 use App\Http\Controllers\Platform\PaymentReviewController;
 use App\Http\Controllers\PortalController;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -38,15 +37,9 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('auth')->name('logout');
-Route::get('/verify-email', fn () => view('auth.verify-email'))->middleware('auth')->name('verification.notice');
-Route::get('/verify-email/{id}/{hash}', function (EmailVerificationRequest $request) {
-    $request->fulfill();
-    return redirect()->route('dashboard');
-})->middleware(['auth', 'signed', 'throttle:6,1'])->name('verification.verify');
-Route::post('/email/verification-notification', function (Request $request) {
-    $request->user()->sendEmailVerificationNotification();
-    return back()->with('success', 'Verification link sent.');
-})->middleware(['auth', 'throttle:6,1'])->name('verification.send');
+Route::get('/verify-email', [EmailVerificationController::class, 'notice'])->middleware('auth')->name('verification.notice');
+Route::get('/verify-email/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['auth', 'signed', 'throttle:6,1'])->name('verification.verify');
+Route::post('/email/verification-notification', [EmailVerificationController::class, 'send'])->middleware(['auth', 'throttle:6,1'])->name('verification.send');
 
 Route::prefix('connect/{device}')->name('portal.')->middleware('throttle:120,1')->group(function () {
     Route::get('/', [PortalController::class, 'show'])->name('show');

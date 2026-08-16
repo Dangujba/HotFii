@@ -22,3 +22,14 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Private planning transcript, 850 KB. Not part of the product.
+/conversation.md
+
+# Empty leftover from the initial scaffold.
+/hotfii-scaffold
+
+# Database dumps produced by the backup commands in
+# docs/DOCKER_VPS_DEPLOYMENT.md.
+*.dump
+/hotfii-uploads.tar.gz

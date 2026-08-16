@@ -1,0 +1,46 @@
+# Build context exclusions. Everything here is either rebuilt inside the image,
+# host-specific, or must never reach a server.
+
+.git
+.gitattributes
+.gitignore
+.editorconfig
+
+# Rebuilt by the vendor and assets stages.
+vendor
+node_modules
+public/build
+public/hot
+
+# Never bake secrets into an image.
+.env
+.env.*
+!.env.example
+!.env.docker.example
+auth.json
+
+# Runtime state belongs in volumes.
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/app/public/*
+storage/pail
+bootstrap/cache/*.php
+database/database.sqlite
+
+# Planning transcript, 850 KB of conversation history.
+conversation.md
+hotfii-scaffold
+
+# Editor and OS noise.
+.idea
+.vscode
+.fleet
+.nova
+.zed
+.phpunit.result.cache
+.phpunit.cache
+Thumbs.db
+.DS_Store
+*.log

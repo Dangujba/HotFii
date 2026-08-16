@@ -1,4 +1,8 @@
-sql hotfii_sql {
+# The instance name must be `sql`. sites-available/default references the module
+# as a bare `-sql`, so an instance named anything else is silently never called
+# and every request falls through to reject.
+
+sql {
     dialect = "postgresql"
     driver = "rlm_sql_${dialect}"
 
@@ -6,9 +10,11 @@ sql hotfii_sql {
     port = 5432
     login = "hotfii_radius"
     password = "REPLACE_ME"
-    database = "hotfii"
 
-    radius_db = "radius"
+    # In FreeRADIUS 3 radius_db is the database name; there is no `database`
+    # parameter.
+    radius_db = "hotfii"
+
     read_clients = yes
     client_table = "nas"
     group_attribute = "SQL-Group"
@@ -24,5 +30,5 @@ sql hotfii_sql {
         idle_timeout = 60
     }
 
-    $INCLUDE ${modconf_dir}/sql/main/${dialect}/queries.conf
+    $INCLUDE ${modconfdir}/${.:name}/main/${dialect}/queries.conf
 }

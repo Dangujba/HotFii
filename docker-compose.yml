@@ -1,0 +1,205 @@
+# HotFii production stack.
+#
+# Every service reads secrets from the single .env file in this directory
+# (copied from .env.docker.example). Compose also uses that file for ${...}
+# substitution below, so APP_DOMAIN and the passwords are defined once.
+#
+#   docker compose up -d --build      first boot / redeploy
+#   docker compose logs -f app        application log
+#   docker compose ps                 health of every service
+#
+# Published ports: 80, 443 (web) and 1812/udp, 1813/udp (freeradius).
+# Postgres, Redis and Reverb stay on the internal network deliberately.
+
+name: hotfii
+
+# Shared by every stage that touches the app source, so the app and web images
+# resolve to the same build cache instead of compiling the frontend twice.
+x-build-args: &build-args
+  COMPOSER_FLAGS: ${COMPOSER_FLAGS:---no-dev}
+  # Vite inlines these into the JS bundle. Changing REVERB_APP_KEY therefore
+  # needs `docker compose up -d --build`, not just a restart.
+  VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+  VITE_REVERB_HOST: ${REVERB_HOST:-}
+  VITE_REVERB_PORT: ${REVERB_PORT:-443}
+  VITE_REVERB_SCHEME: ${REVERB_SCHEME:-https}
+  VITE_APP_NAME: ${APP_NAME:-HotFii}
+
+x-php-common: &php-common
+  build:
+    context: .
+    target: app
+    args: *build-args
+  image: hotfii-app:latest
+  env_file: .env
+  restart: unless-stopped
+  volumes:
+    # Only user uploads are shared. storage/framework and bootstrap/cache stay
+    # inside each container so `php artisan optimize` never races.
+    - app_public:/var/www/html/storage/app/public
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-hotfii}
+      POSTGRES_USER: ${DB_USERNAME:-hotfii}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # Scoped to this container's initdb only; the app connects with its own
+      # explicit password.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      RADIUS_DB_PASSWORD: ${RADIUS_DB_PASSWORD:?RADIUS_DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Runs once, on an empty data directory: creates the hotfii_radius login.
+      # Table grants come later, from the app entrypoint, because the tables do
+      # not exist yet at cluster init.
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-hotfii} -d ${DB_DATABASE:-hotfii}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # appendonly so queued jobs survive a restart of this container.
+    command: ["redis-server", "--appendonly", "yes", "--save", "300", "1"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    <<: *php-common
+    command: ["app"]
+    healthcheck:
+      # cgi-fcgi is not in the image, so probe the FPM socket directly.
+      test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 9000) ? 0 : 1);'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  queue:
+    <<: *php-common
+    command: ["queue"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        # Wait for migrations, which only the app role runs.
+        condition: service_healthy
+
+  scheduler:
+    <<: *php-common
+    command: ["scheduler"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+
+  reverb:
+    <<: *php-common
+    command: ["reverb"]
+    # Not published. Browsers reach Reverb through nginx on 443, so the
+    # WebSocket inherits the Let's Encrypt certificate.
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      target: web
+      args: *build-args
+    image: hotfii-web:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Consumed by the nginx image's envsubst pass over
+      # /etc/nginx/templates/*.template.
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is required}
+    # The stock entrypoint still runs the envsubst pass and then execs this.
+    # The reload loop is how a certificate renewed by the certbot container gets
+    # picked up without anyone touching the host.
+    command: ["/bin/sh", "-c", "while :; do sleep 12h; nginx -s reload; done & exec nginx -g 'daemon off;'"]
+    volumes:
+      - certbot_conf:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot
+      - app_public:/var/www/html/public/storage:ro
+    depends_on:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    # Certbot's own --keep-until-expiring makes this a no-op until ~30 days
+    # before expiry. The web container reloads nginx on its own 12h timer, so a
+    # renewed certificate is picked up without host intervention.
+    entrypoint: /bin/sh
+    command: -c 'trap exit TERM; while :; do certbot renew --webroot --webroot-path=/var/www/certbot --quiet; sleep 12h & wait $${!}; done'
+
+  freeradius:
+    build:
+      context: ./infrastructure/freeradius
+    image: hotfii-freeradius:latest
+    restart: unless-stopped
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    environment:
+      RADIUS_DB_HOST: postgres
+      RADIUS_DB_PORT: "5432"
+      RADIUS_DB_NAME: ${DB_DATABASE:-hotfii}
+      RADIUS_DB_USER: hotfii_radius
+      RADIUS_DB_PASSWORD: ${RADIUS_DB_PASSWORD:?RADIUS_DB_PASSWORD is required}
+      # Only used by the loopback client that makes `radtest` work inside this
+      # container. Real routers get their own secret from the nas table.
+      RADIUS_LOCALHOST_SECRET: ${RADIUS_LOCALHOST_SECRET:-hotfii-loopback}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app:
+        # The rad* tables and the hotfii_radius grants must exist before
+        # read_clients runs, or FreeRADIUS exits on startup.
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_public:
+  certbot_conf:
+  certbot_www:
