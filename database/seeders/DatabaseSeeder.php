@@ -39,7 +39,7 @@ class DatabaseSeeder extends Seeder
                 'mode' => OrganizationMode::Hybrid,
                 'status' => OrganizationStatus::Sandbox,
                 'billing_plan' => BillingPlan::Organization20,
-                'branding' => ['portal_name' => 'Demo Market Wi-Fi', 'primary_color' => '#146c43'],
+                'branding' => ['portal_name' => 'Demo Market Wi-Fi', 'primary_color' => '#f4610a'],
             ],
         );
         $organization->users()->syncWithoutDetaching([

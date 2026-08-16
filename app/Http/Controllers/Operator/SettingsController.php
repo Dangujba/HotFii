@@ -39,7 +39,7 @@ class SettingsController extends Controller
             'timezone' => $data['timezone'],
             'branding' => [
                 'portal_name' => $data['portal_name'] ?? $data['name'],
-                'primary_color' => $data['portal_primary_color'] ?? '#146c43',
+                'primary_color' => $data['portal_primary_color'] ?? '#f4610a',
             ],
         ]);
 

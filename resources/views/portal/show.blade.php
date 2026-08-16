@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}">
 <title>Connect · {{ $device->organization->name }}</title>
 @vite(['resources/css/app.css','resources/js/app.js'])
-<style>:root{--hotfii-primary:{{ $device->organization->branding['primary_color'] ?? '#146c43' }};}</style>
+<style>:root{--hotfii-primary:{{ $device->organization->branding['primary_color'] ?? '#f4610a' }};}</style>
 </head>
 <body class="portal-shell py-4">
 <div class="container"><div class="card portal-card mx-auto">
