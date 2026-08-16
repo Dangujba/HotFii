@@ -28,7 +28,7 @@
             <button class="btn btn-link border-0 p-1" id="theme-toggle" title="Switch theme" style="color: var(--hf-toggle-icon-color); font-size: 1.15rem;">
                 <i class="bi bi-sun"></i>
             </button>
-            <a class="btn btn-outline-success" href="{{ route('login') }}">Sign in</a>
+            <a class="btn btn-hotfii" href="{{ route('login') }}">Sign in</a>
             <a class="btn btn-hotfii" href="{{ route('register') }}">Start testing free</a>
         </div>
     </div>

@@ -2,7 +2,7 @@
 @section('title', 'Reports')
 @section('heading', 'Reports')
 @section('subheading', 'Revenue, access usage, and plan performance')
-@section('actions')<a class="btn btn-outline-success" href="{{ route('reports.export', request()->only('from','to')) }}"><i class="bi bi-download me-1"></i>Export CSV</a>@endsection
+@section('actions')<a class="btn btn-hotfii" href="{{ route('reports.export', request()->only('from','to')) }}"><i class="bi bi-download me-1"></i>Export CSV</a>@endsection
 @section('content')
 <div class="card metric-card mb-4"><div class="card-body"><form class="row g-3 align-items-end"><div class="col-md-4"><label class="form-label">From</label><input class="form-control" type="date" name="from" value="{{ $from->format('Y-m-d') }}"></div><div class="col-md-4"><label class="form-label">To</label><input class="form-control" type="date" name="to" value="{{ $to->format('Y-m-d') }}"></div><div class="col-md-4"><button class="btn btn-hotfii w-100">Apply date range</button></div></form></div></div>
 <div class="row g-3 mb-4"><div class="col-md-6"><div class="card metric-card"><div class="card-body"><div class="text-secondary">Sessions in period</div><div class="fs-3 fw-bold">{{ number_format($usage->sessions ?? 0) }}</div></div></div></div><div class="col-md-6"><div class="card metric-card"><div class="card-body"><div class="text-secondary">Transferred data</div><div class="fs-3 fw-bold">{{ number_format(($usage->bytes ?? 0) / 1073741824, 2) }} GB</div></div></div></div></div>

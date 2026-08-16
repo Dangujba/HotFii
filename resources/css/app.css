@@ -6,6 +6,7 @@
 /* ───────────────────────────────────────────────
    HotFii Theme System
    3 modes: daylight · dusk · midnight
+   Brand: Fire Orange #f4610a + Amber #f4b942
    ─────────────────────────────────────────────── */
 
 /* ── Smooth theme transitions ─────────────────── */
@@ -16,135 +17,137 @@
         background-color 0.3s ease,
         color 0.3s ease,
         border-color 0.3s ease,
-        box-shadow 0.3s ease,
-        fill 0.3s ease;
+        box-shadow 0.3s ease;
 }
 
 /* ── DAYLIGHT theme (default) ─────────────────── */
 [data-hotfii-theme="daylight"],
 :root {
-    --hf-primary:       #146c43;
-    --hf-primary-hover: #0f5735;
-    --hf-primary-soft:  #d9f5e7;
+    --hf-primary:       #f4610a;
+    --hf-primary-hover: #d9520a;
+    --hf-primary-soft:  #fff0e8;
     --hf-accent:        #f4b942;
-    --hf-accent-soft:   #fef4dd;
+    --hf-accent-soft:   #fef9e3;
 
-    --hf-ink:           #1c2b23;
-    --hf-ink-secondary: #5c6e63;
-    --hf-surface:       #faf8f5;
+    --hf-ink:           #1e1a17;
+    --hf-ink-secondary: #6b5f56;
+    --hf-surface:       #fdfaf7;
     --hf-surface-card:  #ffffff;
-    --hf-surface-raised:#f2efea;
-    --hf-border:        #e2ddd5;
-    --hf-border-subtle: #ebe7e0;
+    --hf-surface-raised:#f5f0eb;
+    --hf-border:        #e4d9d0;
+    --hf-border-subtle: #ede5dc;
 
-    --hf-sidebar-bg:    #f5f3ef;
-    --hf-sidebar-ink:   #3d4a42;
+    --hf-sidebar-bg:    #1a1612;
+    --hf-sidebar-ink:   #a89480;
     --hf-sidebar-active-bg: var(--hf-primary);
     --hf-sidebar-active-ink: #fff;
-    --hf-sidebar-header: #a3ac9f;
-    --hf-sidebar-dot:   rgba(20, 108, 67, 0.06);
-    --hf-sidebar-border: #e2ddd5;
+    --hf-sidebar-header: #5a4d42;
+    --hf-sidebar-dot:   rgba(244, 97, 10, 0.08);
+    --hf-sidebar-border: #2a211a;
 
     --hf-header-bg:     #ffffff;
-    --hf-header-border: #e8e3dc;
-    --hf-footer-bg:     #f5f3ef;
-    --hf-footer-ink:    #7a8580;
+    --hf-header-border: #ede5dc;
+    --hf-footer-bg:     #fdf9f5;
+    --hf-footer-ink:    #9e8070;
 
-    --hf-card-shadow:   0 2px 12px rgba(28, 43, 35, 0.06);
+    --hf-card-shadow:   0 2px 14px rgba(244, 97, 10, 0.07);
     --hf-card-stripe:   var(--hf-primary);
     --hf-card-glow:     none;
 
-    --hf-scrollbar-track: #f0ede8;
-    --hf-scrollbar-thumb: #c9c3b9;
+    --hf-scrollbar-track: #f0e8e0;
+    --hf-scrollbar-thumb: #d0b9a8;
 
-    --hf-code-bg:       #f4f1ec;
-    --hf-alert-bg:      #fef9f0;
+    --hf-code-bg:       #1a1612;
+    --hf-code-ink:      #f4c89e;
+    --hf-alert-bg:      #fff8f5;
 
-    --hf-toggle-icon-color: #b08c32;
+    --hf-toggle-icon-color: #f4610a;
 }
 
 /* ── DUSK theme ───────────────────────────────── */
 [data-hotfii-theme="dusk"] {
-    --hf-primary:       #1e9e5e;
-    --hf-primary-hover: #18855a;
-    --hf-primary-soft:  rgba(30, 158, 94, 0.12);
-    --hf-accent:        #e8a830;
-    --hf-accent-soft:   rgba(232, 168, 48, 0.1);
+    --hf-primary:       #f46f2a;
+    --hf-primary-hover: #e05c18;
+    --hf-primary-soft:  rgba(244, 111, 42, 0.14);
+    --hf-accent:        #f4b942;
+    --hf-accent-soft:   rgba(244, 185, 66, 0.1);
 
-    --hf-ink:           #d4d6db;
-    --hf-ink-secondary: #8d919a;
-    --hf-surface:       #24272c;
-    --hf-surface-card:  #2d3037;
-    --hf-surface-raised:#33363d;
-    --hf-border:        #3c3f47;
-    --hf-border-subtle: #353840;
+    --hf-ink:           #d8cfca;
+    --hf-ink-secondary: #8a7f78;
+    --hf-surface:       #231e1b;
+    --hf-surface-card:  #2d2622;
+    --hf-surface-raised:#353029;
+    --hf-border:        #3e3530;
+    --hf-border-subtle: #362f28;
 
-    --hf-sidebar-bg:    #1e2025;
-    --hf-sidebar-ink:   #a0a4ad;
+    --hf-sidebar-bg:    #1a1410;
+    --hf-sidebar-ink:   #9a8272;
     --hf-sidebar-active-bg: var(--hf-primary);
     --hf-sidebar-active-ink: #fff;
-    --hf-sidebar-header: #5f636c;
-    --hf-sidebar-dot:   rgba(30, 158, 94, 0.04);
-    --hf-sidebar-border: #2c2f36;
+    --hf-sidebar-header: #5e4e42;
+    --hf-sidebar-dot:   rgba(244, 111, 42, 0.05);
+    --hf-sidebar-border: #28201a;
 
-    --hf-header-bg:     #2a2d33;
-    --hf-header-border: #3a3d45;
-    --hf-footer-bg:     #1e2025;
-    --hf-footer-ink:    #6b6f78;
+    --hf-header-bg:     #2a2320;
+    --hf-header-border: #3a3028;
+    --hf-footer-bg:     #1a1410;
+    --hf-footer-ink:    #6b5a4e;
 
-    --hf-card-shadow:   0 2px 16px rgba(0, 0, 0, 0.2);
+    --hf-card-shadow:   0 2px 18px rgba(0, 0, 0, 0.25);
     --hf-card-stripe:   var(--hf-primary);
-    --hf-card-glow:     0 0 0 1px rgba(30, 158, 94, 0.08);
+    --hf-card-glow:     0 0 0 1px rgba(244, 111, 42, 0.10);
 
-    --hf-scrollbar-track: #2a2d33;
-    --hf-scrollbar-thumb: #4a4e58;
+    --hf-scrollbar-track: #28221e;
+    --hf-scrollbar-thumb: #4a3e36;
 
-    --hf-code-bg:       #1a1c21;
-    --hf-alert-bg:      #2a2d33;
+    --hf-code-bg:       #16110e;
+    --hf-code-ink:      #f4b880;
+    --hf-alert-bg:      #2a2320;
 
-    --hf-toggle-icon-color: #e8a830;
+    --hf-toggle-icon-color: #f46f2a;
 }
 
 /* ── MIDNIGHT theme ───────────────────────────── */
 [data-hotfii-theme="midnight"] {
-    --hf-primary:       #26c070;
-    --hf-primary-hover: #20a861;
-    --hf-primary-soft:  rgba(38, 192, 112, 0.1);
+    --hf-primary:       #ff7a35;
+    --hf-primary-hover: #f4610a;
+    --hf-primary-soft:  rgba(255, 122, 53, 0.10);
     --hf-accent:        #f4b942;
     --hf-accent-soft:   rgba(244, 185, 66, 0.08);
 
-    --hf-ink:           #e2e4e9;
-    --hf-ink-secondary: #7c8090;
-    --hf-surface:       #0e1014;
-    --hf-surface-card:  #161820;
-    --hf-surface-raised:#1c1e28;
-    --hf-border:        #262a35;
-    --hf-border-subtle: #1f2230;
+    --hf-ink:           #e4ddd8;
+    --hf-ink-secondary: #7c7068;
+    --hf-surface:       #0f0d0c;
+    --hf-surface-card:  #181410;
+    --hf-surface-raised:#201a16;
+    --hf-border:        #2a2218;
+    --hf-border-subtle: #221c16;
 
-    --hf-sidebar-bg:    #0a0c10;
-    --hf-sidebar-ink:   #8990a3;
+    --hf-sidebar-bg:    #0a0806;
+    --hf-sidebar-ink:   #8a7060;
     --hf-sidebar-active-bg: var(--hf-primary);
     --hf-sidebar-active-ink: #fff;
-    --hf-sidebar-header: #4c5166;
-    --hf-sidebar-dot:   rgba(38, 192, 112, 0.03);
-    --hf-sidebar-border: #181b24;
+    --hf-sidebar-header: #4e3e30;
+    --hf-sidebar-dot:   rgba(255, 122, 53, 0.04);
+    --hf-sidebar-border: #1a1410;
 
-    --hf-header-bg:     #12141a;
-    --hf-header-border: #222530;
-    --hf-footer-bg:     #0a0c10;
-    --hf-footer-ink:    #4a4f60;
+    --hf-header-bg:     #130f0c;
+    --hf-header-border: #221c16;
+    --hf-footer-bg:     #0a0806;
+    --hf-footer-ink:    #4e3e30;
 
-    --hf-card-shadow:   0 4px 24px rgba(0, 0, 0, 0.35);
+    --hf-card-shadow:   0 4px 28px rgba(0, 0, 0, 0.40);
     --hf-card-stripe:   var(--hf-accent);
-    --hf-card-glow:     0 0 0 1px rgba(244, 185, 66, 0.06);
+    --hf-card-glow:     0 0 0 1px rgba(244, 185, 66, 0.07);
 
-    --hf-scrollbar-track: #0e1014;
-    --hf-scrollbar-thumb: #2e3240;
+    --hf-scrollbar-track: #0f0d0c;
+    --hf-scrollbar-thumb: #2e2418;
 
-    --hf-code-bg:       #08090d;
-    --hf-alert-bg:      #161820;
+    --hf-code-bg:       #08060a;
+    --hf-code-ink:      #f4a860;
+    --hf-alert-bg:      #181410;
 
-    --hf-toggle-icon-color: #8990a3;
+    --hf-toggle-icon-color: #7c7068;
 }
 
 /* ───────────────────────────────────────────────
@@ -195,7 +198,7 @@ body {
     box-shadow: none !important;
 }
 
-/* Dot-grid texture overlay — subtle geometric identity */
+/* Flame dot-grid texture overlay */
 .app-sidebar .sidebar-wrapper {
     background-image: radial-gradient(
         circle,
@@ -211,7 +214,7 @@ body {
 }
 .brand-link {
     text-decoration: none;
-    color: var(--hf-ink) !important;
+    color: #e4ddd8 !important;
 }
 .brand-mark {
     width: 2.1rem;
@@ -219,8 +222,8 @@ body {
     display: inline-grid;
     place-items: center;
     border-radius: .6rem;
-    background: var(--hf-accent);
-    color: #1c2b23;
+    background: var(--hf-primary);
+    color: #fff;
     font-weight: 800;
     font-size: .95rem;
 }
@@ -235,15 +238,15 @@ body {
     font-size: .875rem;
 }
 .sidebar-menu .nav-link:hover {
-    color: var(--hf-ink) !important;
-    background: var(--hf-surface-raised);
+    color: #e4ddd8 !important;
+    background: rgba(244, 97, 10, 0.1);
 }
 
-/* Glowing pill active state */
+/* Glowing pill active state — fire orange */
 .sidebar-menu .nav-link.active {
     background: var(--hf-sidebar-active-bg) !important;
     color: var(--hf-sidebar-active-ink) !important;
-    box-shadow: 0 2px 12px rgba(20, 108, 67, 0.25);
+    box-shadow: 0 2px 14px rgba(244, 97, 10, 0.35);
     font-weight: 600;
 }
 
@@ -281,7 +284,7 @@ body {
 }
 
 /* ───────────────────────────────────────────────
-   Cards — Accent Stripe + themed surfaces
+   Cards — Left accent stripe + themed surfaces
    ─────────────────────────────────────────────── */
 .card {
     background: var(--hf-surface-card) !important;
@@ -309,7 +312,7 @@ body {
 }
 
 /* ───────────────────────────────────────────────
-   HotFii Buttons
+   HotFii Brand Utilities
    ─────────────────────────────────────────────── */
 .text-hotfii { color: var(--hf-primary) !important; }
 .bg-hotfii { background: var(--hf-primary) !important; color: #fff; }
@@ -354,14 +357,7 @@ body {
 }
 
 /* ───────────────────────────────────────────────
-   Alerts
-   ─────────────────────────────────────────────── */
-.alert {
-    border-radius: .75rem;
-}
-
-/* ───────────────────────────────────────────────
-   Status dots
+   Status Dots
    ─────────────────────────────────────────────── */
 .status-dot {
     width: .55rem;
@@ -375,19 +371,19 @@ body {
 .status-pending { background: #ffc107; }
 
 /* ───────────────────────────────────────────────
-   Auth shell — themed gradient
+   Auth Shell
    ─────────────────────────────────────────────── */
 .auth-shell {
     min-height: 100vh;
-    background: linear-gradient(135deg, #10271e 0%, var(--hf-primary) 58%, #d99b20 100%);
+    background: linear-gradient(135deg, #1a0e08 0%, #f4610a 60%, #f4b942 100%);
 }
 
 /* ───────────────────────────────────────────────
-   Portal shell
+   Portal Shell
    ─────────────────────────────────────────────── */
 .portal-shell {
     min-height: 100vh;
-    background: radial-gradient(circle at top left, var(--hf-primary-soft), var(--hf-surface) 50%, var(--hf-surface-card));
+    background: radial-gradient(circle at top left, var(--hf-primary-soft), var(--hf-surface) 55%, var(--hf-surface-card));
 }
 .portal-card {
     max-width: 520px;
@@ -397,7 +393,7 @@ body {
 }
 
 /* ───────────────────────────────────────────────
-   Provisioning script block
+   Provisioning Script
    ─────────────────────────────────────────────── */
 .provisioning-script {
     max-height: 34rem;
@@ -405,13 +401,13 @@ body {
     border-radius: .75rem;
     padding: 1rem;
     background: var(--hf-code-bg);
-    color: #c8f5df;
+    color: var(--hf-code-ink);
     white-space: pre-wrap;
     border: 1px solid var(--hf-border-subtle);
 }
 
 /* ───────────────────────────────────────────────
-   Plan option selector
+   Plan Option Selector
    ─────────────────────────────────────────────── */
 .plan-option {
     display: flex;
@@ -434,7 +430,7 @@ body {
 }
 
 /* ───────────────────────────────────────────────
-   Success ring
+   Success Ring
    ─────────────────────────────────────────────── */
 .success-ring {
     width: 5rem;
@@ -471,6 +467,7 @@ body {
 }
 #theme-toggle:hover {
     background: var(--hf-surface-raised);
+    color: var(--hf-primary) !important;
 }
 #theme-toggle i {
     transition: transform 0.4s cubic-bezier(.34, 1.56, .64, 1);
@@ -482,23 +479,13 @@ body {
 /* ───────────────────────────────────────────────
    Custom Scrollbar
    ─────────────────────────────────────────────── */
-::-webkit-scrollbar {
-    width: 7px;
-    height: 7px;
-}
-::-webkit-scrollbar-track {
-    background: var(--hf-scrollbar-track);
-}
-::-webkit-scrollbar-thumb {
-    background: var(--hf-scrollbar-thumb);
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: var(--hf-ink-secondary);
-}
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: var(--hf-scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--hf-scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--hf-ink-secondary); }
 
 /* ───────────────────────────────────────────────
-   Form controls (theme-aware)
+   Form Controls
    ─────────────────────────────────────────────── */
 .form-control,
 .form-select {
@@ -511,27 +498,14 @@ body {
     background-color: var(--hf-surface-card);
     border-color: var(--hf-primary);
     color: var(--hf-ink);
-    box-shadow: 0 0 0 .2rem rgba(20, 108, 67, .18);
+    box-shadow: 0 0 0 .2rem rgba(244, 97, 10, 0.18);
 }
-.form-control::placeholder {
-    color: var(--hf-ink-secondary);
-    opacity: .65;
-}
-.form-label {
-    color: var(--hf-ink);
-    font-weight: 500;
-}
+.form-control::placeholder { color: var(--hf-ink-secondary); opacity: .65; }
+.form-label { color: var(--hf-ink); font-weight: 500; }
 .input-group-text {
     background: var(--hf-surface-raised);
     border-color: var(--hf-border);
     color: var(--hf-ink-secondary);
-}
-
-/* ───────────────────────────────────────────────
-   Badges (subtle tinting in dark modes)
-   ─────────────────────────────────────────────── */
-.badge {
-    font-weight: 600;
 }
 
 /* ───────────────────────────────────────────────
@@ -560,32 +534,17 @@ body {
     border: 1px solid var(--hf-border);
     color: var(--hf-ink);
 }
-.modal-header {
-    border-color: var(--hf-border-subtle);
-}
-.modal-footer {
-    border-color: var(--hf-border-subtle);
-}
-.btn-close {
-    filter: var(--hf-ink-secondary);
-}
+.modal-header { border-color: var(--hf-border-subtle); }
+.modal-footer { border-color: var(--hf-border-subtle); }
 
 /* ───────────────────────────────────────────────
-   Text helpers (theme-aware)
+   Global Text & Links
    ─────────────────────────────────────────────── */
-.text-secondary {
-    color: var(--hf-ink-secondary) !important;
-}
-a {
-    color: var(--hf-primary);
-}
-a:hover {
-    color: var(--hf-primary-hover);
-}
+.text-secondary { color: var(--hf-ink-secondary) !important; }
+a { color: var(--hf-primary); }
+a:hover { color: var(--hf-primary-hover); }
 
 /* ───────────────────────────────────────────────
-   AdminLTE overrides for bg-body-tertiary
+   AdminLTE overrides
    ─────────────────────────────────────────────── */
-.bg-body-tertiary {
-    background-color: var(--hf-surface) !important;
-}
+.bg-body-tertiary { background-color: var(--hf-surface) !important; }
