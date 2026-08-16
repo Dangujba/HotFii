@@ -54,9 +54,26 @@ sudo ufw status verbose
 
 ## 2. Clone the repository
 
+Create the directory as root, then clone as yourself. Cloning *with* `sudo` runs
+git as root, which uses root's credential store — a private repository will then
+either prompt in a way you cannot answer or fail outright.
+
 ```bash
-cd /opt && sudo git clone https://github.com/<your-account>/hotfii.git && sudo chown -R "$USER":"$USER" /opt/hotfii && cd /opt/hotfii
+sudo mkdir -p /opt/hotfii && sudo chown "$USER":"$USER" /opt/hotfii && git clone https://github.com/<your-account>/hotfii.git /opt/hotfii && cd /opt/hotfii
 ```
+
+If the repository is private, git asks for a username and password. GitHub no
+longer accepts account passwords over HTTPS — paste a **Personal Access Token**
+(github.com/settings/tokens, classic token with the `repo` scope) as the
+password. To avoid re-entering it on every `git pull`:
+
+```bash
+git config --global credential.helper store
+```
+
+That writes the token to `~/.git-credentials` in plain text, readable only by
+your user. A deploy key over SSH is the stricter alternative if you prefer not to
+store a token that can reach all your repositories.
 
 ---
 
