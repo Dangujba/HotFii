@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Platform') · HotFii</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/hotfii-icon.png') }}">
     <script>
         (function(){
             var t = localStorage.getItem('hotfii-theme');
@@ -18,7 +19,7 @@
 <body>
 <nav class="navbar navbar-expand-lg shadow-sm" style="background: var(--hf-header-bg); border-bottom: 1px solid var(--hf-header-border);">
     <div class="container-fluid px-4">
-        <a class="navbar-brand fw-bold" href="{{ route('platform.index') }}" style="color: var(--hf-ink);"><span class="brand-mark me-2">H</span>HotFii Platform</a>
+        <a class="navbar-brand fw-bold d-flex align-items-center" href="{{ route('platform.index') }}" style="color: var(--hf-ink);"><img src="{{ asset('images/hotfii-icon.png') }}" alt="HotFii Logo" style="height: 28px; width: 28px; border-radius: 7px;" class="me-2"><span>HotFii Platform</span></a>
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-link border-0 p-1" id="theme-toggle" title="Switch theme" style="color: var(--hf-toggle-icon-color); font-size: 1.15rem;"><i class="bi bi-sun"></i></button>
             <span style="color: var(--hf-ink-secondary);">{{ auth()->user()->email }}</span>

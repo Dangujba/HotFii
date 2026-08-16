@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') · HotFii</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/hotfii-icon.png') }}">
     {{-- Prevent flash of wrong theme before JS loads --}}
     <script>
         (function(){
@@ -68,7 +69,7 @@
     </nav>
 
     <aside class="app-sidebar">
-        <div class="sidebar-brand"><a href="{{ route('dashboard') }}" class="brand-link"><span class="brand-mark me-2">H</span><span class="brand-text fw-semibold">HotFii</span></a></div>
+        <div class="sidebar-brand"><a href="{{ route('dashboard') }}" class="brand-link d-flex align-items-center"><img src="{{ asset('images/hotfii-icon.png') }}" alt="HotFii Logo" style="height: 28px; width: 28px; border-radius: 7px;" class="me-2"><span class="brand-text fw-bold" style="font-size: 1.15rem; letter-spacing: -0.02em;">HotFii</span></a></div>
         <div class="sidebar-wrapper">
             <nav class="mt-2">
                 <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">

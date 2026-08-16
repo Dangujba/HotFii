@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}">
 <title>Connect · {{ $device->organization->name }}</title>
+<link rel="icon" type="image/png" href="{{ asset('images/hotfii-icon.png') }}">
 @vite(['resources/css/app.css','resources/js/app.js'])
 <style>:root{--hotfii-primary:{{ $device->organization->branding['primary_color'] ?? '#f4610a' }};}</style>
 </head>
 <body class="portal-shell py-4">
 <div class="container"><div class="card portal-card mx-auto">
 <div class="card-body p-4 p-md-5">
-<div class="text-center mb-4"><span class="brand-mark fs-4 mb-3">H</span><h1 class="h3 mt-3 mb-1">{{ $device->organization->branding['portal_name'] ?? $device->organization->name }}</h1><p class="text-secondary">{{ $device->location->name }} · Secure Wi-Fi access</p></div>
+<div class="text-center mb-4"><img src="{{ asset('images/hotfii-icon.png') }}" alt="HotFii Logo" style="height: 48px; width: 48px; border-radius: 12px;" class="mb-3"><h1 class="h3 mt-3 mb-1">{{ $device->organization->branding['portal_name'] ?? $device->organization->name }}</h1><p class="text-secondary">{{ $device->location->name }} · Secure Wi-Fi access</p></div>
 @if($errors->any())<div class="alert alert-danger">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif
 
 <ul class="nav nav-pills nav-fill mb-4" role="tablist">

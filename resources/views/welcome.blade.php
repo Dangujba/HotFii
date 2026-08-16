@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="HotFii — Cloud-managed Wi-Fi access for Nigerian network operators. Multi-vendor RADIUS, Paystack payments, vouchers and live session monitoring in one dashboard.">
+    <meta name="description" content="HotFii · Cloud-managed Wi-Fi access for Nigerian network operators. Multi-vendor RADIUS, Paystack payments, vouchers and live session monitoring in one dashboard.">
     <title>HotFii · Network access, made accountable</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -453,8 +453,8 @@
     <div class="container">
         <div class="d-flex align-items-center justify-content-between py-3">
             <a href="#" class="text-decoration-none d-flex align-items-center gap-2">
-                <span class="brand-mark">H</span>
-                <span style="font-weight: 800; font-size: 1.1rem; color: var(--hf-ink);">HotFii</span>
+                <img src="{{ asset('images/hotfii-icon.png') }}" alt="HotFii Logo" style="height: 34px; width: 34px; border-radius: 8px;">
+                <span style="font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; color: var(--hf-ink);">HotFii</span>
             </a>
             <div class="d-none d-md-flex align-items-center gap-1">
                 <a href="#features" class="nav-link-pill">Features</a>
@@ -511,7 +511,7 @@
                         <span class="mock-dot" style="background:#ef4444;"></span>
                         <span class="mock-dot" style="background:#f59e0b;"></span>
                         <span class="mock-dot" style="background:#22c55e;"></span>
-                        <span class="mock-title">HotFii Dashboard — Gwarinpa HQ</span>
+                        <span class="mock-title">HotFii Dashboard · Gwarinpa HQ</span>
                     </div>
                     <div class="mock-body">
                         <div class="row g-2 mb-3">
@@ -583,7 +583,7 @@
         <div class="text-center mb-5 reveal">
             <div class="section-eyebrow">Platform capabilities</div>
             <h2 class="section-title">Everything a network operator needs.</h2>
-            <p class="section-sub mt-3">From the router handshake to the customer invoice — HotFii owns the full stack so you don't have to stitch tools together.</p>
+            <p class="section-sub mt-3">From the router handshake to the customer invoice, HotFii owns the full stack so you do not have to stitch tools together.</p>
         </div>
         <div class="bento-grid">
             <div class="bento-card span-2 reveal reveal-delay-1">
@@ -609,7 +609,7 @@
             <div class="bento-card reveal reveal-delay-1">
                 <div class="bento-icon"><i class="bi bi-credit-card-2-front"></i></div>
                 <div class="bento-title">Paystack payments</div>
-                <div class="bento-body">Online checkout with automatic split settlement. Collect from customers, settle to sub-accounts — no manual reconciliation.</div>
+                <div class="bento-body">Online checkout with automatic split settlement. Collect from customers, settle to sub-accounts with zero manual reconciliation.</div>
             </div>
             <div class="bento-card reveal reveal-delay-2">
                 <div class="bento-icon info"><i class="bi bi-broadcast"></i></div>
@@ -651,7 +651,7 @@
             <div class="col-6 col-md-3">
                 <div class="stat-item">
                     <div class="stat-number">2%</div>
-                    <div class="stat-label">Commerce fee — no hidden charges</div>
+                    <div class="stat-label">Commerce fee · No hidden charges</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
@@ -714,7 +714,7 @@
                     <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Paystack online checkout</div>
                     <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Printed QR voucher batches</div>
                     <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Live session monitoring</div>
-                    <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Micro seller — no minimum up to ₦50k</div>
+                    <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Micro seller · No minimum up to ₦50k</div>
                     <div class="mt-4">
                         <a href="{{ route('register') }}" class="btn-lp-ghost" style="justify-content: center; width: 100%;">Start free sandbox</a>
                     </div>
@@ -783,11 +783,11 @@
         <div class="row g-5">
             <div class="col-lg-4">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="brand-mark">H</span>
+                    <img src="{{ asset('images/hotfii-icon.png') }}" alt="HotFii Logo" style="height: 32px; width: 32px; border-radius: 8px;">
                     <span class="footer-brand">HotFii</span>
                 </div>
                 <div class="footer-tagline">Network access, made accountable.</div>
-                <div class="footer-tagline mt-2">Built for Nigerian network operators — from hotspot sellers to institutional ISPs.</div>
+                <div class="footer-tagline mt-2">Built for Nigerian network operators, from hotspot sellers to institutional ISPs.</div>
             </div>
             <div class="col-6 col-lg-2">
                 <div class="footer-heading">Platform</div>

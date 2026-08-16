@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title') · HotFii</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/hotfii-icon.png') }}">
     <script>
         (function(){
             var t = localStorage.getItem('hotfii-theme');
@@ -22,8 +23,9 @@
         <div class="row justify-content-center">
             <div class="col-lg-6 col-xl-5">
                 <div class="text-center text-white mb-4">
-                    <a class="text-white text-decoration-none fs-2 fw-bold" href="{{ route('home') }}">
-                        <span class="brand-mark me-2">H</span>HotFii
+                    <a class="text-white text-decoration-none d-inline-flex align-items-center gap-2 fs-2 fw-bold" href="{{ route('home') }}">
+                        <img src="{{ asset('images/hotfii-icon.png') }}" alt="HotFii Logo" style="height: 42px; width: 42px; border-radius: 10px;">
+                        <span>HotFii</span>
                     </a>
                     <p class="opacity-75 mt-2">One dashboard for every network.</p>
                 </div>

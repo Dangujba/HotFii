@@ -20,6 +20,30 @@
         box-shadow 0.3s ease;
 }
 
+/* ── Global Request / Navigation Loader ───────── */
+#hotfii-loader-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    width: 0%;
+    background: linear-gradient(90deg, var(--hf-primary), var(--hf-accent));
+    box-shadow: 0 0 12px rgba(244, 97, 10, 0.75);
+    z-index: 999999;
+    transition: width 0.25s ease, opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+}
+#hotfii-loader-bar.active {
+    opacity: 1;
+}
+.btn.is-loading,
+button[type="submit"].is-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.85;
+}
+
 /* ── DAYLIGHT theme (default) ─────────────────── */
 [data-hotfii-theme="daylight"],
 :root {
