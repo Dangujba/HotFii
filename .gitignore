@@ -33,3 +33,7 @@ Thumbs.db
 # docs/DOCKER_VPS_DEPLOYMENT.md.
 *.dump
 /hotfii-uploads.tar.gz
+
+# Throwaway VPS helper scripts. They hold host credentials, so they must
+# never reach the repository.
+/.vps_*.py

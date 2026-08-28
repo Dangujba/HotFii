@@ -68,21 +68,6 @@
                 radial-gradient(ellipse 50% 40% at 100% 80%, rgba(244,185,66,.07) 0%, transparent 55%);
             pointer-events: none;
         }
-        .hero-eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: .5rem;
-            background: var(--hf-primary-soft);
-            color: var(--hf-primary);
-            border: 1px solid rgba(244,97,10,.2);
-            border-radius: 2rem;
-            padding: .35rem 1rem;
-            font-size: .8rem;
-            font-weight: 600;
-            letter-spacing: .02em;
-            text-transform: uppercase;
-            margin-bottom: 1.75rem;
-        }
         .hero-title {
             font-size: clamp(2.5rem, 6vw, 4.2rem);
             font-weight: 900;
@@ -481,10 +466,6 @@
     <div class="container py-5">
         <div class="row align-items-center g-5">
             <div class="col-lg-6">
-                <div class="hero-eyebrow">
-                    <i class="bi bi-lightning-charge-fill"></i>
-                    Built for Nigerian network operators
-                </div>
                 <h1 class="hero-title">
                     The command centre<br>for <span class="highlight">every network</span><br>you operate.
                 </h1>

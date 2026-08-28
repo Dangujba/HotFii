@@ -42,32 +42,49 @@
                                 </div>
                                 <div class="col-md-4"><strong>Settlement</strong>
                                     <div>
-                                        {{ $organization->paymentProfile->bank_name }}<br>{{ $organization->paymentProfile->account_name }}
-                                        · {{ $organization->paymentProfile->account_number_cipher }}</div>
+                                        {{ $organization->paymentProfile->bank_name }}@if($organization->paymentProfile->bank_code) <span class="text-secondary">({{ $organization->paymentProfile->bank_code }})</span>@endif<br>{{ $organization->paymentProfile->account_name }}
+                                        · {{ $organization->paymentProfile->account_number_cipher }}
+                                        @if($organization->paymentProfile->resolved_account_name && $organization->paymentProfile->resolved_account_name !== $organization->paymentProfile->account_name)
+                                            <div class="text-danger">Bank says: {{ $organization->paymentProfile->resolved_account_name }}</div>
+                                        @endif
+                                    </div>
                                 </div>
                                 <div class="col-md-4"><strong>Identity</strong>
                                     <div>{{ strtoupper($organization->paymentProfile->identity_type) }} ·
                                         {{ $organization->paymentProfile->identity_number_cipher }}</div>
                                 </div>
+                                @if($organization->paymentProfile->review_notes)
+                                    <div class="col-12">
+                                        <div class="alert alert-warning py-2 mb-0 mt-2"><i class="bi bi-robot me-1"></i><strong>Automatic approval declined:</strong> {{ $organization->paymentProfile->review_notes }}</div>
+                                    </div>
+                                @endif
                             </div>
                             <div class="row g-3 mt-2">
                                 <div class="col-md-7">
                                     <form method="POST" action="{{ route('platform.payment.approve', $organization) }}">@csrf
                                         <div class="input-group"><input class="form-control" name="paystack_subaccount_code"
-                                                placeholder="Paystack subaccount code" required><input class="form-control"
+                                                placeholder="Subaccount code (blank = create it)"><input class="form-control"
                                                 name="review_notes" placeholder="Optional note"><button
-                                                class="btn btn-success">Approve</button></div>
+                                                class="btn btn-success"
+                                                data-confirm-title="Enable live payments for {{ $organization->name }}?"
+                                                data-confirm="They will start collecting real money immediately, settled to the bank account on this profile. Leaving the code blank makes HotFii open the subaccount at Paystack."
+                                                data-confirm-icon="warning"
+                                                data-confirm-button="Approve and go live">Approve</button></div>
                                     </form>
                                 </div>
                                 <div class="col-md-5">
                                     <form method="POST" action="{{ route('platform.payment.reject', $organization) }}">@csrf<div
                                             class="input-group"><input class="form-control" name="review_notes"
                                                 placeholder="Required rejection reason" required><button
-                                                class="btn btn-outline-danger">Reject</button></div>
+                                                class="btn btn-outline-danger"
+                                                data-confirm-title="Reject {{ $organization->name }}?"
+                                                data-confirm="Live payments stay off and the owner sees your reason. They can correct the profile and resubmit."
+                                                data-confirm-icon="danger"
+                                                data-confirm-button="Reject profile">Reject</button></div>
                                     </form>
                                 </div>
                         </div>@endif
-                </div>@empty<div class="p-5 text-center text-secondary">No payment requests waiting.</div>@endforelse
+                </div>@empty<div class="p-5 text-center text-secondary"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Nothing waiting. Profiles Paystack can verify are approved automatically and only exceptions land here.</div>@endforelse
                 </div>
             </div>
             <div class="card metric-card">
@@ -96,7 +113,11 @@
                                         action="{{ route('platform.impersonate.start', $organization) }}">@csrf<input
                                             class="form-control form-control-sm" name="reason" minlength="10"
                                             placeholder="Written support reason" required><button
-                                            class="btn btn-sm btn-outline-primary">Open</button></form>
+                                            class="btn btn-sm btn-outline-primary"
+                                            data-confirm-title="Enter support mode for {{ $organization->name }}?"
+                                            data-confirm="You will see their customers, sessions and finances as they do. The reason you typed is written to the audit log against your account."
+                                            data-confirm-icon="warning"
+                                            data-confirm-button="Enter support mode">Open</button></form>
                                 </td>
                         </tr>@endforeach
                         </tbody>

@@ -99,7 +99,7 @@
         @if(session()->has('impersonated_organization_id'))
             <div class="alert alert-danger rounded-0 border-0 mb-0 d-flex justify-content-between align-items-center px-4">
                 <span><i class="bi bi-shield-exclamation me-2"></i>Support mode: you are viewing {{ $currentOrganization->name }}.</span>
-                <form method="POST" action="{{ route('platform.impersonate.stop') }}">@csrf<button class="btn btn-sm btn-light">Exit support mode</button></form>
+                <form method="POST" action="{{ route('platform.impersonate.stop') }}">@csrf<button class="btn btn-sm btn-light" data-confirm-title="Leave support mode?" data-confirm="You return to your own organization. Re-entering requires a fresh written reason." data-confirm-icon="info" data-confirm-button="Leave support mode">Exit support mode</button></form>
             </div>
         @endif
         <div class="app-content-header">

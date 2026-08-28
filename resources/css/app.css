@@ -569,6 +569,331 @@ a { color: var(--hf-primary); }
 a:hover { color: var(--hf-primary-hover); }
 
 /* ───────────────────────────────────────────────
+   HotFii Dialogs (swal-style) + Toasts
+   ─────────────────────────────────────────────── */
+body.hf-swal-lock { overflow: hidden; }
+
+.hf-swal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000000;
+    display: grid;
+    place-items: center;
+    padding: 1.25rem;
+    background: rgba(12, 8, 5, 0.62);
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+.hf-swal-overlay.is-open { opacity: 1; }
+
+.hf-swal {
+    width: 100%;
+    max-width: 26rem;
+    background: var(--hf-surface-card);
+    color: var(--hf-ink);
+    border: 1px solid var(--hf-border-subtle);
+    border-radius: 1.25rem;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .28);
+    padding: 2rem 1.75rem 1.5rem;
+    text-align: center;
+    transform: translateY(12px) scale(.96);
+    transition: transform .22s cubic-bezier(.34, 1.4, .64, 1);
+}
+.hf-swal-overlay.is-open .hf-swal { transform: translateY(0) scale(1); }
+
+.hf-swal-icon {
+    width: 4.25rem;
+    height: 4.25rem;
+    margin: 0 auto 1.15rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 2rem;
+}
+.hf-swal-icon-warning  { background: var(--hf-primary-soft); color: var(--hf-primary); }
+.hf-swal-icon-danger   { background: rgba(220, 53, 69, .12); color: #dc3545; }
+.hf-swal-icon-info     { background: rgba(13, 110, 253, .12); color: #0d6efd; }
+.hf-swal-icon-success  { background: rgba(32, 201, 151, .14); color: #12a37b; }
+.hf-swal-icon-question { background: var(--hf-accent-soft); color: var(--hf-accent); }
+
+.hf-swal-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0 0 .5rem;
+    color: var(--hf-ink);
+}
+.hf-swal-text {
+    margin: 0 0 1.6rem;
+    color: var(--hf-ink-secondary);
+    font-size: .95rem;
+    line-height: 1.55;
+}
+
+.hf-swal-actions {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: .65rem;
+}
+.hf-swal-btn {
+    flex: 1;
+    border: 1px solid transparent;
+    border-radius: .7rem;
+    padding: .7rem 1rem;
+    font-weight: 600;
+    font-size: .95rem;
+    cursor: pointer;
+}
+.hf-swal-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 .22rem rgba(244, 97, 10, .3);
+}
+.hf-swal-btn-primary {
+    background: var(--hf-primary);
+    color: #fff;
+}
+.hf-swal-btn-primary:hover { background: var(--hf-primary-hover); }
+.hf-swal-btn-danger {
+    background: #dc3545;
+    color: #fff;
+}
+.hf-swal-btn-danger:hover { background: #bb2d3b; }
+.hf-swal-btn-danger:focus-visible { box-shadow: 0 0 0 .22rem rgba(220, 53, 69, .3); }
+.hf-swal-btn-cancel {
+    background: var(--hf-surface-raised);
+    border-color: var(--hf-border);
+    color: var(--hf-ink-secondary);
+}
+.hf-swal-btn-cancel:hover { color: var(--hf-ink); }
+
+@media (max-width: 400px) {
+    .hf-swal-actions { flex-direction: column; }
+}
+
+.hf-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.75rem;
+    z-index: 1000001;
+    display: inline-flex;
+    align-items: center;
+    max-width: calc(100vw - 2rem);
+    padding: .7rem 1.15rem;
+    border-radius: 2rem;
+    font-size: .9rem;
+    font-weight: 500;
+    background: var(--hf-code-bg);
+    color: #f7f1ec;
+    border: 1px solid rgba(255, 255, 255, .08);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .3);
+    transform: translate(-50%, 1rem);
+    opacity: 0;
+    transition: transform .25s cubic-bezier(.34, 1.4, .64, 1), opacity .25s ease;
+    pointer-events: none;
+}
+.hf-toast.is-open {
+    transform: translate(-50%, 0);
+    opacity: 1;
+}
+.hf-toast-success i { color: #35d6a4; }
+.hf-toast-warning i { color: var(--hf-accent); }
+.hf-toast-danger i  { color: #ff7a85; }
+
+/* ───────────────────────────────────────────────
+   Copy Buttons
+   ─────────────────────────────────────────────── */
+.code-block {
+    position: relative;
+}
+.code-block .btn-copy {
+    position: absolute;
+    top: .6rem;
+    right: .6rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: .1rem;
+    border: 1px solid rgba(255, 255, 255, .16);
+    background: rgba(255, 255, 255, .08);
+    color: #f4c89e;
+    border-radius: .5rem;
+    padding: .3rem .65rem;
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1.4;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+}
+.code-block .btn-copy:hover {
+    background: var(--hf-primary);
+    border-color: var(--hf-primary);
+    color: #fff;
+}
+.code-block .btn-copy.is-copied {
+    background: #12a37b;
+    border-color: #12a37b;
+    color: #fff;
+}
+.code-block .provisioning-script { padding-top: 2.6rem; }
+
+.btn-copy-inline.is-copied {
+    background: #12a37b !important;
+    border-color: #12a37b !important;
+    color: #fff !important;
+}
+
+/* ───────────────────────────────────────────────
+   HotFii Custom Select
+   The native <select> stays in the flow at opacity 0
+   so constraint validation can still focus it.
+   ─────────────────────────────────────────────── */
+.hf-select {
+    position: relative;
+}
+.hf-select > select.form-select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+.hf-select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    width: 100%;
+    text-align: left;
+    padding: .5rem .85rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    border: 1px solid var(--hf-border);
+    border-radius: .375rem;
+    background: var(--hf-surface-card);
+    color: var(--hf-ink);
+    cursor: pointer;
+}
+.hf-select-sm .hf-select-trigger {
+    padding: .25rem .6rem;
+    font-size: .875rem;
+    border-radius: .25rem;
+}
+.hf-select-trigger:hover { border-color: var(--hf-ink-secondary); }
+.hf-select-trigger:focus-visible,
+.hf-select.is-open .hf-select-trigger {
+    outline: none;
+    border-color: var(--hf-primary);
+    box-shadow: 0 0 0 .2rem rgba(244, 97, 10, .18);
+}
+.hf-select-trigger:disabled {
+    background: var(--hf-surface-raised);
+    color: var(--hf-ink-secondary);
+    cursor: not-allowed;
+}
+.hf-select.is-invalid .hf-select-trigger {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 .2rem rgba(220, 53, 69, .18);
+}
+.hf-select-value {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.hf-select-value.is-placeholder { color: var(--hf-ink-secondary); }
+.hf-select-caret {
+    font-size: .75rem;
+    color: var(--hf-ink-secondary);
+    transition: transform .2s ease;
+}
+.hf-select.is-open .hf-select-caret {
+    transform: rotate(180deg);
+    color: var(--hf-primary);
+}
+
+.hf-select-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + .3rem);
+    z-index: 1055;
+    display: none;
+    background: var(--hf-surface-card);
+    border: 1px solid var(--hf-border);
+    border-radius: .7rem;
+    box-shadow: 0 14px 38px rgba(0, 0, 0, .18);
+    overflow: hidden;
+}
+.hf-select.is-open .hf-select-panel { display: block; }
+.hf-select.is-flipped .hf-select-panel {
+    top: auto;
+    bottom: calc(100% + .3rem);
+}
+
+.hf-select-search {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .6rem .85rem;
+    border-bottom: 1px solid var(--hf-border-subtle);
+    color: var(--hf-ink-secondary);
+}
+.hf-select-search input {
+    flex: 1;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--hf-ink);
+    font-size: .9rem;
+}
+
+.hf-select-list {
+    max-height: 15rem;
+    overflow-y: auto;
+    padding: .3rem;
+}
+.hf-select-option {
+    padding: .5rem .7rem;
+    border-radius: .45rem;
+    font-size: .92rem;
+    cursor: pointer;
+    color: var(--hf-ink);
+}
+.hf-select-option.is-placeholder { color: var(--hf-ink-secondary); }
+.hf-select-option.is-active { background: var(--hf-primary-soft); }
+.hf-select-option.is-selected {
+    background: var(--hf-primary);
+    color: #fff;
+    font-weight: 600;
+}
+.hf-select-option.is-disabled {
+    color: var(--hf-ink-secondary);
+    opacity: .6;
+    cursor: not-allowed;
+}
+.hf-select-empty {
+    display: none;
+    padding: 1.1rem .85rem;
+    text-align: center;
+    font-size: .88rem;
+    color: var(--hf-ink-secondary);
+}
+
+/* Keep input-group selects flush with their neighbours. */
+.input-group > .hf-select { flex: 1 1 auto; width: 1%; }
+.input-group > .hf-select:not(:first-child) .hf-select-trigger {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+.input-group > .hf-select:not(:last-child) .hf-select-trigger {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+/* ───────────────────────────────────────────────
    AdminLTE overrides
    ─────────────────────────────────────────────── */
 .bg-body-tertiary { background-color: var(--hf-surface) !important; }

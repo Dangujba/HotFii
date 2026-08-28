@@ -14,7 +14,7 @@
             <div class="mb-3"><label class="form-label">Quantity</label><input type="number" class="form-control" name="quantity" min="1" max="5000" value="20" required></div>
             <div class="mb-3"><label class="form-label">Retail price per voucher (₦)</label><input type="number" class="form-control" name="retail_price_naira" min="0" step="0.01" placeholder="Use plan price"></div>
             <p class="small text-secondary"><i class="bi bi-info-circle me-1"></i>Validity begins on first successful activation. Default simultaneous use comes from the plan.</p>
-            <button class="btn btn-hotfii w-100">Generate and print</button>
+            <button class="btn btn-hotfii w-100" data-confirm-title="Generate this voucher batch?" data-confirm="Codes are minted straight away and cannot be un-minted. Print them before handing any out." data-confirm-icon="question" data-confirm-button="Generate batch">Generate and print</button>
         </form>@endif
     </div></div></div>
 </div>
