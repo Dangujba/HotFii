@@ -23,14 +23,26 @@ class DatabaseSeeder extends Seeder
         }
 
         $password = 'HotFii-Test-2026!';
+
+        // email_verified_at is deliberately not mass-assignable, so it goes
+        // through the model's own method — the same route CreatePlatformAdmin
+        // takes. Passed to updateOrCreate() it used to be dropped in silence,
+        // which is why the demo accounts came out unverified and could not
+        // reach the pages they exist to demonstrate.
         $owner = User::updateOrCreate(
             ['email' => 'owner@hotfii.test'],
-            ['name' => 'HotFii Demo Owner', 'password' => $password, 'email_verified_at' => now()],
+            ['name' => 'HotFii Demo Owner', 'password' => $password],
         );
-        User::updateOrCreate(
+        $admin = User::updateOrCreate(
             ['email' => 'admin@hotfii.test'],
-            ['name' => 'HotFii Platform Admin', 'password' => $password, 'email_verified_at' => now(), 'is_platform_admin' => true],
+            ['name' => 'HotFii Platform Admin', 'password' => $password, 'is_platform_admin' => true],
         );
+
+        foreach ([$owner, $admin] as $user) {
+            if (! $user->hasVerifiedEmail()) {
+                $user->markEmailAsVerified();
+            }
+        }
 
         $organization = Organization::firstOrCreate(
             ['slug' => 'hotfii-demo'],
