@@ -17,7 +17,11 @@ class AuthenticatedSessionController extends Controller
         $credentials=$request->validate(['email'=>['required','email'],'password'=>['required','string']]);
         if(!Auth::attempt($credentials,$request->boolean('remember'))) throw ValidationException::withMessages(['email'=>'The supplied credentials are incorrect.']);
         $request->session()->regenerate();
-        return redirect()->intended(route('dashboard'));
+        // The dashboard needs an organization. A platform admin who only does
+        // support work belongs to none, so send them to the platform console
+        // instead of into a 403.
+        $user=$request->user();
+        return redirect()->intended($user->is_platform_admin && !$user->organizations()->exists() ? route('platform.index') : route('dashboard'));
     }
     public function destroy(Request $request): RedirectResponse
     {
