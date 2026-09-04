@@ -3,6 +3,7 @@
 namespace App\Services\Vouchers;
 
 use App\Domain\Enums\OrganizationStatus;
+use App\Domain\Enums\VoucherPinFormat;
 use App\Domain\Enums\VoucherStatus;
 use App\Events\VoucherActivated;
 use App\Models\AccessPlan;
@@ -20,19 +21,27 @@ use RuntimeException;
 
 class VoucherService
 {
+    private const PIN_LENGTH = 12;
+
     public function __construct(
         private readonly RadiusCredentialService $credentials,
         private readonly CommerceFeeCalculator $fees,
         private readonly TrialManager $trials,
     ) {}
 
-    public function createBatch(Organization $organization, AccessPlan $plan, int $quantity, ?int $priceKobo = null): VoucherBatch
-    {
+    public function createBatch(
+        Organization $organization,
+        AccessPlan $plan,
+        int $quantity,
+        ?int $priceKobo = null,
+        VoucherPinFormat $pinFormat = VoucherPinFormat::Numbers,
+        bool $dashedPin = true,
+    ): VoucherBatch {
         if ($quantity < 1 || $quantity > 5000) {
             throw new RuntimeException('Voucher quantity must be between 1 and 5,000.');
         }
 
-        return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo) {
+        return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin) {
             $batch = VoucherBatch::create([
                 'organization_id' => $organization->id,
                 'access_plan_id' => $plan->id,
@@ -43,7 +52,7 @@ class VoucherService
             ]);
 
             for ($index = 0; $index < $quantity; $index++) {
-                $code = $this->newCode();
+                $code = $this->newCode($pinFormat, $dashedPin);
                 $batch->vouchers()->create([
                     'organization_id' => $organization->id,
                     'code_lookup' => $this->lookup($code),
@@ -138,10 +147,17 @@ class VoucherService
         });
     }
 
-    private function newCode(): string
+    private function newCode(VoucherPinFormat $format, bool $dashed): string
     {
+        $alphabet = $format->alphabet();
+        $highest = strlen($alphabet) - 1;
+
         do {
-            $code = 'HF-'.implode('-', str_split(Str::upper(Str::random(12)), 4));
+            $pin = '';
+            for ($position = 0; $position < self::PIN_LENGTH; $position++) {
+                $pin .= $alphabet[random_int(0, $highest)];
+            }
+            $code = $dashed ? implode('-', str_split($pin, 4)) : $pin;
         } while (Voucher::where('code_lookup', $this->lookup($code))->exists());
 
         return $code;

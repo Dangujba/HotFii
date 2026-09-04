@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Operator;
 
+use App\Domain\Enums\VoucherPinFormat;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\VoucherBatch;
@@ -10,6 +11,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class VoucherBatchController extends Controller
@@ -19,6 +21,7 @@ class VoucherBatchController extends Controller
         return view('operator.vouchers', [
             'batches' => $organization->voucherBatches()->with('accessPlan')->latest()->paginate(20),
             'plans' => $organization->accessPlans()->where('is_active', true)->where('access_type', 'paid')->orderBy('name')->get(),
+            'pinFormats' => VoucherPinFormat::cases(),
         ]);
     }
 
@@ -28,6 +31,8 @@ class VoucherBatchController extends Controller
             'access_plan_id' => ['required', 'integer'],
             'quantity' => ['required', 'integer', 'min:1', 'max:5000'],
             'retail_price_naira' => ['nullable', 'numeric', 'min:0'],
+            'pin_format' => ['nullable', Rule::enum(VoucherPinFormat::class)],
+            'dashed_pin' => ['nullable', 'boolean'],
         ]);
 
         $plan = $organization->accessPlans()->where('access_type', 'paid')->findOrFail($data['access_plan_id']);
@@ -36,6 +41,8 @@ class VoucherBatchController extends Controller
             $plan,
             $data['quantity'],
             isset($data['retail_price_naira']) ? (int) round($data['retail_price_naira'] * 100) : null,
+            VoucherPinFormat::tryFrom($data['pin_format'] ?? '') ?? VoucherPinFormat::Numbers,
+            $request->has('dashed_pin') ? $request->boolean('dashed_pin') : true,
         );
 
         return redirect()->route('vouchers.print', $batch)->with('success', 'Voucher batch generated.');

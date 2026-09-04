@@ -34,7 +34,7 @@
 @endif
 <div class="tab-pane fade {{ $canBuyOnline ? '' : 'show active' }}" id="voucher">
 <form method="POST" action="{{ route('portal.redeem',$device) }}">@csrf
-<div class="mb-3"><label class="form-label">Printed voucher code</label><input id="voucher-code" class="form-control form-control-lg text-uppercase font-monospace" name="voucher_code" value="{{ old('voucher_code') }}" placeholder="HF-XXXX-XXXX-XXXX" required></div>
+<div class="mb-3"><label class="form-label">Printed voucher code</label><input id="voucher-code" class="form-control form-control-lg text-uppercase font-monospace" name="voucher_code" value="{{ old('voucher_code') }}" placeholder="Code printed on your voucher" required></div>
 <div class="mb-3"><label class="form-label">Phone <span class="text-secondary">(optional)</span></label><input class="form-control" name="phone" inputmode="tel"></div>
 @foreach($portalContext as $key=>$value)@if($value)<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif @endforeach
 <label class="btn btn-outline-secondary w-100 mb-2"><i class="bi bi-qr-code-scan me-2"></i>Scan QR from voucher<input id="qr-file" class="d-none" type="file" accept="image/*" capture="environment"></label>
