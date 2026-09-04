@@ -13,6 +13,11 @@
 -- Read-only: HotFii owns every row here. FreeRADIUS decides nothing, it only
 -- looks up what the app has already issued.
 GRANT SELECT ON nas           TO hotfii_radius;
+
+-- FreeRADIUS uses nasreload for NAS restart tracking and
+-- Simultaneous-Use accounting queries.
+GRANT SELECT, INSERT, UPDATE ON nasreload TO hotfii_radius;
+
 GRANT SELECT ON radcheck      TO hotfii_radius;
 GRANT SELECT ON radreply      TO hotfii_radius;
 GRANT SELECT ON radgroupcheck TO hotfii_radius;

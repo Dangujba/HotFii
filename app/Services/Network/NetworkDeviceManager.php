@@ -50,8 +50,18 @@ class NetworkDeviceManager
                 ]]);
             }
 
+            $nasName = $device->management_address ?: $device->nas_identifier;
+
+            if ($vendor === RouterVendor::Mikrotik) {
+                $wireguardAddress = ($device->management_config ?? [])['wireguard_address'] ?? null;
+
+                if ($wireguardAddress) {
+                    $nasName = Str::before($wireguardAddress, '/');
+                }
+            }
+
             DB::table('nas')->insert([
-                'nasname' => $device->management_address ?: $device->nas_identifier,
+                'nasname' => $nasName,
                 'shortname' => $device->nas_identifier,
                 'type' => $vendor->value,
                 'secret' => $device->radius_secret,

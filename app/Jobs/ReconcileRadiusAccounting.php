@@ -41,9 +41,10 @@ class ReconcileRadiusAccounting implements ShouldQueue
     public function handle(NetworkDeviceManager $devices): void
     {
         DB::table('radacct')
-            ->where(fn ($query) => $query
-                ->where('acctupdatetime', '>=', now()->subMinutes(10))
-                ->orWhere('acctstoptime', '>=', now()->subMinutes(10)))
+            ->whereRaw("(
+                acctupdatetime >= CURRENT_TIMESTAMP - INTERVAL '10 minutes'
+                OR acctstoptime >= CURRENT_TIMESTAMP - INTERVAL '10 minutes'
+            )")
             ->orderBy('radacctid')
             ->chunkById(250, function ($records) use ($devices) {
                 foreach ($records as $record) {
