@@ -1,44 +1,49 @@
-import ApexCharts from 'apexcharts';
+import { axisLabels, chrome, mount, naira, nairaCompact, readJson } from './charts.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const element = document.querySelector('#sales-chart');
     if (!element) return;
 
-    const series = JSON.parse(element.dataset.series || '[]');
-    const categories = JSON.parse(element.dataset.categories || '[]');
+    const values = readJson(element, 'series');
+    const categories = readJson(element, 'categories');
+    const last = values.length - 1;
 
-    const chart = new ApexCharts(element, {
-        chart: {
-            type: 'area',
-            height: 320,
-            toolbar: { show: false },
-            background: 'transparent',
-        },
-        series: [{ name: 'Sales (₦)', data: series }],
-        xaxis: { categories },
-        colors: ['#f4610a'],
+    mount(element, (t) => ({
+        ...chrome(t),
+        chart: { ...chrome(t).chart, type: 'area', height: 320 },
+        series: [{ name: 'Sales', data: values }],
+        colors: [t.series[0]],
+        stroke: { curve: 'smooth', width: 2, lineCap: 'round' },
         fill: {
             type: 'gradient',
-            gradient: {
-                shadeIntensity: 1,
-                opacityFrom: 0.45,
-                opacityTo: 0.05,
-                stops: [20, 100, 100, 100],
-            },
+            gradient: { shadeIntensity: 1, opacityFrom: 0.18, opacityTo: 0.02, stops: [0, 100] },
         },
-        dataLabels: { enabled: false },
-        stroke: { curve: 'smooth', width: 2.5 },
-        noData: { text: 'No paid sales in this date range' },
-        theme: {
-            mode: document.documentElement.getAttribute('data-bs-theme') || 'light',
+        dataLabels: {
+            enabled: true,
+            formatter: (value, { dataPointIndex }) => (dataPointIndex === last && value > 0 ? nairaCompact(value) : ''),
+            offsetY: -10,
+            background: { enabled: false },
+            style: { colors: [t.muted], fontSize: '11px', fontWeight: 600 },
         },
-    });
-    chart.render();
-
-    window.addEventListener('theme-changed', (event) => {
-        const isDark = event.detail.theme !== 'daylight';
-        chart.updateOptions({
-            theme: { mode: isDark ? 'dark' : 'light' },
-        });
-    });
+        markers: {
+            size: 0,
+            strokeWidth: 2,
+            strokeColors: t.surface,
+            discrete: last >= 0
+                ? [{ seriesIndex: 0, dataPointIndex: last, size: 5, fillColor: t.series[0], strokeColor: t.surface }]
+                : [],
+            hover: { size: 6 },
+        },
+        xaxis: {
+            categories,
+            labels: axisLabels(t, { hideOverlappingLabels: true, rotate: 0 }),
+            axisBorder: { color: t.grid },
+            axisTicks: { show: false },
+            crosshairs: { stroke: { color: t.grid, width: 1, dashArray: 0 } },
+            tooltip: { enabled: false },
+        },
+        yaxis: { labels: axisLabels(t, { formatter: nairaCompact }) },
+        tooltip: { ...chrome(t).tooltip, y: { formatter: naira } },
+        noData: { ...chrome(t).noData, text: 'No paid sales in this date range' },
+    }));
 });

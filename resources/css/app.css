@@ -86,6 +86,13 @@ button[type="submit"].is-loading {
     --hf-alert-bg:      #fff8f5;
 
     --hf-toggle-icon-color: #f4610a;
+
+    /* Chart series. Separate from --hf-primary because a chart mark is judged
+       against the card it sits on, not against a button: these are the steps
+       that clear the lightness band and 3:1 on this theme's card surface. */
+    --hf-chart-1:       #f4610a;
+    --hf-chart-2:       #0f9b76;
+    --hf-chart-grid:    #ede5dc;
 }
 
 /* ── DUSK theme ───────────────────────────────── */
@@ -129,6 +136,10 @@ button[type="submit"].is-loading {
     --hf-alert-bg:      #2a2320;
 
     --hf-toggle-icon-color: #f46f2a;
+
+    --hf-chart-1:       #e8631a;
+    --hf-chart-2:       #1a9e77;
+    --hf-chart-grid:    #3a322c;
 }
 
 /* ── MIDNIGHT theme ───────────────────────────── */
@@ -172,6 +183,10 @@ button[type="submit"].is-loading {
     --hf-alert-bg:      #181410;
 
     --hf-toggle-icon-color: #7c7068;
+
+    --hf-chart-1:       #e8631a;
+    --hf-chart-2:       #1a9e77;
+    --hf-chart-grid:    #2a2218;
 }
 
 /* ───────────────────────────────────────────────
@@ -294,6 +309,12 @@ body {
 /* ───────────────────────────────────────────────
    Content Area
    ─────────────────────────────────────────────── */
+/* AdminLTE ships `padding: 0 .5rem`, so the first card on every page sits flush
+   against the header rule. Give the content its own top breathing room. */
+.app-content {
+    padding-top: 1.5rem;
+    padding-bottom: .5rem;
+}
 .app-content-header {
     background: transparent;
     border-bottom: 1px solid var(--hf-border-subtle);
@@ -393,6 +414,139 @@ body {
 .status-online  { background: #20c997; }
 .status-offline { background: #dc3545; }
 .status-pending { background: #ffc107; }
+
+/* ───────────────────────────────────────────────
+   Charts — reserved status scale, stat tiles, chrome
+   ─────────────────────────────────────────────── */
+
+/* Reserved status colours. Deliberately not the chart series steps, so a status
+   never impersonates a series. Mode-invariant: every one of these clears 3:1 on
+   the dusk and midnight cards, and on daylight the two light ones lean on the
+   count printed beside them rather than on the fill. */
+:root {
+    --hf-status-good:     #0ca30c;
+    --hf-status-warning:  #fab219;
+    --hf-status-serious:  #ec835a;
+    --hf-status-critical: #d03b3b;
+    --hf-status-idle:     #8b8178;
+}
+
+/* ── Stat tiles ───────────────────────────────── */
+.hf-stat .card-body {
+    padding: 1.4rem 1.35rem;
+}
+.hf-stat-label {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--hf-ink-secondary);
+}
+.hf-stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.15;
+    /* Proportional figures: tabular-nums makes a number like 121 look loose at
+       display sizes. Columns of numbers get tabular-nums, headline values don't. */
+    font-variant-numeric: proportional-nums;
+}
+.hf-stat-foot {
+    font-size: .8rem;
+    color: var(--hf-ink-secondary);
+}
+.hf-stat-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: .15rem;
+    padding: .1rem .4rem;
+    border-radius: .4rem;
+    font-size: .75rem;
+    font-weight: 600;
+}
+.hf-stat-delta-up   { background: rgba(12, 163, 12, .13);  color: #0a7d0a; }
+.hf-stat-delta-down { background: rgba(208, 59, 59, .13);  color: #c03434; }
+[data-hotfii-theme="dusk"] .hf-stat-delta-up,
+[data-hotfii-theme="midnight"] .hf-stat-delta-up   { color: #35c935; }
+[data-hotfii-theme="dusk"] .hf-stat-delta-down,
+[data-hotfii-theme="midnight"] .hf-stat-delta-down { color: #f07070; }
+.hf-stat-icon {
+    width: 2.9rem;
+    height: 2.9rem;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: .85rem;
+    font-size: 1.15rem;
+}
+/* The tile icon takes the same slot its charts do — money orange, usage teal —
+   so a glance down the row groups the tiles the way the charts below group. */
+.hf-stat-icon-money { background: rgba(244, 97, 10, .12); color: var(--hf-chart-1); }
+.hf-stat-icon-usage { background: rgba(15, 155, 118, .13); color: var(--hf-chart-2); }
+
+/* ── Chart cards ──────────────────────────────── */
+.hf-chart-eyebrow {
+    display: block;
+    font-size: .7rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--hf-ink-secondary);
+    margin-bottom: .15rem;
+}
+/* Sized to include the x-axis band, so the card never grows a nested scrollbar
+   around axis labels that did not fit. */
+.hf-chart { min-height: 20rem; }
+.hf-chart-sm { min-height: 15rem; }
+
+/* Legend rows double as the table view: the count is printed, so a fill that
+   sits below 3:1 on the daylight card is never the only way to read a value. */
+.hf-legend {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+}
+.hf-legend-row {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    padding: .4rem .25rem;
+    font-size: .875rem;
+    border-top: 1px solid var(--hf-border-subtle);
+}
+.hf-legend-row:first-child { border-top: 0; }
+.hf-legend-row .hf-legend-key {
+    width: .7rem;
+    height: .7rem;
+    flex-shrink: 0;
+    border-radius: .2rem;
+}
+.hf-legend-row.is-empty { opacity: .55; }
+.hf-legend-count { font-variant-numeric: tabular-nums; }
+
+/* ── ApexCharts chrome ────────────────────────── */
+.apexcharts-canvas { color: var(--hf-ink); }
+.apexcharts-tooltip.apexcharts-theme-light,
+.apexcharts-tooltip.apexcharts-theme-dark {
+    background: var(--hf-surface-card) !important;
+    border: 1px solid var(--hf-border) !important;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, .18) !important;
+    color: var(--hf-ink) !important;
+}
+.apexcharts-tooltip-title {
+    background: var(--hf-surface-raised) !important;
+    border-bottom: 1px solid var(--hf-border-subtle) !important;
+    color: var(--hf-ink-secondary) !important;
+    font-weight: 600 !important;
+}
+.apexcharts-xaxistooltip,
+.apexcharts-yaxistooltip {
+    background: var(--hf-surface-card) !important;
+    border-color: var(--hf-border) !important;
+    color: var(--hf-ink) !important;
+}
+.apexcharts-xaxistooltip-bottom::before,
+.apexcharts-xaxistooltip-bottom::after { border-bottom-color: var(--hf-border) !important; }
+.apexcharts-legend-text { color: var(--hf-ink) !important; }
 
 /* ───────────────────────────────────────────────
    Auth Shell
