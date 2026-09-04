@@ -10,7 +10,7 @@
             <td class="fw-semibold">{{ $plan->name }}</td>
             <td><span class="badge text-bg-{{ $plan->access_type === 'paid' ? 'success' : ($plan->access_type === 'internal' ? 'primary' : 'secondary') }}">{{ ucfirst($plan->access_type) }}</span></td>
             <td>{{ $plan->price_kobo ? '₦'.number_format($plan->price_kobo / 100, 0) : 'Free' }}</td>
-            <td>@if($plan->duration_minutes){{ number_format($plan->duration_minutes) }} min @endif @if($plan->data_limit_bytes)<div>{{ number_format($plan->data_limit_bytes / 1073741824, 2) }} GB</div>@endif @if(!$plan->duration_minutes && !$plan->data_limit_bytes)Unlimited @endif</td>
+            <td>@if($plan->duration_minutes){{ number_format($plan->duration_minutes) }} min @endif @if($plan->dataAllowance())<div>{{ $plan->dataAllowance() }}</div>@endif @if(!$plan->duration_minutes && !$plan->data_limit_bytes)Unlimited @endif</td>
             <td>{{ $plan->download_kbps ? number_format($plan->download_kbps / 1000, 1).' / '.number_format($plan->upload_kbps / 1000, 1).' Mbps' : 'Uncapped' }}</td>
             <td>{{ $plan->simultaneous_use }}</td>
         </tr>@empty<tr><td colspan="6" class="text-center py-5 text-secondary">Create the first access plan.</td></tr>@endforelse</tbody>

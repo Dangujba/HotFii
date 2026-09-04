@@ -23,7 +23,7 @@
 @php($plan = $batch->accessPlan)
 @php($duration = collect([
     $plan->duration_minutes ? number_format($plan->duration_minutes).' min' : null,
-    $plan->data_limit_bytes ? number_format($plan->data_limit_bytes / 1073741824, 2).' GB' : null,
+    $plan->dataAllowance(),
 ])->filter()->implode(' · ') ?: 'Unlimited')
 @foreach($batch->vouchers->chunk(2) as $pair)
 <table class="row"><tr>

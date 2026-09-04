@@ -88,6 +88,7 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
     Route::get('/finance', FinanceController::class)->middleware('role:owner,manager,accountant,viewer')->name('finance.index');
     Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
     Route::get('/reports/export', [ReportsController::class, 'export'])->name('reports.export');
+    Route::get('/reports/export/pdf', [ReportsController::class, 'exportPdf'])->name('reports.export.pdf');
 
     Route::get('/team', [TeamController::class, 'index'])->name('team.index');
     Route::post('/team', [TeamController::class, 'store'])->middleware('role:owner,manager')->name('team.store');
