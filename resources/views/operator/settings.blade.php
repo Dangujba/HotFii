@@ -19,7 +19,7 @@
 @endif
 <form method="POST" action="{{ route('settings.payment-profile') }}">@csrf
 <div class="row g-3">
-    <div class="col-md-6"><label class="form-label" for="pp-business-name">Registered business name</label><input id="pp-business-name" class="form-control" name="business_name" value="{{ old('business_name', $paymentProfile?->business_name ?? $currentOrganization->name) }}" required></div>
+    <div class="col-md-6"><label class="form-label" for="pp-business-name">Registered business name</label><input id="pp-business-name" class="form-control" name="business_name" value="{{ old('business_name', $paymentProfile?->business_name ?? $currentOrganization->name) }}" required><div class="form-text">Kept on your HotFii record. Paystack is sent the account name below.</div></div>
     <div class="col-md-6"><label class="form-label" for="pp-contact-name">Contact name</label><input id="pp-contact-name" class="form-control" name="contact_name" value="{{ old('contact_name', $paymentProfile?->contact_name) }}" required></div>
     <div class="col-md-6"><label class="form-label" for="pp-contact-phone">Contact phone</label><input id="pp-contact-phone" class="form-control" name="contact_phone" value="{{ old('contact_phone', $paymentProfile?->contact_phone) }}" required></div>
     <div class="col-md-6">
@@ -36,10 +36,18 @@
             <div class="form-text">The bank list is unavailable, so this profile goes to manual review.</div>
         @endif
     </div>
-    <div class="col-md-6"><label class="form-label" for="pp-account-name">Account name</label><input id="pp-account-name" class="form-control" name="account_name" value="{{ old('account_name', $paymentProfile?->account_name) }}" required><div class="form-text">Must match the name your bank holds for the account.</div></div>
-    <div class="col-md-6"><label class="form-label" for="pp-account-number">Account number</label><input id="pp-account-number" class="form-control" name="account_number" inputmode="numeric" pattern="[0-9]{10,16}" required placeholder="{{ $paymentProfile ? 'Re-enter to resubmit' : '' }}"></div>
+    <div class="col-md-6"><label class="form-label" for="pp-account-name">Account name</label><input id="pp-account-name" class="form-control" name="account_name" value="{{ old('account_name', $paymentProfile?->account_name) }}" required><div class="form-text">Must match the name your bank holds for the account. This is the name your settlement account carries in Paystack.</div></div>
+    <div class="col-md-6"><label class="form-label" for="pp-account-number">Account number</label><input id="pp-account-number" class="form-control" name="account_number" inputmode="numeric" pattern="[0-9]{10,16}" @if(! $paymentProfile) required @endif placeholder="{{ $paymentProfile ? 'Leave blank to keep' : '' }}">
+        @if($paymentProfile?->accountNumberHint())
+            <div class="form-text">On file: <span class="font-monospace">{{ $paymentProfile->accountNumberHint() }}</span>. Leave blank to keep it, or type a new number to replace it.</div>
+        @endif
+    </div>
     <div class="col-md-6"><label class="form-label" for="pp-identity-type">Identity type</label><select id="pp-identity-type" class="form-select" name="identity_type"><option value="nin" @selected(old('identity_type', $paymentProfile?->identity_type) === 'nin')>NIN</option><option value="bvn" @selected(old('identity_type', $paymentProfile?->identity_type) === 'bvn')>BVN</option><option value="cac" @selected(old('identity_type', $paymentProfile?->identity_type) === 'cac')>CAC</option></select></div>
-    <div class="col-md-6"><label class="form-label" for="pp-identity-number">Identity number</label><input id="pp-identity-number" class="form-control" name="identity_number" required placeholder="{{ $paymentProfile ? 'Re-enter to resubmit' : '' }}"></div>
+    <div class="col-md-6"><label class="form-label" for="pp-identity-number">Identity number</label><input id="pp-identity-number" class="form-control" name="identity_number" @if(! $paymentProfile) required @endif placeholder="{{ $paymentProfile ? 'Leave blank to keep' : '' }}">
+        @if($paymentProfile?->identityNumberHint())
+            <div class="form-text">On file: <span class="font-monospace">{{ $paymentProfile->identityNumberHint() }}</span>. Leave blank to keep it, or type a new number to replace it.</div>
+        @endif
+    </div>
 </div>
 <button class="btn btn-hotfii mt-4" data-confirm-title="Switch on live payments?" data-confirm="HotFii will ask your bank to confirm this account and then start settling real customer payments into it. Check the account number before continuing." data-confirm-icon="warning" data-confirm-button="Confirm and go live">{{ $banks !== [] ? 'Verify and enable live payments' : 'Submit for payment review' }}</button></form></div></div>
 @endif

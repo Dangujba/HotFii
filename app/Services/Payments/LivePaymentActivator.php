@@ -54,11 +54,17 @@ class LivePaymentActivator
 
         $existingCode = $organization->paystack_subaccount_code;
 
+        // Paystack shows business_name as the subaccount's label, so send the
+        // settlement account's own name — in the bank's spelling when the bank
+        // gave us one. The registered business name stays on the profile for
+        // the platform's records rather than becoming the label.
+        $subaccountName = $resolved['account_name'] ?? (string) $profile->account_name;
+
         try {
             $subaccount = filled($existingCode)
                 ? $this->paystack->updateSubaccount(
                     subaccountCode: (string) $existingCode,
-                    businessName: (string) $profile->business_name,
+                    businessName: $subaccountName,
                     bankCode: (string) $profile->bank_code,
                     accountNumber: $accountNumber,
                     contactEmail: $contactEmail,
@@ -66,7 +72,7 @@ class LivePaymentActivator
                     contactPhone: (string) $profile->contact_phone,
                 )
                 : $this->paystack->createSubaccount(
-                    businessName: (string) $profile->business_name,
+                    businessName: $subaccountName,
                     bankCode: (string) $profile->bank_code,
                     accountNumber: $accountNumber,
                     contactEmail: $contactEmail,

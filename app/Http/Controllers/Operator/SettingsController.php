@@ -62,15 +62,21 @@ class SettingsController extends Controller
         abort_unless($organization->sellsAccess(), 422, 'Internal organizations do not need live-payment approval.');
 
         $banks = $this->paystack->banks();
+        $existing = $organization->paymentProfile;
+
+        // The account and identity numbers are encrypted and never rendered
+        // back into the form, so on a resubmit an empty box means "keep what is
+        // on file" rather than "clear it". They stay required on a first submit.
+        $keepable = $existing ? ['nullable'] : ['required'];
 
         $rules = [
             'business_name' => ['required', 'string', 'max:255'],
             'contact_name' => ['required', 'string', 'max:255'],
             'contact_phone' => ['required', 'string', 'max:32'],
             'account_name' => ['required', 'string', 'max:255'],
-            'account_number' => ['required', 'digits_between:10,16'],
+            'account_number' => [...$keepable, 'digits_between:10,16'],
             'identity_type' => ['required', 'in:nin,bvn,cac'],
-            'identity_number' => ['required', 'string', 'min:8', 'max:32'],
+            'identity_number' => [...$keepable, 'string', 'min:8', 'max:32'],
         ];
 
         // With the bank list available we capture the settlement bank code,
@@ -87,27 +93,33 @@ class SettingsController extends Controller
         $bankCode = $data['bank_code'] ?? null;
         $bankName = $bankCode ? $this->paystack->bankName($bankCode) : null;
 
-        $profile = $organization->paymentProfile()->updateOrCreate(
-            [],
-            [
-                'business_name' => $data['business_name'],
-                'contact_name' => $data['contact_name'],
-                'contact_phone' => $data['contact_phone'],
-                'bank_name' => $bankName ?? $data['bank_name'] ?? '',
-                'bank_code' => $bankCode,
-                'account_name' => $data['account_name'],
-                'resolved_account_name' => null,
-                'account_number_cipher' => $data['account_number'],
-                'identity_type' => $data['identity_type'],
-                'identity_number_cipher' => $data['identity_number'],
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'reviewed_at' => null,
-                'reviewed_by' => null,
-                'auto_approved_at' => null,
-                'review_notes' => null,
-            ],
-        );
+        $attributes = [
+            'business_name' => $data['business_name'],
+            'contact_name' => $data['contact_name'],
+            'contact_phone' => $data['contact_phone'],
+            'bank_name' => $bankName ?? $data['bank_name'] ?? '',
+            'bank_code' => $bankCode,
+            'account_name' => $data['account_name'],
+            'resolved_account_name' => null,
+            'identity_type' => $data['identity_type'],
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'reviewed_at' => null,
+            'reviewed_by' => null,
+            'auto_approved_at' => null,
+            'review_notes' => null,
+        ];
+
+        // Only overwrite a cipher when a new value actually arrived.
+        if (filled($data['account_number'] ?? null)) {
+            $attributes['account_number_cipher'] = $data['account_number'];
+        }
+
+        if (filled($data['identity_number'] ?? null)) {
+            $attributes['identity_number_cipher'] = $data['identity_number'];
+        }
+
+        $profile = $organization->paymentProfile()->updateOrCreate([], $attributes);
 
         // Submitting bank details must not take a working organization
         // offline. Status stays as it is; the profile carries the review

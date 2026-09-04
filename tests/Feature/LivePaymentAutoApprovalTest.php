@@ -56,6 +56,53 @@ class LivePaymentAutoApprovalTest extends TestCase
         $this->assertSame('057', $profile->bank_code);
         $this->assertSame('BABA GONI MUHAMMAD', $profile->resolved_account_name);
         $this->assertDatabaseHas('audit_logs', ['action' => 'payment-profile.auto-approved']);
+
+        // The subaccount is labelled with the settlement account's name, in the
+        // bank's spelling, so Paystack's dashboard shows who is being paid
+        // rather than the organization's name.
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.paystack.co/subaccount'
+            && $request['business_name'] === 'BABA GONI MUHAMMAD');
+    }
+
+    public function test_a_resubmitted_profile_keeps_the_stored_account_and_identity_numbers(): void
+    {
+        Http::fake([
+            'api.paystack.co/bank?*' => Http::response($this->bankListResponse()),
+            'api.paystack.co/bank/resolve*' => Http::response($this->resolveResponse('BABA GONI MUHAMMAD')),
+            'api.paystack.co/subaccount' => Http::response([
+                'status' => true,
+                'data' => ['subaccount_code' => 'ACCT_auto123'],
+            ]),
+            'api.paystack.co/subaccount/*' => Http::response([
+                'status' => true,
+                'data' => ['subaccount_code' => 'ACCT_auto123'],
+            ]),
+        ]);
+
+        [$user, $organization] = $this->owner();
+
+        $this->actingAs($user)
+            ->withSession(['current_organization_id' => $organization->id])
+            ->post(route('settings.payment-profile'), $this->payload())
+            ->assertRedirect();
+
+        // The form never renders the ciphers back, so an empty box on a
+        // resubmit has to keep what is on file rather than wipe it.
+        $resubmit = $this->payload();
+        unset($resubmit['account_number'], $resubmit['identity_number']);
+        $resubmit['contact_phone'] = '08039999999';
+
+        $this->actingAs($user)
+            ->withSession(['current_organization_id' => $organization->id])
+            ->post(route('settings.payment-profile'), $resubmit)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $profile = $organization->paymentProfile()->first();
+
+        $this->assertSame('0123456789', $profile->account_number_cipher);
+        $this->assertSame('12345678901', $profile->identity_number_cipher);
+        $this->assertSame('08039999999', $profile->contact_phone);
     }
 
     public function test_name_mismatch_falls_back_to_manual_review(): void
