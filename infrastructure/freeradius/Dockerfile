@@ -39,12 +39,16 @@ RUN set -eux; \
 # Rendered at start-up so the database password never lands in an image layer.
 COPY sql.conf ${RADDB}/mods-available/sql.template
 COPY clients.conf ${RADDB}/clients.conf.template
+COPY hotfii-dynamic-clients ${RADDB}/sites-available/hotfii-dynamic-clients
 COPY entrypoint.sh /usr/local/bin/hotfii-radius-entrypoint
+COPY patch-default.sh /usr/local/bin/hotfii-radius-patch-default
 
 RUN set -eux; \
-    chmod +x /usr/local/bin/hotfii-radius-entrypoint; \
+    chmod +x /usr/local/bin/hotfii-radius-entrypoint /usr/local/bin/hotfii-radius-patch-default; \
+    /usr/local/bin/hotfii-radius-patch-default "$RADDB/sites-available/default"; \
     \
     ln -sf ../mods-available/sql "$RADDB/mods-enabled/sql"; \
+    ln -sf ../sites-available/hotfii-dynamic-clients "$RADDB/sites-enabled/hotfii-dynamic-clients"; \
     \
     # authorize, accounting and post-auth already reference the module as -sql,
     # which is a no-op until it is enabled. Assert that rather than assume it: if
@@ -56,6 +60,11 @@ RUN set -eux; \
     # a commented bare `sql` with no leading dash.
     grep -q '^#[[:space:]]*sql$' "$RADDB/sites-available/default"; \
     sed -i 's/^#\([[:space:]]*sql\)$/\1/' "$RADDB/sites-available/default"; \
+    \
+    # HotFii uses PostgreSQL as the authoritative accounting store.
+    # Disable the stock file-based detail accounting module.
+    grep -A20 '^accounting {' "$RADDB/sites-available/default" | grep -q '^[[:space:]]*detail$'; \
+    sed -i '/^accounting {/,/^}/{s/^[[:space:]]*detail$/    # detail  # HotFii uses PostgreSQL accounting/}' "$RADDB/sites-available/default"; \
     \
     # HotFii does not use EAP inner-tunnel, so treat it as best effort.
     if [ -f "$RADDB/sites-available/inner-tunnel" ]; then \

@@ -19,9 +19,12 @@ return [
     ],
     'wireguard' => [
         'server_public_key' => env('HOTFII_WIREGUARD_SERVER_PUBLIC_KEY'),
+        'server_address' => env('HOTFII_WIREGUARD_SERVER_ADDRESS', '10.77.0.1'),
         'endpoint' => env('HOTFII_WIREGUARD_ENDPOINT'),
         'port' => (int) env('HOTFII_WIREGUARD_PORT', 51820),
         'allowed_addresses' => env('HOTFII_WIREGUARD_ALLOWED_ADDRESSES', '10.77.0.0/16'),
+        'agent_url' => env('HOTFII_WIREGUARD_AGENT_URL', 'http://172.18.0.1:8787'),
+        'agent_secret' => env('HOTFII_WIREGUARD_AGENT_SECRET'),
     ],
     'supported_vendors' => ['generic', 'mikrotik', 'unifi', 'omada', 'ruijie', 'cambium', 'cisco', 'huawei', 'dlink'],
     'internal_plans' => [

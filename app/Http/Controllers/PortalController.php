@@ -63,6 +63,50 @@ class PortalController extends Controller
         ]);
     }
 
+    public function mikrotikLogin(NetworkDevice $device): \Illuminate\Http\Response
+    {
+        $portalUrl = route('portal.show', $device);
+
+        $html = <<<'HTML'
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Connecting to HotFii</title>
+</head>
+<body>
+    <p>Connecting to HotFii…</p>
+
+    <form id="hotfii-redirect" method="get" action="__PORTAL_URL__">
+        <input type="hidden" name="link_login" value="$(link-login-only)">
+        <input type="hidden" name="link_orig" value="$(link-orig)">
+        <input type="hidden" name="mac" value="$(mac)">
+        <input type="hidden" name="ip" value="$(ip)">
+        <noscript>
+            <button type="submit">Continue to HotFii</button>
+        </noscript>
+    </form>
+
+    <script>
+        document.getElementById('hotfii-redirect').submit();
+    </script>
+</body>
+</html>
+HTML;
+
+        $html = str_replace(
+            '__PORTAL_URL__',
+            htmlspecialchars($portalUrl, ENT_QUOTES, 'UTF-8'),
+            $html
+        );
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+        ]);
+    }
+
     public function status(NetworkDevice $device, Request $request, AllowanceService $allowances): View
     {
         $voucher = $device->organization->vouchers()

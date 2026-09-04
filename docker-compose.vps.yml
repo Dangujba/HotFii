@@ -1,0 +1,21 @@
+services:
+  web:
+    ports: !override
+      - "127.0.0.1:3000:80"
+
+    volumes:
+      - ./infrastructure/nginx/templates/hotfii-vps.conf.template:/etc/nginx/templates/hotfii.conf.template:ro
+
+    command:
+      - /bin/sh
+      - -c
+      - |
+        envsubst '$${APP_DOMAIN}' \
+          < /etc/nginx/templates/hotfii.conf.template \
+          > /etc/nginx/conf.d/hotfii.conf
+        while :; do sleep 12h; nginx -s reload; done &
+        exec nginx -g 'daemon off;'
+
+  certbot:
+    profiles:
+      - docker-tls
