@@ -13,7 +13,7 @@
 @if($paymentProfile?->status === 'approved')
 <div class="alert alert-success"><i class="bi bi-check-circle-fill me-2"></i><strong>Live payments are on.</strong> Settling to {{ $paymentProfile->resolved_account_name ?: $paymentProfile->account_name }} at {{ $paymentProfile->bank_name }}.@if($paymentProfile->wasAutoApproved()) Approved automatically {{ $paymentProfile->auto_approved_at->diffForHumans() }}.@endif</div>
 @elseif($paymentProfile?->review_notes)<div class="alert alert-{{ $paymentProfile->status === 'rejected' ? 'danger' : 'info' }}"><strong>Review note:</strong> {{ $paymentProfile->review_notes }}</div>@endif
-<p class="text-secondary">Only payment information is checked. Router, plan, RADIUS, voucher, and Paystack test-mode work remains available in sandbox.</p>
+<p class="text-secondary">Your organization is already live. This step only unlocks card payments on the captive portal, so customers can pay you online. Routers, plans, RADIUS, vouchers and cash sales all work without it.</p>
 @if($banks !== [])
 <div class="alert alert-info py-2 small mb-3"><i class="bi bi-lightning-charge-fill me-1"></i>Approval is automatic: HotFii asks your bank to confirm the account, then opens your settlement subaccount straight away.</div>
 @endif

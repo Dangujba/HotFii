@@ -5,7 +5,6 @@ namespace App\Services\Billing;
 use App\Data\FeeQuote;
 use App\Domain\Enums\BillingPlan;
 use App\Domain\Enums\OrganizationMode;
-use App\Domain\Enums\OrganizationStatus;
 use App\Models\Organization;
 
 class CommerceFeeCalculator
@@ -15,11 +14,11 @@ class CommerceFeeCalculator
         $billableSalesKobo = max(0, $billableSalesKobo);
         $percentage = intdiv($billableSalesKobo * (int) config('hotfii.commerce.platform_fee_bps'), 10_000);
 
-        $firstLiveActivation = $organization->status === OrganizationStatus::Live
-            && $organization->live_payments_enabled_at
-            && ! $organization->trial_started_at;
+        // Nothing is charged before the trial clock has started, which happens
+        // on the first real activation rather than at registration.
+        $beforeFirstActivation = ! $organization->trial_started_at;
 
-        if ($organization->inTrial() || $organization->billing_plan === BillingPlan::Sandbox || $firstLiveActivation) {
+        if ($organization->inTrial() || $organization->billing_plan === BillingPlan::Sandbox || $beforeFirstActivation) {
             return new FeeQuote($billableSalesKobo, $percentage, 0, 0, 'trial_or_sandbox');
         }
 

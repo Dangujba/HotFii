@@ -63,11 +63,27 @@ class Organization extends Model
         return $this->status === OrganizationStatus::Trial && $this->trial_ends_at?->isFuture();
     }
 
+    /**
+     * Collecting real money is gated on the payment profile alone, not on the
+     * account lifecycle. An organization is Live from registration so it can
+     * build plans, provision routers and sell in sandbox; the settlement
+     * subaccount is what unlocks live collection.
+     */
     public function canCollectLivePayments(): bool
     {
         return $this->sellsAccess()
-            && in_array($this->status, [OrganizationStatus::Live, OrganizationStatus::Trial], true)
+            && ! in_array($this->status, [OrganizationStatus::Suspended, OrganizationStatus::PaymentRejected], true)
             && $this->live_payments_enabled_at !== null
+            && filled($this->paystack_subaccount_code);
+    }
+
+    /**
+     * True once a payment profile exists and is approved. Distinct from
+     * canCollectLivePayments(), which also refuses suspended accounts.
+     */
+    public function paymentProfileActivated(): bool
+    {
+        return $this->live_payments_enabled_at !== null
             && filled($this->paystack_subaccount_code);
     }
 }

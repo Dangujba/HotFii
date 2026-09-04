@@ -109,7 +109,13 @@ class SettingsController extends Controller
             ],
         );
 
-        $organization->update(['status' => OrganizationStatus::PaymentReview]);
+        // Submitting bank details must not take a working organization
+        // offline. Status stays as it is; the profile carries the review
+        // state, and only PaymentRejected accounts are lifted back to Live.
+        if ($organization->status === OrganizationStatus::PaymentRejected) {
+            $organization->update(['status' => OrganizationStatus::Live]);
+        }
+
         $this->audit($request, $organization, 'payment-profile.submitted', [], ['profile_id' => $profile->id]);
 
         $result = $this->activator->attempt($organization, $profile, (string) $request->user()->email);
@@ -132,7 +138,7 @@ class SettingsController extends Controller
             'reason' => $result['reason'],
         ]);
 
-        return back()->with('success', 'Payment details submitted. '.$result['reason'].' A HotFii reviewer will finish the check. Sandbox testing remains available.');
+        return back()->with('success', 'Payment details submitted. '.$result['reason'].' A HotFii reviewer will finish the check. Everything else on your account keeps working, and you can still sell with vouchers and cash.');
     }
 
     private function audit(Request $request, Organization $organization, string $action, array $before, array $after): void

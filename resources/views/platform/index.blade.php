@@ -8,7 +8,7 @@
         </div>
     </div>
     <div class="row g-3 mb-4">
-        @foreach([['Organizations', $stats['organizations'], 'buildings', 'primary'], ['Live organizations', $stats['live_organizations'], 'broadcast-pin', 'success'], ['Monthly processed volume', '₦' . number_format($stats['monthly_volume'] / 100, 0), 'cash-stack', 'info'], ['Payment reviews', $stats['pending_reviews'], 'person-check', 'warning']] as [$label, $value, $icon, $color])
+        @foreach([['Organizations', $stats['organizations'], 'buildings', 'primary'], ['Collecting payments', $stats['live_organizations'], 'broadcast-pin', 'success'], ['Monthly processed volume', '₦' . number_format($stats['monthly_volume'] / 100, 0), 'cash-stack', 'info'], ['Payment reviews', $stats['pending_reviews'], 'person-check', 'warning']] as [$label, $value, $icon, $color])
             <div class="col-sm-6 col-xl-3">
                 <div class="card metric-card">
                     <div class="card-body">

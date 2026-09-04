@@ -2,7 +2,6 @@
 
 namespace App\Services\Payments;
 
-use App\Domain\Enums\OrganizationStatus;
 use App\Domain\Enums\PaymentStatus;
 use App\Events\PaymentStatusChanged;
 use App\Models\FeeLedgerEntry;
@@ -40,7 +39,7 @@ class PaymentProcessor
             ]);
 
             $organization = $transaction->organization;
-            if (! $organization->trial_started_at && $organization->status === OrganizationStatus::Live) {
+            if (! $organization->trial_started_at) {
                 $organization = $this->trials->start($organization);
             }
 

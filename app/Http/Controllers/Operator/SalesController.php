@@ -53,7 +53,9 @@ class SalesController extends Controller
         $plan = $organization->accessPlans()->where('access_type', 'paid')->where('is_active', true)->findOrFail($data['access_plan_id']);
         $device = $organization->networkDevices()->where('status', 'online')->findOrFail($data['network_device_id']);
 
-        if ($organization->status === OrganizationStatus::Sandbox && ! $organization->trial_started_at) {
+        // The trial clock starts on the first real activation, whatever the
+        // account status is, so a never-sold organization is not billed.
+        if (! $organization->trial_started_at) {
             $organization = $trials->start($organization);
         }
 

@@ -38,8 +38,12 @@ class GenerateMonthlyInvoices implements ShouldQueue
     {
         $period = $this->billingPeriod();
 
+        // Organizations are Live from registration, so status can no longer
+        // stand in for "has started paying". An untouched account has no
+        // trial_started_at and must never be invoiced for a subscription.
         Organization::query()
-            ->whereNotIn('status', [OrganizationStatus::Sandbox, OrganizationStatus::PaymentReview, OrganizationStatus::PaymentRejected])
+            ->whereNotNull('trial_started_at')
+            ->where('status', '!=', OrganizationStatus::PaymentRejected)
             ->chunkById(100, function ($organizations) use ($period) {
                 foreach ($organizations as $organization) {
                     $ledger = FeeLedgerEntry::where('organization_id', $organization->id)

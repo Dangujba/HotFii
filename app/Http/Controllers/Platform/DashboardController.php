@@ -25,11 +25,20 @@ class DashboardController extends Controller
         return view('platform.index', [
             'stats' => [
                 'organizations' => Organization::count(),
-                'live_organizations' => Organization::where('status', 'live')->count(),
+                // Every organization is Live from registration, so the useful
+                // count is how many can actually collect money.
+                'live_organizations' => Organization::whereNotNull('live_payments_enabled_at')
+                    ->whereNotNull('paystack_subaccount_code')
+                    ->count(),
                 'monthly_volume' => Transaction::where('status', 'successful')->where('paid_at', '>=', now()->startOfMonth())->sum('gross_amount_kobo'),
-                'pending_reviews' => Organization::where('status', 'payment_review')->count(),
+                'pending_reviews' => Organization::whereHas('paymentProfile', fn ($query) => $query->where('status', 'submitted'))->count(),
             ],
-            'paymentRequests' => Organization::where('status', 'payment_review')->with('paymentProfile')->oldest()->get(),
+            // Keyed off the profile, not the organization status: organizations
+            // stay Live while a profile waits, so status cannot signal this.
+            'paymentRequests' => Organization::whereHas('paymentProfile', fn ($query) => $query->where('status', 'submitted'))
+                ->with('paymentProfile')
+                ->oldest()
+                ->get(),
             'recentOrganizations' => Organization::latest()->limit(10)->get(),
             'health' => [
                 'redis' => $redis,

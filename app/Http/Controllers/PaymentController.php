@@ -27,7 +27,10 @@ class PaymentController extends Controller
     ): JsonResponse {
         $organization = $device->organization;
         abort_unless($organization->sellsAccess(), 422, 'This organization does not sell guest access.');
-        abort_if($paystack->isLiveMode() && ! $organization->canCollectLivePayments(), 403, 'Live collections require an approved payment profile.');
+        // The payment profile is the only gate on collecting money. Without an
+        // approved settlement subaccount there is nowhere for the money to go,
+        // so this is refused in test mode too rather than paying the platform.
+        abort_unless($organization->canCollectLivePayments(), 403, 'This organization has not activated its payment profile yet.');
 
         $data = $request->validate([
             'access_plan_uuid' => ['required', 'uuid'],

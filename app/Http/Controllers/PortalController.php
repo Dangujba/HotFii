@@ -31,6 +31,9 @@ class PortalController extends Controller
                 ->where('is_active', true)
                 ->orderBy('price_kobo')
                 ->get(),
+            // Hides the card-payment tab entirely when there is no settlement
+            // account, rather than letting a customer pay into nowhere.
+            'canBuyOnline' => $device->organization->canCollectLivePayments(),
             'portalContext' => $request->only(['link_login', 'link_orig', 'mac', 'ip']),
         ]);
     }

@@ -6,9 +6,14 @@
 @section('content')
 <livewire:dashboard-pulse :organization-uuid="$currentOrganization->uuid" />
 
-@if($currentOrganization->status->value === 'sandbox')
+@if($currentOrganization->sellsAccess() && ! $currentOrganization->paymentProfileActivated())
     <div class="alert alert-warning border-0 shadow-sm">
-        <div class="d-flex"><i class="bi bi-flask fs-3 me-3"></i><div><strong>Your organization is in sandbox mode.</strong><div>Connect a router and run the readiness test. Payment review is needed only before live collections.</div></div></div>
+        <div class="d-flex align-items-center"><i class="bi bi-credit-card-2-front fs-3 me-3"></i>
+            <div class="flex-grow-1"><strong>Online payments are not active yet.</strong>
+                <div>Everything else is live: routers, plans, vouchers and staff access all work. Activate your payment profile to let customers pay from the portal.</div>
+            </div>
+            <a href="{{ route('settings.index') }}" class="btn btn-hotfii ms-3 flex-shrink-0">Activate payments</a>
+        </div>
     </div>
 @endif
 

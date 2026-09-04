@@ -14,11 +14,13 @@
 @if($errors->any())<div class="alert alert-danger">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif
 
 <ul class="nav nav-pills nav-fill mb-4" role="tablist">
-@if($device->organization->sellsAccess())<li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#buy">Buy access</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#voucher">Voucher</button></li>@endif
+@if($canBuyOnline)<li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#buy">Buy access</button></li>@endif
+@if($device->organization->sellsAccess())<li class="nav-item"><button class="nav-link {{ $canBuyOnline ? '' : 'active' }}" data-bs-toggle="pill" data-bs-target="#voucher">Voucher</button></li>@endif
 @if($device->organization->mode->value !== 'commerce')<li class="nav-item"><button class="nav-link {{ $device->organization->sellsAccess() ? '' : 'active' }}" data-bs-toggle="pill" data-bs-target="#staff">Staff / member</button></li>@endif
 </ul>
 <div class="tab-content">
 @if($device->organization->sellsAccess())
+@if($canBuyOnline)
 <div class="tab-pane fade show active" id="buy">
 <form id="payment-form">
 <div class="vstack gap-2 mb-3">@forelse($plans->where('access_type','paid') as $plan)<label class="plan-option"><input class="form-check-input me-2" type="radio" name="access_plan_uuid" value="{{ $plan->uuid }}" @checked($loop->first)><span><strong>{{ $plan->name }}</strong><small>@if($plan->duration_minutes){{ $plan->duration_minutes }} minutes @endif @if($plan->data_limit_bytes)· {{ number_format($plan->data_limit_bytes / 1073741824, 2) }} GB @endif @if($plan->download_kbps)· {{ number_format($plan->download_kbps / 1000, 1) }} Mbps @endif</small></span><strong class="ms-auto">₦{{ number_format($plan->price_kobo / 100, 0) }}</strong></label>@empty<div class="alert alert-warning">No paid plans are available.</div>@endforelse</div>
@@ -29,7 +31,8 @@
 <div id="payment-error" class="text-danger small mt-2"></div>
 </form>
 </div>
-<div class="tab-pane fade" id="voucher">
+@endif
+<div class="tab-pane fade {{ $canBuyOnline ? '' : 'show active' }}" id="voucher">
 <form method="POST" action="{{ route('portal.redeem',$device) }}">@csrf
 <div class="mb-3"><label class="form-label">Printed voucher code</label><input id="voucher-code" class="form-control form-control-lg text-uppercase font-monospace" name="voucher_code" value="{{ old('voucher_code') }}" placeholder="HF-XXXX-XXXX-XXXX" required></div>
 <div class="mb-3"><label class="form-label">Phone <span class="text-secondary">(optional)</span></label><input class="form-control" name="phone" inputmode="tel"></div>

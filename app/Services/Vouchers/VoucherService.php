@@ -83,7 +83,7 @@ class VoucherService
             if ($organization->status === OrganizationStatus::Suspended && ! $voucher->is_complimentary) {
                 throw new RuntimeException('Paid voucher activation is unavailable while the organization is suspended.');
             }
-            if ($organization->status === OrganizationStatus::Sandbox && ! $organization->trial_started_at
+            if (! $organization->trial_started_at
                 && $organization->networkDevices()->where('status', 'online')->exists()) {
                 $organization = $this->trials->start($organization);
             }

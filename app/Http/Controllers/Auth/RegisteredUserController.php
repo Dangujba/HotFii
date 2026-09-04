@@ -28,11 +28,11 @@ class RegisteredUserController extends Controller
         [$user,$organization]=DB::transaction(function() use($data){
             $user=User::create(['name'=>$data['name'],'email'=>Str::lower($data['email']),'password'=>$data['password']]);
             $mode=OrganizationMode::from($data['mode']);
-            $organization=Organization::create(['name'=>$data['organization_name'],'slug'=>Str::slug($data['organization_name']).'-'.Str::lower(Str::random(5)),'mode'=>$mode,'status'=>OrganizationStatus::Sandbox,'billing_plan'=>$mode===OrganizationMode::Commerce?BillingPlan::Sandbox:BillingPlan::Organization20]);
+            $organization=Organization::create(['name'=>$data['organization_name'],'slug'=>Str::slug($data['organization_name']).'-'.Str::lower(Str::random(5)),'mode'=>$mode,'status'=>OrganizationStatus::Live,'billing_plan'=>$mode===OrganizationMode::Commerce?BillingPlan::Sandbox:BillingPlan::Organization20]);
             $organization->users()->attach($user->id,['role'=>MembershipRole::Owner->value,'joined_at'=>now()]);
             return [$user,$organization];
         });
         event(new Registered($user)); Auth::login($user); $request->session()->put('current_organization_id',$organization->id);
-        return redirect()->route('dashboard')->with('success','Your HotFii sandbox is ready. Add a location and router when you are ready.');
+        return redirect()->route('dashboard')->with('success','Your organization is live. Add a location and router, then activate your payment profile when you are ready to collect money.');
     }
 }

@@ -4,7 +4,6 @@ namespace App\Services\Network;
 
 use App\Domain\Enums\NetworkDeviceStatus;
 use App\Domain\Enums\OrganizationMode;
-use App\Domain\Enums\OrganizationStatus;
 use App\Domain\Enums\RouterVendor;
 use App\Domain\Enums\SupportLevel;
 use App\Events\NetworkDeviceStatusChanged;
@@ -114,10 +113,12 @@ class NetworkDeviceManager
             NetworkDeviceStatusChanged::dispatch($device->refresh());
         }
 
+        // Internal organizations never sell, so a router coming online is the
+        // only signal that they have started using the product.
         $organization = $device->organization;
         if ($status === NetworkDeviceStatus::Online
             && $organization->mode === OrganizationMode::Internal
-            && $organization->status === OrganizationStatus::Sandbox) {
+            && ! $organization->trial_started_at) {
             $this->trials->start($organization);
         }
     }

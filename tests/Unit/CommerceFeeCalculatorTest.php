@@ -15,7 +15,7 @@ class CommerceFeeCalculatorTest extends TestCase
     {
         $organization = new Organization([
             'mode' => OrganizationMode::Commerce,
-            'status' => OrganizationStatus::Sandbox,
+            'status' => OrganizationStatus::Live,
             'billing_plan' => BillingPlan::Sandbox,
         ]);
 
@@ -24,6 +24,22 @@ class CommerceFeeCalculatorTest extends TestCase
         $this->assertSame(200000, $quote->percentageFeeKobo);
         $this->assertSame(0, $quote->chargeablePercentageFeeKobo());
         $this->assertSame(0, $quote->totalFeeKobo);
+    }
+
+    public function test_a_live_organization_that_never_sold_is_not_charged(): void
+    {
+        // Live is now the registration default, so status alone must not make
+        // an untouched organization billable.
+        $organization = new Organization([
+            'mode' => OrganizationMode::Commerce,
+            'status' => OrganizationStatus::Live,
+            'billing_plan' => BillingPlan::StandardSeller,
+        ]);
+
+        $quote = app(CommerceFeeCalculator::class)->quote($organization, 10000000);
+
+        $this->assertSame(0, $quote->totalFeeKobo);
+        $this->assertSame('trial_or_sandbox', $quote->reason);
     }
 
     public function test_standard_uses_two_percent_or_monthly_minimum(): void
