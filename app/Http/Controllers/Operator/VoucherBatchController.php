@@ -45,7 +45,13 @@ class VoucherBatchController extends Controller
             $request->has('dashed_pin') ? $request->boolean('dashed_pin') : true,
         );
 
-        return redirect()->route('vouchers.print', $batch)->with('success', 'Voucher batch generated.');
+        // Redirecting straight at the PDF leaves the browser downloading a file
+        // instead of navigating, so the page never reloads and the submit
+        // spinner never clears. Land back on the list and let the view pull the
+        // download in out of band.
+        return redirect()->route('vouchers.index')
+            ->with('success', 'Voucher batch generated.')
+            ->with('download_batch', $batch->getRouteKey());
     }
 
     public function print(Request $request, VoucherBatch $batch): Response
