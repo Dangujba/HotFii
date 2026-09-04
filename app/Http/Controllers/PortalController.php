@@ -9,6 +9,7 @@ use App\Services\Vouchers\VoucherService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -107,6 +108,70 @@ HTML;
         return response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
+        ]);
+    }
+
+    public function connected(NetworkDevice $device, Request $request)
+    {
+        $voucher = $device->organization->vouchers()
+            ->with('credential')
+            ->where('uuid', $request->query('voucher'))
+            ->first();
+
+        $config = $device->management_config ?? [];
+        $nasIp = is_array($config)
+            ? ($config['wireguard_address'] ?? null)
+            : null;
+
+        if ($nasIp) {
+            $nasIp = preg_replace('/\/\d+$/', '', $nasIp);
+        }
+
+        if (! $nasIp) {
+            $nasIp = DB::table('nas')
+                ->where('network_device_id', $device->id)
+                ->value('nasname');
+        }
+
+        $mac = $request->query('mac');
+
+        $connected = false;
+
+        if ($voucher?->credential && $nasIp) {
+            $query = DB::table('radacct')
+                ->where('username', $voucher->credential->username)
+                ->where('nasipaddress', $nasIp)
+                ->whereNull('acctstoptime')
+                ->whereRaw("(
+                    acctstarttime >= CURRENT_TIMESTAMP - INTERVAL '3 minutes'
+                    OR acctupdatetime >= CURRENT_TIMESTAMP - INTERVAL '3 minutes'
+                )");
+
+            if ($mac) {
+                $query->where('callingstationid', $mac);
+            }
+
+            $connected = $query->exists();
+        }
+
+        if ($request->boolean('check')) {
+            return response()->json([
+                'connected' => $connected,
+            ]);
+        }
+
+        $originalUrl = $request->query('orig');
+
+        if (! is_string($originalUrl)
+            || ! preg_match('#^https?://#i', $originalUrl)) {
+            $originalUrl = 'https://www.google.com';
+        }
+
+        return view('portal.connected', [
+            'device' => $device,
+            'voucher' => $voucher,
+            'connected' => $connected,
+            'originalUrl' => $originalUrl,
         ]);
     }
 

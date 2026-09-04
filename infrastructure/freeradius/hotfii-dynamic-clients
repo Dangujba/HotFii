@@ -1,15 +1,14 @@
 # HotFii dynamic RADIUS clients.
 #
 # Only routers connected through the private HotFii WireGuard network may
-# become dynamic clients. Their individual secrets are read from the nas table.
+# become dynamic clients. Their individual secrets are read from PostgreSQL.
 
 client hotfii-wireguard-dynamic {
     ipaddr = 10.77.0.0/16
-
     dynamic_clients = hotfii_dynamic_clients
 
-    # Re-check the database periodically so secret/device changes do not
-    # require restarting FreeRADIUS.
+    # Cache each dynamically discovered router for five minutes.
+    # After expiry FreeRADIUS performs the SQL lookup again.
     lifetime = 300
 }
 
@@ -18,20 +17,13 @@ server hotfii_dynamic_clients {
         if ("%{sql:SELECT nasname FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}") {
             update control {
                 &FreeRADIUS-Client-IP-Address = "%{Packet-Src-IP-Address}"
-
                 &FreeRADIUS-Client-Shortname = "%{sql:SELECT shortname FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
-
                 &FreeRADIUS-Client-Secret = "%{sql:SELECT secret FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
-
                 &FreeRADIUS-Client-NAS-Type = "%{sql:SELECT type FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
-
-                # HotFii MikroTik provisioning uses Message-Authenticator.
                 &FreeRADIUS-Client-Require-MA = yes
             }
-
-            ok
         }
 
-        reject
+        ok
     }
 }

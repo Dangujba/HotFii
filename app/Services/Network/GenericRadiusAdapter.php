@@ -91,22 +91,43 @@ class GenericRadiusAdapter implements RouterAdapter
     public function disconnect(HotspotSession $session): bool
     {
         $device = $session->networkDevice;
-        if (! $session->acct_session_id || ! $device->management_address) {
+
+        $managementConfig = $device->management_config ?? [];
+        $wireGuardAddress = is_array($managementConfig)
+            ? ($managementConfig['wireguard_address'] ?? null)
+            : null;
+
+        $target = $wireGuardAddress ?: $device->management_address;
+
+        if (! $session->acct_session_id || ! $target) {
             return false;
         }
 
+        // WireGuard addresses are stored as CIDR values such as 10.77.0.3/32.
+        $target = preg_replace('/\/\d+$/', '', trim((string) $target));
+
         $host = parse_url(
-            str_contains($device->management_address, '://') ? $device->management_address : 'udp://'.$device->management_address,
+            str_contains($target, '://') ? $target : 'udp://'.$target,
             PHP_URL_HOST,
         );
+
         if (! $host) {
             return false;
         }
 
         $clean = fn (?string $value) => str_replace(["\r", "\n", '"'], ['', '', '\"'], (string) $value);
+
+        $framedIp = preg_replace('/\/\d+$/', '', (string) $session->ip_address);
+
+        if (! $framedIp) {
+            return false;
+        }
+
+        // MikroTik HotSpot Disconnect-Request works reliably with
+        // User-Name + Framed-IP-Address. Additional session attributes
+        // may cause RouterOS to return Unsupported-Extension.
         $payload = 'User-Name = "'.$clean($session->radius_username).'"'.PHP_EOL
-            .'Acct-Session-Id = "'.$clean($session->acct_session_id).'"'.PHP_EOL
-            .'Calling-Station-Id = "'.$clean($session->mac_address).'"'.PHP_EOL;
+            .'Framed-IP-Address = '.$clean($framedIp).PHP_EOL;
 
         $result = Process::timeout(10)
             ->input($payload)

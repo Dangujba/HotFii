@@ -51,6 +51,7 @@ Route::prefix('connect/{device}')->name('portal.')->middleware('throttle:120,1')
     Route::get('/', [PortalController::class, 'show'])->name('show');
     Route::post('/voucher', [PortalController::class, 'redeem'])->name('redeem');
     Route::get('/status', [PortalController::class, 'status'])->name('status');
+    Route::get('/connected', [PortalController::class, 'connected'])->name('connected');
     Route::get('/mikrotik/login.html', [PortalController::class, 'mikrotikLogin'])->name('mikrotik-login');
     Route::post('/payment', [PaymentController::class, 'initialize'])->name('payment');
     Route::get('/payment/{transaction}/callback', [PaymentController::class, 'callback'])->name('payment.callback');
