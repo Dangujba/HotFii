@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\VoucherBatch;
 use App\Services\Vouchers\VoucherService;
+use App\Support\ListFilters;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,12 +17,34 @@ use Illuminate\View\View;
 
 class VoucherBatchController extends Controller
 {
-    public function index(Organization $organization): View
+    /** A batch is minted, then printed. Individual vouchers carry their own status. */
+    private const BATCH_STATUSES = ['generated', 'printed'];
+
+    public function index(Request $request, Organization $organization): View
     {
+        $filters = [
+            'search' => ListFilters::text($request, 'search'),
+            'status' => ListFilters::choice($request, 'status', self::BATCH_STATUSES),
+            'plan' => ListFilters::id($request, 'plan'),
+        ];
+
         return view('operator.vouchers', [
-            'batches' => $organization->voucherBatches()->with('accessPlan')->latest()->paginate(20),
+            'batches' => $organization->voucherBatches()
+                ->with('accessPlan')
+                ->when($filters['search'], fn ($query, $term) => $query->where('reference', 'like', "%{$term}%"))
+                ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
+                ->when($filters['plan'], fn ($query, $plan) => $query->where('access_plan_id', $plan))
+                ->latest()
+                ->paginate(20)
+                ->withQueryString(),
             'plans' => $organization->accessPlans()->where('is_active', true)->where('access_type', 'paid')->orderBy('name')->get(),
+            // Batches outlive the plans they were minted from, so the filter
+            // list is not the same as the list you can generate against.
+            'filterPlans' => $organization->accessPlans()->orderBy('name')->get(['id', 'name']),
             'pinFormats' => VoucherPinFormat::cases(),
+            'statuses' => self::BATCH_STATUSES,
+            'filters' => $filters,
+            'filtered' => ListFilters::any($filters),
         ]);
     }
 

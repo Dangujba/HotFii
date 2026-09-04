@@ -4,9 +4,15 @@
 @section('subheading', 'Generate, assign, print, sell, and redeem hard-copy access')
 @section('content')
 <div class="row g-4">
-    <div class="col-xl-8"><div class="card metric-card"><div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
+    <div class="col-xl-8"><div class="card metric-card">
+        <x-filter-bar :action="route('vouchers.index')" :active="$filtered">
+            <div class="col-md-4"><input class="form-control form-control-sm" name="search" value="{{ $filters['search'] }}" placeholder="Batch reference"></div>
+            <div class="col-md-3"><select class="form-select form-select-sm" name="status"><option value="">Any status</option>@foreach($statuses as $status)<option value="{{ $status }}" @selected($filters['status'] === $status)>{{ ucfirst($status) }}</option>@endforeach</select></div>
+            <div class="col-md-3"><select class="form-select form-select-sm" name="plan"><option value="">All plans</option>@foreach($filterPlans as $option)<option value="{{ $option->id }}" @selected($filters['plan'] === $option->id)>{{ $option->name }}</option>@endforeach</select></div>
+        </x-filter-bar>
+        <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
         <thead><tr><th>Reference</th><th>Plan</th><th>Quantity</th><th>Retail value</th><th>Status</th><th></th></tr></thead>
-        <tbody>@forelse($batches as $batch)<tr><td class="fw-semibold">{{ $batch->reference }}</td><td>{{ $batch->accessPlan->name }}</td><td>{{ number_format($batch->quantity) }}</td><td>₦{{ number_format(($batch->retail_price_kobo * $batch->quantity) / 100, 0) }}</td><td><span class="badge text-bg-light border">{{ ucfirst($batch->status instanceof BackedEnum ? $batch->status->value : $batch->status) }}</span></td><td><a class="btn btn-sm btn-hotfii" href="{{ route('vouchers.print', $batch) }}" download><i class="bi bi-printer me-1"></i>PDF</a></td></tr>@empty<tr><td colspan="6" class="text-center py-5 text-secondary">No voucher batches yet.</td></tr>@endforelse</tbody>
+        <tbody>@forelse($batches as $batch)<tr><td class="fw-semibold">{{ $batch->reference }}</td><td>{{ $batch->accessPlan->name }}</td><td>{{ number_format($batch->quantity) }}</td><td>₦{{ number_format(($batch->retail_price_kobo * $batch->quantity) / 100, 0) }}</td><td><span class="badge text-bg-light border">{{ ucfirst($batch->status instanceof BackedEnum ? $batch->status->value : $batch->status) }}</span></td><td><a class="btn btn-sm btn-hotfii" href="{{ route('vouchers.print', $batch) }}" download><i class="bi bi-printer me-1"></i>PDF</a></td></tr>@empty<tr><td colspan="6" class="text-center py-5 text-secondary">{{ $filtered ? 'No batches match these filters.' : 'No voucher batches yet.' }}</td></tr>@endforelse</tbody>
     </table></div></div></div><div class="mt-3">{{ $batches->links() }}</div></div>
     <div class="col-xl-4"><div class="card metric-card"><div class="card-header"><h2 class="h5 mb-0">Generate batch</h2></div><div class="card-body">
         @if($plans->isEmpty())<div class="alert alert-warning">Create an active access plan first.</div>@else<form method="POST" action="{{ route('vouchers.store') }}">@csrf

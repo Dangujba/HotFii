@@ -4,13 +4,37 @@ namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class AccessPlanController extends Controller
 {
-    public function index(Organization $organization): View { return view('operator.plans',['plans'=>$organization->accessPlans()->latest()->paginate(20)]); }
+    private const TYPES = ['paid', 'free', 'internal'];
+
+    public function index(Request $request, Organization $organization): View
+    {
+        $filters = [
+            'search' => ListFilters::text($request, 'search'),
+            'type' => ListFilters::choice($request, 'type', self::TYPES),
+            'state' => ListFilters::choice($request, 'state', ['active', 'inactive']),
+        ];
+
+        return view('operator.plans', [
+            'plans' => $organization->accessPlans()
+                ->when($filters['search'], fn ($query, $term) => $query->where('name', 'like', "%{$term}%"))
+                ->when($filters['type'], fn ($query, $type) => $query->where('access_type', $type))
+                ->when($filters['state'], fn ($query, $state) => $query->where('is_active', $state === 'active'))
+                ->latest()
+                ->paginate(20)
+                ->withQueryString(),
+            'types' => self::TYPES,
+            'filters' => $filters,
+            'filtered' => ListFilters::any($filters),
+        ]);
+    }
+
     public function store(Request $request, Organization $organization): RedirectResponse
     {
         $data=$request->validate(['name'=>['required','string','max:255'],'access_type'=>['required','in:paid,free,internal'],'price_naira'=>['required','numeric','min:0'],'duration_minutes'=>['nullable','integer','min:1'],'data_limit_mb'=>['nullable','integer','min:1'],'download_kbps'=>['nullable','integer','min:64'],'upload_kbps'=>['nullable','integer','min:64'],'simultaneous_use'=>['required','integer','min:1','max:20'],'validity_days'=>['nullable','integer','min:1']]);

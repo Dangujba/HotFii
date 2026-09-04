@@ -88,9 +88,18 @@
                 </div>
             </div>
             <div class="card metric-card">
-                <div class="card-header">
-                    <h2 class="h5 mb-0">Recent organizations</h2>
-                </div>
+                <x-filter-bar :action="route('platform.index')" :active="$filtered" title="Organizations">
+                    <div class="col-md-4"><input class="form-control form-control-sm" name="search"
+                            value="{{ $filters['search'] }}" placeholder="Organization name"></div>
+                    <div class="col-md-3"><select class="form-select form-select-sm" name="status">
+                            <option value="">Any status</option>@foreach($statuses as $status)<option
+                                value="{{ $status->value }}" @selected($filters['status'] === $status->value)>{{ str_replace('_', ' ', ucfirst($status->value)) }}</option>@endforeach
+                        </select></div>
+                    <div class="col-md-3"><select class="form-select form-select-sm" name="mode">
+                            <option value="">All modes</option>@foreach($modes as $mode)<option value="{{ $mode->value }}"
+                                @selected($filters['mode'] === $mode->value)>{{ ucfirst($mode->value) }}</option>@endforeach
+                        </select></div>
+                </x-filter-bar>
                 <div class="card-body p-0">
                     <table class="table mb-0">
                         <thead>
@@ -102,7 +111,7 @@
                                 <th>Support</th>
                             </tr>
                         </thead>
-                        <tbody>@foreach($recentOrganizations as $organization)
+                        <tbody>@forelse($organizations as $organization)
                             <tr>
                                 <td>{{ $organization->name }}</td>
                                 <td>{{ ucfirst($organization->mode->value) }}</td>
@@ -119,11 +128,12 @@
                                             data-confirm-icon="warning"
                                             data-confirm-button="Enter support mode">Open</button></form>
                                 </td>
-                        </tr>@endforeach
+                        </tr>@empty<tr><td colspan="5" class="text-center py-5 text-secondary">{{ $filtered ? 'No organizations match these filters.' : 'No organizations yet.' }}</td></tr>@endforelse
                         </tbody>
                     </table>
                 </div>
             </div>
+            <div class="mt-3">{{ $organizations->links() }}</div>
         </div>
         <div class="col-xl-4">
             <div class="card metric-card">

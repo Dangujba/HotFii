@@ -11,9 +11,15 @@
 @endif
 <div class="row g-4">
     <div class="col-xl-8">
-        <div class="card metric-card"><div class="card-header"><form class="row g-2"><div class="col"><input class="form-control" name="search" value="{{ $search }}" placeholder="Search name, email, or phone"></div><div class="col-auto"><button class="btn btn-outline-secondary"><i class="bi bi-search"></i></button></div></form></div><div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
+        <div class="card metric-card">
+        <x-filter-bar :action="route('customers.index')" :active="$filtered">
+            <div class="col-md-4"><input class="form-control form-control-sm" name="search" value="{{ $filters['search'] }}" placeholder="Name, email, or phone"></div>
+            <div class="col-md-3"><select class="form-select form-select-sm" name="type"><option value="">All types</option>@foreach($types as $type)<option value="{{ $type }}" @selected($filters['type'] === $type)>{{ ucfirst($type) }}</option>@endforeach</select></div>
+            <div class="col-md-3"><select class="form-select form-select-sm" name="status"><option value="">Any status</option>@foreach($statuses as $status)<option value="{{ $status }}" @selected($filters['status'] === $status)>{{ ucfirst($status) }}</option>@endforeach</select></div>
+        </x-filter-bar>
+        <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
             <thead><tr><th>Person</th><th>Type</th><th>Status</th><th>Credential</th><th>Last access</th></tr></thead>
-            <tbody>@forelse($customers as $customer)<tr><td><strong>{{ $customer->name ?: 'Guest customer' }}</strong><div class="small text-secondary">{{ $customer->email ?: $customer->phone }}</div></td><td>{{ ucfirst($customer->type) }}</td><td><span class="badge text-bg-{{ $customer->status === 'active' ? 'success' : 'secondary' }}">{{ ucfirst($customer->status) }}</span></td><td>@if($customer->currentCredential)<code>{{ $customer->currentCredential->username }}</code><div class="small text-secondary">{{ $customer->currentCredential->accessPlan?->name }}</div>@else<span class="text-secondary">None</span>@endif</td><td>{{ $customer->last_authenticated_at?->diffForHumans() ?? 'Never' }}</td></tr>@empty<tr><td colspan="5" class="text-center py-5 text-secondary">No identities yet.</td></tr>@endforelse</tbody>
+            <tbody>@forelse($customers as $customer)<tr><td><strong>{{ $customer->name ?: 'Guest customer' }}</strong><div class="small text-secondary">{{ $customer->email ?: $customer->phone }}</div></td><td>{{ ucfirst($customer->type) }}</td><td><span class="badge text-bg-{{ $customer->status === 'active' ? 'success' : 'secondary' }}">{{ ucfirst($customer->status) }}</span></td><td>@if($customer->currentCredential)<code>{{ $customer->currentCredential->username }}</code><div class="small text-secondary">{{ $customer->currentCredential->accessPlan?->name }}</div>@else<span class="text-secondary">None</span>@endif</td><td>{{ $customer->last_authenticated_at?->diffForHumans() ?? 'Never' }}</td></tr>@empty<tr><td colspan="5" class="text-center py-5 text-secondary">{{ $filtered ? 'No identities match these filters.' : 'No identities yet.' }}</td></tr>@endforelse</tbody>
         </table></div></div></div><div class="mt-3">{{ $customers->links() }}</div>
     </div>
     <div class="col-xl-4"><div class="card metric-card"><div class="card-header"><h2 class="h5 mb-0">Create identity</h2></div><div class="card-body">

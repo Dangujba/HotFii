@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Operator;
 
+use App\Domain\Enums\NetworkDeviceStatus;
 use App\Domain\Enums\RouterVendor;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunNetworkDeviceTests;
@@ -9,18 +10,40 @@ use App\Models\NetworkDevice;
 use App\Models\Organization;
 use App\Services\Network\NetworkDeviceManager;
 use App\Services\Network\RouterAdapterRegistry;
+use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class NetworkDeviceController extends Controller
 {
-    public function index(Organization $organization): View
+    public function index(Request $request, Organization $organization): View
     {
+        $filters = [
+            'search' => ListFilters::text($request, 'search'),
+            'status' => ListFilters::choice($request, 'status', ListFilters::enumValues(NetworkDeviceStatus::class)),
+            'vendor' => ListFilters::choice($request, 'vendor', ListFilters::enumValues(RouterVendor::class)),
+            'location' => ListFilters::id($request, 'location'),
+        ];
+
         return view('network.index', [
-            'devices' => $organization->networkDevices()->with('location')->latest()->paginate(20),
+            'devices' => $organization->networkDevices()
+                ->with('location')
+                ->when($filters['search'], fn ($query, $term) => $query->where(fn ($inner) => $inner
+                    ->where('name', 'like', "%{$term}%")
+                    ->orWhere('model', 'like', "%{$term}%")
+                    ->orWhere('management_address', 'like', "%{$term}%")))
+                ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
+                ->when($filters['vendor'], fn ($query, $vendor) => $query->where('vendor', $vendor))
+                ->when($filters['location'], fn ($query, $location) => $query->where('location_id', $location))
+                ->latest()
+                ->paginate(20)
+                ->withQueryString(),
             'locations' => $organization->locations()->orderBy('name')->get(),
             'vendors' => RouterVendor::cases(),
+            'statuses' => NetworkDeviceStatus::cases(),
+            'filters' => $filters,
+            'filtered' => ListFilters::any($filters),
         ]);
     }
 

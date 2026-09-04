@@ -7,17 +7,28 @@ use App\Models\AccessGroup;
 use App\Models\Customer;
 use App\Models\Organization;
 use App\Services\Radius\AccessGroupRadiusService;
+use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class AccessGroupController extends Controller
 {
-    public function index(Organization $organization): View
+    public function index(Request $request, Organization $organization): View
     {
+        $search = ListFilters::text($request, 'search');
+
         return view('operator.access-groups', [
-            'groups' => $organization->accessGroups()->withCount('customers')->orderBy('name')->get(),
+            'groups' => $organization->accessGroups()
+                ->withCount('customers')
+                ->when($search, fn ($query, $term) => $query->where('name', 'like', "%{$term}%"))
+                ->orderBy('name')
+                ->paginate(12)
+                ->withQueryString(),
+            // Feeds the assign dropdowns, so it stays a full list.
             'customers' => $organization->customers()->where('status', 'active')->orderBy('name')->get(),
+            'filters' => ['search' => $search],
+            'filtered' => $search !== '',
         ]);
     }
 

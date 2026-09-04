@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operator;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Services\Radius\RadiusCredentialService;
+use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,16 +13,26 @@ use Illuminate\View\View;
 
 class CustomerController extends Controller
 {
+    private const TYPES = ['customer', 'employee', 'student', 'contractor', 'guest'];
+
+    private const STATUSES = ['active', 'suspended', 'expired'];
+
     public function index(Request $request, Organization $organization): View
     {
-        $search = trim((string) $request->query('search'));
+        $filters = [
+            'search' => ListFilters::text($request, 'search'),
+            'type' => ListFilters::choice($request, 'type', self::TYPES),
+            'status' => ListFilters::choice($request, 'status', self::STATUSES),
+        ];
 
         $customers = $organization->customers()
             ->with('currentCredential.accessPlan')
-            ->when($search, fn ($query) => $query->where(fn ($inner) => $inner
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%")))
+            ->when($filters['search'], fn ($query, $term) => $query->where(fn ($inner) => $inner
+                ->where('name', 'like', "%{$term}%")
+                ->orWhere('email', 'like', "%{$term}%")
+                ->orWhere('phone', 'like', "%{$term}%")))
+            ->when($filters['type'], fn ($query, $type) => $query->where('type', $type))
+            ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
             ->latest()
             ->paginate(25)
             ->withQueryString();
@@ -33,7 +44,10 @@ class CustomerController extends Controller
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(),
-            'search' => $search,
+            'types' => self::TYPES,
+            'statuses' => self::STATUSES,
+            'filters' => $filters,
+            'filtered' => ListFilters::any($filters),
         ]);
     }
 

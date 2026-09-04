@@ -11,6 +11,7 @@ use App\Models\Transaction;
 use App\Services\Billing\CommerceFeeCalculator;
 use App\Services\Billing\TrialManager;
 use App\Services\Payments\PaymentProcessor;
+use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -18,13 +19,49 @@ use Illuminate\View\View;
 
 class SalesController extends Controller
 {
-    public function index(Organization $organization): View
+    /** Channels a transaction can be recorded through. */
+    private const CHANNELS = ['online', 'cash'];
+
+    public function index(Request $request, Organization $organization): View
     {
+        $filters = [
+            'search' => ListFilters::text($request, 'search'),
+            'status' => ListFilters::choice($request, 'status', ListFilters::enumValues(PaymentStatus::class)),
+            'channel' => ListFilters::choice($request, 'channel', self::CHANNELS),
+            'from' => ListFilters::date($request, 'from'),
+            'to' => ListFilters::date($request, 'to'),
+        ];
+
         return view('operator.sales', [
-            'transactions' => $organization->transactions()->with('customer', 'accessPlan')->latest()->paginate(25),
-            'voucherSales' => $organization->vouchers()->with('batch.accessPlan')->whereNotNull('sold_at')->latest('sold_at')->limit(25)->get(),
+            'transactions' => $organization->transactions()
+                ->with('customer', 'accessPlan')
+                ->when($filters['search'], fn ($query, $term) => $query->where(fn ($inner) => $inner
+                    ->where('reference', 'like', "%{$term}%")
+                    ->orWhereHas('customer', fn ($customer) => $customer
+                        ->where('name', 'like', "%{$term}%")
+                        ->orWhere('email', 'like', "%{$term}%")
+                        ->orWhere('phone', 'like', "%{$term}%"))))
+                ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
+                ->when($filters['channel'], fn ($query, $channel) => $query->where('channel', $channel))
+                ->when($filters['from'], fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
+                ->when($filters['to'], fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
+                ->latest()
+                ->paginate(25)
+                ->withQueryString(),
+            // Its own page name, or paging the voucher list would drag the
+            // transaction table along with it.
+            'voucherSales' => $organization->vouchers()
+                ->with('batch.accessPlan')
+                ->whereNotNull('sold_at')
+                ->latest('sold_at')
+                ->paginate(12, ['*'], 'vouchers')
+                ->withQueryString(),
             'plans' => $organization->accessPlans()->where('access_type', 'paid')->where('is_active', true)->orderBy('name')->get(),
             'devices' => $organization->networkDevices()->where('status', 'online')->orderBy('name')->get(),
+            'statuses' => PaymentStatus::cases(),
+            'channels' => self::CHANNELS,
+            'filters' => $filters,
+            'filtered' => ListFilters::any($filters),
             'totals' => [
                 'online' => $organization->transactions()->where('channel', 'online')->where('status', 'successful')->sum('gross_amount_kobo'),
                 'voucher' => $organization->vouchers()->whereNotNull('activated_at')->where('is_complimentary', false)->sum('price_snapshot_kobo'),

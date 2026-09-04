@@ -6,15 +6,38 @@ use App\Domain\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class TeamController extends Controller
 {
-    public function index(Organization $organization): View
+    public function index(Request $request, Organization $organization): View
     {
-        return view('operator.team', ['members' => $organization->users()->orderBy('name')->get()]);
+        $filters = [
+            'search' => ListFilters::text($request, 'search'),
+            'role' => ListFilters::choice($request, 'role', ListFilters::enumValues(MembershipRole::class)),
+        ];
+
+        // Columns are qualified because this reads through the membership pivot.
+        // The role filter stays outside a when() closure: wherePivot lives on the
+        // relation, and when() hands its callback the underlying query builder.
+        $members = $organization->users()
+            ->when($filters['search'], fn ($query, $term) => $query->where(fn ($inner) => $inner
+                ->where('users.name', 'like', "%{$term}%")
+                ->orWhere('users.email', 'like', "%{$term}%")));
+
+        if ($filters['role'] !== '') {
+            $members->wherePivot('role', $filters['role']);
+        }
+
+        return view('operator.team', [
+            'members' => $members->orderBy('users.name')->paginate(25)->withQueryString(),
+            'roles' => MembershipRole::cases(),
+            'filters' => $filters,
+            'filtered' => ListFilters::any($filters),
+        ]);
     }
 
     public function store(Request $request, Organization $organization): RedirectResponse

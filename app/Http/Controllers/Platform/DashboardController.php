@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Platform;
 
+use App\Domain\Enums\OrganizationMode;
+use App\Domain\Enums\OrganizationStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\PaymentWebhook;
 use App\Models\Transaction;
+use App\Support\ListFilters;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\View\View;
@@ -13,7 +17,7 @@ use Throwable;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(Request $request): View
     {
         try {
             Redis::connection()->ping();
@@ -21,6 +25,12 @@ class DashboardController extends Controller
         } catch (Throwable) {
             $redis = 'offline';
         }
+
+        $filters = [
+            'search' => ListFilters::text($request, 'search'),
+            'status' => ListFilters::choice($request, 'status', ListFilters::enumValues(OrganizationStatus::class)),
+            'mode' => ListFilters::choice($request, 'mode', ListFilters::enumValues(OrganizationMode::class)),
+        ];
 
         return view('platform.index', [
             'stats' => [
@@ -39,7 +49,17 @@ class DashboardController extends Controller
                 ->with('paymentProfile')
                 ->oldest()
                 ->get(),
-            'recentOrganizations' => Organization::latest()->limit(10)->get(),
+            'organizations' => Organization::query()
+                ->when($filters['search'], fn ($query, $term) => $query->where('name', 'like', "%{$term}%"))
+                ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
+                ->when($filters['mode'], fn ($query, $mode) => $query->where('mode', $mode))
+                ->latest()
+                ->paginate(15)
+                ->withQueryString(),
+            'statuses' => OrganizationStatus::cases(),
+            'modes' => OrganizationMode::cases(),
+            'filters' => $filters,
+            'filtered' => ListFilters::any($filters),
             'health' => [
                 'redis' => $redis,
                 'queued_jobs' => DB::table('jobs')->count(),
