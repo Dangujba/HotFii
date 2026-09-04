@@ -86,4 +86,40 @@ class Organization extends Model
         return $this->live_payments_enabled_at !== null
             && filled($this->paystack_subaccount_code);
     }
+
+    /**
+     * Unlock live collection: the subaccount money settles into, and the
+     * timestamp both gates above read.
+     *
+     * Every caller goes through here rather than writing the columns itself.
+     * live_payments_enabled_at is deliberately not fillable, so passing it to
+     * update() throws in dev and is *silently discarded* in production — which
+     * is how organizations ended up Live, holding a subaccount code, and unable
+     * to take a single payment. Keeping the write in one place makes that
+     * mistake unavailable at the call site.
+     *
+     * $at backdates the activation when repairing a profile approved earlier,
+     * so trial and billing windows stay honest.
+     */
+    public function activateLivePayments(string $subaccountCode, ?\DateTimeInterface $at = null): bool
+    {
+        return $this->forceFill([
+            'status' => OrganizationStatus::Live,
+            'paystack_subaccount_code' => $subaccountCode,
+            'live_payments_enabled_at' => $at ?? now(),
+        ])->save();
+    }
+
+    /**
+     * Withdraw live collection. The subaccount code stays on file: it is what
+     * the owner corrects and resubmits against, and clearing it would orphan
+     * the subaccount already open at Paystack.
+     */
+    public function revokeLivePayments(OrganizationStatus $status = OrganizationStatus::PaymentRejected): bool
+    {
+        return $this->forceFill([
+            'status' => $status,
+            'live_payments_enabled_at' => null,
+        ])->save();
+    }
 }

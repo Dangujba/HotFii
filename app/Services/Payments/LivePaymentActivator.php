@@ -2,7 +2,6 @@
 
 namespace App\Services\Payments;
 
-use App\Domain\Enums\OrganizationStatus;
 use App\Models\Organization;
 use App\Models\PaymentProfile;
 use Illuminate\Support\Facades\Log;
@@ -105,15 +104,8 @@ class LivePaymentActivator
                 : 'Approved automatically after Paystack confirmed the settlement account.',
         ]);
 
-        // forceFill: live_payments_enabled_at is not in Organization::$fillable,
-        // so update() would discard it — silently in production. It is the
-        // timestamp canCollectLivePayments() checks, so losing it means an
-        // automatically approved organization can never take a live payment.
-        $organization->forceFill([
-            'status' => OrganizationStatus::Live,
-            'paystack_subaccount_code' => $subaccountCode,
-            'live_payments_enabled_at' => now(),
-        ])->save();
+        // The model owns this write; see Organization::activateLivePayments().
+        $organization->activateLivePayments((string) $subaccountCode);
 
         return [
             'approved' => true,

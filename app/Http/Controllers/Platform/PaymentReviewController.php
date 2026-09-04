@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Platform;
 
-use App\Domain\Enums\OrganizationStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Organization;
@@ -96,15 +95,9 @@ class PaymentReviewController extends Controller
             'auto_approved_at' => null,
         ]);
 
-        // forceFill: live_payments_enabled_at is not fillable, and update() would
-        // drop it — silently in production, where preventSilentlyDiscardingAttributes
-        // is off. Without this timestamp canCollectLivePayments() stays false, so an
-        // approved organization would read as approved and still refuse to sell.
-        $organization->forceFill([
-            'status' => OrganizationStatus::Live,
-            'paystack_subaccount_code' => $data['paystack_subaccount_code'],
-            'live_payments_enabled_at' => now(),
-        ])->save();
+        // The model owns this write: live_payments_enabled_at is not fillable,
+        // and update() would drop it silently in production.
+        $organization->activateLivePayments($data['paystack_subaccount_code']);
 
         $this->audit($request, $organization, 'payment-profile.approved', $data['review_notes'] ?? null);
         return back()->with('success', 'Live payments approved. The trial starts on the first successful live activation.');
@@ -122,12 +115,7 @@ class PaymentReviewController extends Controller
             'reviewed_at' => now(),
             'auto_approved_at' => null,
         ]);
-        // Same reason as approve(): clearing the timestamp is the point of a
-        // rejection, and update() would discard it.
-        $organization->forceFill([
-            'status' => OrganizationStatus::PaymentRejected,
-            'live_payments_enabled_at' => null,
-        ])->save();
+        $organization->revokeLivePayments();
 
         $this->audit($request, $organization, 'payment-profile.rejected', $data['review_notes']);
         return back()->with('success', 'Payment profile rejected with review notes.');
