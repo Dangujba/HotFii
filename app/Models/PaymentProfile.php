@@ -42,25 +42,52 @@ class PaymentProfile extends Model
     }
 
     /**
+     * The full account number, for the one screen that needs it: checking a
+     * submitted profile against the bank is the reviewer's whole job.
+     */
+    public function accountNumberForReview(): ?string
+    {
+        return $this->plaintext('account_number_cipher');
+    }
+
+    /** The full identity number, for the same reason. */
+    public function identityNumberForReview(): ?string
+    {
+        return $this->plaintext('identity_number_cipher');
+    }
+
+    /**
      * The last four characters of a stored secret behind bullets, so the
      * settings page can show which account is on file without putting the
      * whole number back on screen where it can be read or copied.
      */
     private function maskedTail(string $attribute): ?string
     {
-        try {
-            $value = trim((string) $this->getAttribute($attribute));
-        } catch (\Throwable) {
-            // A rotated APP_KEY leaves the old ciphertext unreadable. The hint
-            // is a convenience, so lose it rather than break the page.
-            return null;
-        }
+        $value = $this->plaintext($attribute);
 
-        if ($value === '') {
+        if ($value === null) {
             return null;
         }
 
         return str_repeat('•', max(0, strlen($value) - 4)).substr($value, -4);
+    }
+
+    /**
+     * A decrypted field, or null.
+     *
+     * The encrypted cast throws once APP_KEY has been rotated, and every caller
+     * here is displaying a field on a page full of other fields — losing one of
+     * them beats taking the page down.
+     */
+    private function plaintext(string $attribute): ?string
+    {
+        try {
+            $value = trim((string) $this->getAttribute($attribute));
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $value === '' ? null : $value;
     }
 
     public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }

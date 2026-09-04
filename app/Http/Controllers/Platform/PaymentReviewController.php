@@ -7,12 +7,54 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Services\Payments\LivePaymentActivator;
+use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class PaymentReviewController extends Controller
 {
+    /** A profile is submitted, then approved or rejected by a human or by Paystack. */
+    private const PROFILE_STATUSES = ['submitted', 'approved', 'rejected'];
+
     public function __construct(private readonly LivePaymentActivator $activator) {}
+
+    /**
+     * The review queue, plus the profiles already decided.
+     *
+     * Filtering is keyed off the profile, not the organization status:
+     * organizations stay Live while a profile waits, so status cannot signal
+     * this. Rejections stay reachable because an owner who corrects and
+     * resubmits needs the earlier notes read back.
+     */
+    public function index(Request $request): View
+    {
+        $filters = [
+            'status' => ListFilters::choice($request, 'status', self::PROFILE_STATUSES),
+            'search' => ListFilters::text($request, 'search'),
+        ];
+
+        // Nothing chosen means the queue itself: what is waiting on a decision.
+        $status = $filters['status'] ?: 'submitted';
+
+        return view('platform.reviews', [
+            'organizations' => Organization::query()
+                ->whereHas('paymentProfile', fn ($query) => $query->where('status', $status))
+                ->when($filters['search'], fn ($query, $term) => $query->where('name', 'like', "%{$term}%"))
+                ->with('paymentProfile.reviewer')
+                // Oldest first while they wait — a queue is served in order.
+                ->orderBy('created_at', $status === 'submitted' ? 'asc' : 'desc')
+                ->paginate(15)
+                ->withQueryString(),
+            'counts' => collect(self::PROFILE_STATUSES)->mapWithKeys(fn (string $value) => [
+                $value => Organization::whereHas('paymentProfile', fn ($query) => $query->where('status', $value))->count(),
+            ])->all(),
+            'statuses' => self::PROFILE_STATUSES,
+            'status' => $status,
+            'filters' => $filters,
+            'filtered' => ListFilters::any($filters),
+        ]);
+    }
 
     public function approve(Request $request, Organization $organization): RedirectResponse
     {
@@ -54,11 +96,15 @@ class PaymentReviewController extends Controller
             'auto_approved_at' => null,
         ]);
 
-        $organization->update([
+        // forceFill: live_payments_enabled_at is not fillable, and update() would
+        // drop it — silently in production, where preventSilentlyDiscardingAttributes
+        // is off. Without this timestamp canCollectLivePayments() stays false, so an
+        // approved organization would read as approved and still refuse to sell.
+        $organization->forceFill([
             'status' => OrganizationStatus::Live,
             'paystack_subaccount_code' => $data['paystack_subaccount_code'],
             'live_payments_enabled_at' => now(),
-        ]);
+        ])->save();
 
         $this->audit($request, $organization, 'payment-profile.approved', $data['review_notes'] ?? null);
         return back()->with('success', 'Live payments approved. The trial starts on the first successful live activation.');
@@ -76,10 +122,12 @@ class PaymentReviewController extends Controller
             'reviewed_at' => now(),
             'auto_approved_at' => null,
         ]);
-        $organization->update([
+        // Same reason as approve(): clearing the timestamp is the point of a
+        // rejection, and update() would discard it.
+        $organization->forceFill([
             'status' => OrganizationStatus::PaymentRejected,
             'live_payments_enabled_at' => null,
-        ]);
+        ])->save();
 
         $this->audit($request, $organization, 'payment-profile.rejected', $data['review_notes']);
         return back()->with('success', 'Payment profile rejected with review notes.');

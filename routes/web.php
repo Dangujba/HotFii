@@ -21,9 +21,15 @@ use App\Http\Controllers\Operator\TeamController;
 use App\Http\Controllers\Operator\VoucherBatchController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaystackWebhookController;
+use App\Http\Controllers\Platform\AuditController as PlatformAuditController;
+use App\Http\Controllers\Platform\BillingController as PlatformBillingController;
 use App\Http\Controllers\Platform\DashboardController as PlatformDashboardController;
 use App\Http\Controllers\Platform\ImpersonationController;
+use App\Http\Controllers\Platform\OrganizationController as PlatformOrganizationController;
 use App\Http\Controllers\Platform\PaymentReviewController;
+use App\Http\Controllers\Platform\SystemController as PlatformSystemController;
+use App\Http\Controllers\Platform\TransactionController as PlatformTransactionController;
+use App\Http\Controllers\Platform\UserController as PlatformUserController;
 use App\Http\Controllers\PortalController;
 use Illuminate\Support\Facades\Route;
 
@@ -102,10 +108,28 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
     Route::post('/settings/payment-profile', [SettingsController::class, 'submitPaymentProfile'])->middleware('role:owner')->name('settings.payment-profile');
 });
 
+// The platform owner's console. Deliberately almost entirely read-only: the only
+// writes are payment review, support impersonation, and suspending an
+// organization. Anything that changes what a customer owes stays out of the UI.
 Route::middleware(['auth', 'verified', 'platform-admin'])->prefix('platform')->name('platform.')->group(function () {
     Route::get('/', PlatformDashboardController::class)->name('index');
+
+    Route::get('/organizations', [PlatformOrganizationController::class, 'index'])->name('organizations.index');
+    // withTrashed: a soft-deleted organization still has money and an audit
+    // trail, and the console is the only place left to read them.
+    Route::get('/organizations/{organization}', [PlatformOrganizationController::class, 'show'])->withTrashed()->name('organizations.show');
+    Route::patch('/organizations/{organization}/status', [PlatformOrganizationController::class, 'status'])->name('organizations.status');
+
+    Route::get('/reviews', [PaymentReviewController::class, 'index'])->name('reviews.index');
     Route::post('/organizations/{organization}/payment/approve', [PaymentReviewController::class, 'approve'])->name('payment.approve');
     Route::post('/organizations/{organization}/payment/reject', [PaymentReviewController::class, 'reject'])->name('payment.reject');
+
+    Route::get('/billing', PlatformBillingController::class)->name('billing.index');
+    Route::get('/transactions', PlatformTransactionController::class)->name('transactions.index');
+    Route::get('/users', PlatformUserController::class)->name('users.index');
+    Route::get('/audit', PlatformAuditController::class)->name('audit.index');
+    Route::get('/system', PlatformSystemController::class)->name('system.index');
+
     Route::post('/organizations/{organization}/impersonate', [ImpersonationController::class, 'start'])->name('impersonate.start');
     Route::post('/impersonation/stop', [ImpersonationController::class, 'stop'])->name('impersonate.stop');
 });

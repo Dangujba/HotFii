@@ -1,153 +1,177 @@
 @extends('layouts.platform')
-@section('title', 'Platform Overview')
+@section('title', 'Overview')
+@section('heading', 'Platform Overview')
+@section('subheading', 'Every tenant, every naira, across the whole deployment')
+@section('actions')<a href="{{ route('platform.organizations.index') }}" class="btn btn-hotfii"><i class="bi bi-buildings me-1"></i>All organizations</a>@endsection
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-1">Platform Overview</h1>
-            <p class="text-secondary mb-0">Organizations, payment reviews, and runtime health</p>
-        </div>
-    </div>
-    <div class="row g-3 mb-4">
-        @foreach([['Organizations', $stats['organizations'], 'buildings', 'primary'], ['Collecting payments', $stats['live_organizations'], 'broadcast-pin', 'success'], ['Monthly processed volume', '₦' . number_format($stats['monthly_volume'] / 100, 0), 'cash-stack', 'info'], ['Payment reviews', $stats['pending_reviews'], 'person-check', 'warning']] as [$label, $value, $icon, $color])
-            <div class="col-sm-6 col-xl-3">
-                <div class="card metric-card">
+
+<div class="row g-3 mb-4">
+    @foreach([
+        ['Organizations', number_format($stats['organizations']), 'buildings', 'primary', route('platform.organizations.index')],
+        ['Collecting payments', number_format($stats['collecting']), 'broadcast-pin', 'success', route('platform.organizations.index', ['collecting' => 'yes'])],
+        ['Volume this month', \App\Support\Naira::from($stats['monthly_volume']), 'cash-stack', 'info', route('platform.transactions.index')],
+        ['Fees this month', \App\Support\Naira::from($stats['monthly_fees']), 'percent', 'primary', route('platform.billing.index')],
+        ['Invoices outstanding', \App\Support\Naira::from($stats['open_invoices']), 'receipt', 'warning', route('platform.billing.index', ['invoice_status' => 'open'])],
+        ['Payment reviews', number_format($stats['pending_reviews']), 'person-check', $stats['pending_reviews'] ? 'danger' : 'secondary', route('platform.reviews.index')],
+    ] as [$label, $value, $icon, $tone, $href])
+        <div class="col-sm-6 col-xl-4 col-xxl-2">
+            <a href="{{ $href }}" class="text-decoration-none text-reset">
+                <div class="card metric-card h-100">
                     <div class="card-body">
-                        <div class="text-secondary">{{ $label }}</div>
-                        <div class="fs-3 fw-bold">{{ $value }}</div><i class="bi bi-{{ $icon }} text-{{ $color }}"></i>
+                        <div class="text-secondary small">{{ $label }}</div>
+                        <div class="fs-4 fw-bold">{{ $value }}</div><i class="bi bi-{{ $icon }} text-{{ $tone }}"></i>
                     </div>
                 </div>
-        </div>@endforeach
-    </div>
-    <div class="row g-4">
-        <div class="col-xl-8">
-            <div class="card metric-card mb-4">
-                <div class="card-header">
-                    <h2 class="h5 mb-0">Live payment requests</h2>
+            </a>
+        </div>
+    @endforeach
+</div>
+
+{{-- Money over time, then how the tenant base is distributed. --}}
+<div class="row g-4 mb-4">
+    <div class="col-xxl-8">
+        <div class="card metric-card h-100">
+            <div class="card-header border-0 pt-4 px-4 d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <span class="hf-chart-eyebrow">Last 14 days</span>
+                    <h2 class="h5 mb-0">Gross volume processed</h2>
                 </div>
-                <div class="card-body p-0">@forelse($paymentRequests as $organization)
-                    <div class="p-4 border-bottom">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <h3 class="h6 mb-1">{{ $organization->name }}</h3><span
-                                    class="text-secondary">{{ ucfirst($organization->mode->value) }} · submitted
-                                    {{ $organization->paymentProfile?->submitted_at?->diffForHumans() }}</span>
-                            </div><span class="badge text-bg-warning">Review</span>
-                        </div>
-                        @if($organization->paymentProfile)
-                            <div class="row g-2 small mt-3">
-                                <div class="col-md-4"><strong>Contact</strong>
-                                    <div>
-                                        {{ $organization->paymentProfile->contact_name }}<br>{{ $organization->paymentProfile->contact_phone }}
-                                    </div>
-                                </div>
-                                <div class="col-md-4"><strong>Settlement</strong>
-                                    <div>
-                                        {{ $organization->paymentProfile->bank_name }}@if($organization->paymentProfile->bank_code) <span class="text-secondary">({{ $organization->paymentProfile->bank_code }})</span>@endif<br>{{ $organization->paymentProfile->account_name }}
-                                        · {{ $organization->paymentProfile->account_number_cipher }}
-                                        @if($organization->paymentProfile->resolved_account_name && $organization->paymentProfile->resolved_account_name !== $organization->paymentProfile->account_name)
-                                            <div class="text-danger">Bank says: {{ $organization->paymentProfile->resolved_account_name }}</div>
-                                        @endif
-                                    </div>
-                                </div>
-                                <div class="col-md-4"><strong>Identity</strong>
-                                    <div>{{ strtoupper($organization->paymentProfile->identity_type) }} ·
-                                        {{ $organization->paymentProfile->identity_number_cipher }}</div>
-                                </div>
-                                @if($organization->paymentProfile->review_notes)
-                                    <div class="col-12">
-                                        <div class="alert alert-warning py-2 mb-0 mt-2"><i class="bi bi-robot me-1"></i><strong>Automatic approval declined:</strong> {{ $organization->paymentProfile->review_notes }}</div>
-                                    </div>
-                                @endif
-                            </div>
-                            <div class="row g-3 mt-2">
-                                <div class="col-md-7">
-                                    <form method="POST" action="{{ route('platform.payment.approve', $organization) }}">@csrf
-                                        <div class="input-group"><input class="form-control" name="paystack_subaccount_code"
-                                                placeholder="Subaccount code (blank = create it)"><input class="form-control"
-                                                name="review_notes" placeholder="Optional note"><button
-                                                class="btn btn-success"
-                                                data-confirm-title="Enable live payments for {{ $organization->name }}?"
-                                                data-confirm="They will start collecting real money immediately, settled to the bank account on this profile. Leaving the code blank makes HotFii open the subaccount at Paystack."
-                                                data-confirm-icon="warning"
-                                                data-confirm-button="Approve and go live">Approve</button></div>
-                                    </form>
-                                </div>
-                                <div class="col-md-5">
-                                    <form method="POST" action="{{ route('platform.payment.reject', $organization) }}">@csrf<div
-                                            class="input-group"><input class="form-control" name="review_notes"
-                                                placeholder="Required rejection reason" required><button
-                                                class="btn btn-outline-danger"
-                                                data-confirm-title="Reject {{ $organization->name }}?"
-                                                data-confirm="Live payments stay off and the owner sees your reason. They can correct the profile and resubmit."
-                                                data-confirm-icon="danger"
-                                                data-confirm-button="Reject profile">Reject</button></div>
-                                    </form>
-                                </div>
-                        </div>@endif
-                </div>@empty<div class="p-5 text-center text-secondary"><i class="bi bi-check2-circle fs-3 d-block mb-2"></i>Nothing waiting. Profiles Paystack can verify are approved automatically and only exceptions land here.</div>@endforelse
+                <div class="text-end">
+                    <span class="hf-chart-eyebrow">Total</span>
+                    <div class="fs-5 fw-bold">₦{{ number_format($volume['total'], 0) }}</div>
                 </div>
             </div>
-            <div class="card metric-card">
-                <x-filter-bar :action="route('platform.index')" :active="$filtered" title="Organizations">
-                    <div class="col-md-4"><input class="form-control form-control-sm" name="search"
-                            value="{{ $filters['search'] }}" placeholder="Organization name"></div>
-                    <div class="col-md-3"><select class="form-select form-select-sm" name="status">
-                            <option value="">Any status</option>@foreach($statuses as $status)<option
-                                value="{{ $status->value }}" @selected($filters['status'] === $status->value)>{{ str_replace('_', ' ', ucfirst($status->value)) }}</option>@endforeach
-                        </select></div>
-                    <div class="col-md-3"><select class="form-select form-select-sm" name="mode">
-                            <option value="">All modes</option>@foreach($modes as $mode)<option value="{{ $mode->value }}"
-                                @selected($filters['mode'] === $mode->value)>{{ ucfirst($mode->value) }}</option>@endforeach
-                        </select></div>
-                </x-filter-bar>
-                <div class="card-body p-0">
-                    <table class="table mb-0">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Mode</th>
-                                <th>Status</th>
-                                <th>Created</th>
-                                <th>Support</th>
-                            </tr>
-                        </thead>
-                        <tbody>@forelse($organizations as $organization)
-                            <tr>
-                                <td>{{ $organization->name }}</td>
-                                <td>{{ ucfirst($organization->mode->value) }}</td>
-                                <td>{{ str_replace('_', ' ', ucfirst($organization->status->value)) }}</td>
-                                <td>{{ $organization->created_at->diffForHumans() }}</td>
-                                <td>
-                                    <form class="d-flex gap-2" method="POST"
-                                        action="{{ route('platform.impersonate.start', $organization) }}">@csrf<input
-                                            class="form-control form-control-sm" name="reason" minlength="10"
-                                            placeholder="Written support reason" required><button
-                                            class="btn btn-sm btn-outline-primary"
-                                            data-confirm-title="Enter support mode for {{ $organization->name }}?"
-                                            data-confirm="You will see their customers, sessions and finances as they do. The reason you typed is written to the audit log against your account."
-                                            data-confirm-icon="warning"
-                                            data-confirm-button="Enter support mode">Open</button></form>
-                                </td>
-                        </tr>@empty<tr><td colspan="5" class="text-center py-5 text-secondary">{{ $filtered ? 'No organizations match these filters.' : 'No organizations yet.' }}</td></tr>@endforelse
+            <div class="card-body pt-2 px-3 pb-3">
+                @if($volume['total'] > 0)
+                    <div id="hf-volume-chart" class="hf-chart" role="img"
+                         aria-label="Gross volume processed per day across all organizations for the last 14 days, in naira."
+                         data-labels='@json($volume['labels'])'
+                         data-values='@json($volume['values'])'></div>
+                    {{-- The table view. Every plotted value is readable without a tooltip. --}}
+                    <table class="visually-hidden">
+                        <caption>Gross volume by day</caption>
+                        <thead><tr><th scope="col">Day</th><th scope="col">Volume</th></tr></thead>
+                        <tbody>
+                            @foreach($volume['labels'] as $index => $label)
+                                <tr><th scope="row">{{ $label }}</th><td>₦{{ number_format($volume['values'][$index], 2) }}</td></tr>
+                            @endforeach
                         </tbody>
                     </table>
-                </div>
+                @else
+                    <div class="text-center text-secondary py-5">
+                        <i class="bi bi-graph-up-arrow fs-1 d-block mb-2 opacity-50"></i>
+                        No payments collected anywhere in the last 14 days.
+                    </div>
+                @endif
             </div>
-            <div class="mt-3">{{ $organizations->links() }}</div>
-        </div>
-        <div class="col-xl-4">
-            <div class="card metric-card">
-                <div class="card-header">
-                    <h2 class="h5 mb-0">System & queue health</h2>
-                </div>
-                <div class="list-group list-group-flush">
-                    @foreach(['Redis' => $health['redis'], 'Reverb' => $health['reverb'], 'Queued jobs' => $health['queued_jobs'], 'Failed jobs' => $health['failed_jobs'], 'Pending webhooks' => $health['pending_webhooks']] as $label => $value)
-                        <div class="list-group-item d-flex justify-content-between">
-                    <span>{{ $label }}</span><strong>{{ $value }}</strong></div>@endforeach
-                </div>
-            </div>
-            <div class="alert alert-info mt-4"><i class="bi bi-info-circle me-2"></i>Laravel native Redis workers are used
-                until the Horizon package publishes Laravel 13 compatibility.</div>
         </div>
     </div>
+    <div class="col-xxl-4">
+        <div class="card metric-card h-100">
+            <div class="card-header border-0 pt-4 px-4">
+                <span class="hf-chart-eyebrow">Right now</span>
+                <h2 class="h5 mb-0">Accounts by status</h2>
+            </div>
+            <div class="card-body pt-2 px-3 pb-3">
+                @if($statusMix['total'] > 0)
+                    <div id="hf-status-chart" class="hf-chart-sm" role="img"
+                         aria-label="Organizations in each account status."
+                         data-labels='@json($statusMix['labels'])'
+                         data-values='@json($statusMix['values'])'></div>
+                    {{-- Also the way to reach a filtered list, so the counts are
+                         never only readable off the bars. --}}
+                    <div class="hf-legend mt-3">
+                        @foreach($statusMix['rows'] as $row)
+                            <div class="hf-legend-row @if($row['count'] === 0) is-empty @endif">
+                                <span class="flex-grow-1"><a class="text-decoration-none text-reset" href="{{ route('platform.organizations.index', ['status' => $row['value']]) }}">{{ $row['label'] }}</a></span>
+                                <span class="hf-legend-count fw-semibold">{{ $row['count'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center text-secondary py-5">
+                        <i class="bi bi-buildings fs-1 d-block mb-2 opacity-50"></i>
+                        No organizations have registered yet.
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- What the platform earned, and what it actually received. --}}
+<div class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="card metric-card h-100">
+            <div class="card-header border-0 pt-4 px-4 d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <span class="hf-chart-eyebrow">Last 6 months</span>
+                    <h2 class="h5 mb-0">Platform fees earned and collected</h2>
+                </div>
+                <a href="{{ route('platform.billing.index') }}" class="small">Billing detail</a>
+            </div>
+            <div class="card-body pt-2 px-3 pb-3">
+                @if($fees['accrued_total'] > 0)
+                    <div id="hf-fees-chart" class="hf-chart-sm" role="img"
+                         aria-label="Platform fees earned against fees collected, for each of the last six months, in naira."
+                         data-labels='@json($fees['labels'])'
+                         data-accrued='@json($fees['accrued'])'
+                         data-collected='@json($fees['collected'])'></div>
+                    <table class="visually-hidden">
+                        <caption>Fees earned and collected by month</caption>
+                        <thead><tr><th scope="col">Month</th><th scope="col">Earned</th><th scope="col">Collected</th></tr></thead>
+                        <tbody>
+                            @foreach($fees['labels'] as $index => $label)
+                                <tr><th scope="row">{{ $label }}</th><td>₦{{ number_format($fees['accrued'][$index], 2) }}</td><td>₦{{ number_format($fees['collected'][$index], 2) }}</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                    <p class="small text-secondary mb-0 px-2">
+                        ₦{{ number_format($fees['accrued_total'], 0) }} earned, ₦{{ number_format($fees['collected_total'], 0) }} collected at the gateway. The gap is what the monthly invoice bills.
+                    </p>
+                @else
+                    <div class="text-center text-secondary py-5">
+                        <i class="bi bi-percent fs-1 d-block mb-2 opacity-50"></i>
+                        No platform fees recorded yet.
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card metric-card h-100">
+            <div class="card-header border-0 pt-4 px-4 d-flex justify-content-between"><h2 class="h5 mb-0">Newest organizations</h2><a href="{{ route('platform.organizations.index') }}" class="small">View all</a></div>
+            <div class="list-group list-group-flush">@forelse($organizations as $organization)
+                <a href="{{ route('platform.organizations.show', $organization) }}" class="list-group-item list-group-item-action px-4 py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ $organization->name }}</strong>
+                        <div class="small text-secondary">{{ ucfirst($organization->mode->value) }} · {{ $organization->users_count }} {{ $organization->users_count === 1 ? 'member' : 'members' }} · {{ $organization->created_at->diffForHumans() }}</div>
+                    </div>
+                    <span class="badge text-bg-{{ $organization->status === \App\Domain\Enums\OrganizationStatus::Suspended ? 'danger' : ($organization->paymentProfileActivated() ? 'success' : 'secondary') }}">{{ str_replace('_', ' ', ucfirst($organization->status->value)) }}</span>
+                </a>
+            @empty<div class="p-5 text-center text-secondary">Organizations will appear here as they register.</div>@endforelse</div>
+        </div>
+    </div>
+</div>
+
+<div class="card metric-card">
+    <div class="card-header d-flex justify-content-between align-items-center"><h2 class="h5 mb-0">Latest payments</h2><a href="{{ route('platform.transactions.index') }}" class="small">All transactions</a></div>
+    <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
+        <thead><tr><th>Reference</th><th>Organization</th><th class="text-end">Amount</th><th class="text-end">Fee</th><th>Status</th><th>When</th></tr></thead>
+        <tbody>@forelse($transactions as $transaction)
+            <tr>
+                <td><code>{{ $transaction->reference }}</code></td>
+                <td>@if($transaction->organization)<a class="text-decoration-none" href="{{ route('platform.organizations.show', $transaction->organization) }}">{{ $transaction->organization->name }}</a>@else<span class="text-secondary">—</span>@endif</td>
+                <td class="text-end">{{ \App\Support\Naira::from($transaction->gross_amount_kobo) }}</td>
+                <td class="text-end">{{ \App\Support\Naira::from($transaction->platform_fee_kobo) }}</td>
+                <td><span class="badge text-bg-{{ $transaction->status->value === 'successful' ? 'success' : ($transaction->status->value === 'failed' ? 'danger' : 'secondary') }}">{{ ucfirst($transaction->status->value) }}</span></td>
+                <td>{{ $transaction->created_at->diffForHumans() }}</td>
+            </tr>
+        @empty<tr><td colspan="6" class="text-center py-5 text-secondary">No transactions yet.</td></tr>@endforelse</tbody>
+    </table></div></div>
+</div>
 @endsection
+
+@push('scripts')
+    @vite('resources/js/platform.js')
+@endpush
