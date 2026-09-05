@@ -124,6 +124,17 @@ class VoucherService
             );
 
             if (! $voucher->is_complimentary && $voucher->price_snapshot_kobo > 0) {
+                // The same two counters a card sale moves in PaymentProcessor.
+                // Without them a voucher-only operator reads as a zero-sales
+                // business to everything downstream: they never graduate off
+                // MicroSeller pricing however much they sell, and the trial
+                // ceiling never trips because it can see no sales at all. For a
+                // cash-and-voucher market that is most of the volume.
+                $organization->increment('monthly_sales_kobo', $voucher->price_snapshot_kobo);
+                if ($organization->inTrial()) {
+                    $organization->increment('trial_sales_kobo', $voucher->price_snapshot_kobo);
+                }
+
                 $quote = $this->fees->quote($organization, $voucher->price_snapshot_kobo);
                 FeeLedgerEntry::updateOrCreate(
                     [
