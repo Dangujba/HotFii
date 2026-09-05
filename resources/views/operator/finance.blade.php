@@ -25,7 +25,7 @@
         <div class="d-flex justify-content-between mt-2"><span>{{ $invoice->billing_period->format('M Y') }}</span><strong>₦{{ number_format($invoice->total_kobo / 100, 0) }}</strong></div>
         <div class="small text-secondary">Due {{ $invoice->due_at?->format('d M Y') }}</div>
         @if($invoice->isPaid())
-            <div class="small text-success mt-2"><i class="bi bi-check-circle me-1"></i>Paid {{ $invoice->paid_at?->format('d M Y') }}@if($invoice->payment_method === 'manual') by transfer@endif</div>
+            <div class="small text-success mt-2"><i class="bi bi-check-circle me-1"></i>Paid {{ $invoice->paid_at?->format('d M Y') }}@if($invoice->payment_method === 'manual') by transfer @endif</div>
         @elseif($canPayInvoices)
             {{-- The account is suspended over this bill until it is settled, so
                  the way to settle it belongs next to it rather than in an email. --}}
