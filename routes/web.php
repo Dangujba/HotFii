@@ -76,6 +76,7 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
     Route::post('/network/devices/{device}/provisioning-link', ProvisioningController::class)->middleware('role:owner,manager,technician')->name('network.devices.provisioning-link');
     Route::post('/network/devices/{device}/unifi/discover', [\App\Http\Controllers\Operator\UnifiSetupController::class, 'discover'])->middleware('role:owner,manager,technician')->name('network.devices.unifi.discover');
     Route::post('/network/devices/{device}/unifi/site', [\App\Http\Controllers\Operator\UnifiSetupController::class, 'selectSite'])->middleware('role:owner,manager,technician')->name('network.devices.unifi.site');
+    Route::post('/network/devices/{device}/omada/setup', [\App\Http\Controllers\Operator\OmadaSetupController::class, 'update'])->middleware('role:owner,manager,technician')->name('network.devices.omada.setup');
 
     Route::get('/sessions', [SessionController::class, 'index'])->name('sessions.index');
     Route::post('/sessions/{session}/disconnect', [SessionController::class, 'disconnect'])->middleware('role:owner,manager,technician')->name('sessions.disconnect');

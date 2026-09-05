@@ -58,10 +58,12 @@ class ReconcileRadiusAccounting implements ShouldQueue
                     }
 
                     $session = HotspotSession::updateOrCreate(
-                        ['acct_session_id' => $record->acctsessionid],
+                        [
+                            'network_device_id' => $device->id,
+                            'acct_session_id' => $record->acctsessionid,
+                        ],
                         [
                             'organization_id' => $device->organization_id,
-                            'network_device_id' => $device->id,
                             'source' => $device->vendor === RouterVendor::Omada
                                 ? 'omada'
                                 : 'radius',
@@ -83,7 +85,22 @@ class ReconcileRadiusAccounting implements ShouldQueue
                     $credential->update(['last_used_at' => now()]);
                     $credential->customer?->update(['last_authenticated_at' => now()]);
                     $devices->markEvidence($device, 'radius_auth', 'A valid RADIUS authentication produced accounting traffic.');
-                    $devices->markEvidence($device, 'accounting', 'Accounting-Start or interim traffic received.', ['session' => $session->uuid]);
+                    $devices->markEvidence(
+                        $device,
+                        'accounting',
+                        'Accounting-Start or interim traffic received.',
+                        ['session' => $session->uuid]
+                    );
+
+                    if ($device->vendor === RouterVendor::Omada) {
+                        $devices->markEvidence(
+                            $device,
+                            'session_tracking',
+                            'Omada accounting was synchronized into a HotFii session.',
+                            ['session' => $session->uuid]
+                        );
+                    }
+
                     HotspotSessionUpdated::dispatch($session);
                 }
             }, 'radacctid');

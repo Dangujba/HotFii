@@ -1,29 +1,81 @@
 # HotFii dynamic RADIUS clients.
 #
-# Only routers connected through the private HotFii WireGuard network may
-# become dynamic clients. Their individual secrets are read from PostgreSQL.
+# MikroTik routers normally arrive through the private HotFii WireGuard
+# network. Omada installations may arrive from their registered public IP.
+#
+# In both cases the source IP MUST exist exactly in HotFii's `nas` table.
+# Unknown sources are denied and never become RADIUS clients.
 
+#
+# Preferred/private MikroTik range.
+# Because this /16 is more specific than 0.0.0.0/0, FreeRADIUS uses
+# this client definition for HotFii WireGuard peers.
+#
 client hotfii-wireguard-dynamic {
     ipaddr = 10.77.0.0/16
     dynamic_clients = hotfii_dynamic_clients
 
-    # Cache each dynamically discovered router for five minutes.
-    # After expiry FreeRADIUS performs the SQL lookup again.
+    # Cache a successfully resolved router for five minutes.
+    lifetime = 300
+}
+
+#
+# Public dynamic discovery.
+#
+# This does NOT mean every Internet host becomes a RADIUS client.
+# It only permits an unknown source to reach the SQL lookup below.
+# The source must already have an exact matching row in `nas`.
+#
+client hotfii-public-dynamic {
+    ipaddr = 0.0.0.0/0
+    dynamic_clients = hotfii_dynamic_clients
+
     lifetime = 300
 }
 
 server hotfii_dynamic_clients {
     authorize {
+        #
+        # A source is valid only when HotFii has explicitly registered
+        # that exact IP in the NAS table.
+        #
         if ("%{sql:SELECT nasname FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}") {
+
             update control {
                 &FreeRADIUS-Client-IP-Address = "%{Packet-Src-IP-Address}"
-                &FreeRADIUS-Client-Shortname = "%{sql:SELECT shortname FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
-                &FreeRADIUS-Client-Secret = "%{sql:SELECT secret FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
-                &FreeRADIUS-Client-NAS-Type = "%{sql:SELECT type FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
-                &FreeRADIUS-Client-Require-MA = yes
-            }
-        }
 
-        ok
+                &FreeRADIUS-Client-Shortname = "%{sql:SELECT shortname FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
+
+                &FreeRADIUS-Client-Secret = "%{sql:SELECT secret FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
+
+                &FreeRADIUS-Client-NAS-Type = "%{sql:SELECT type FROM nas WHERE nasname = '%{Packet-Src-IP-Address}' LIMIT 1}"
+            }
+
+            #
+            # MikroTik already works with Message-Authenticator enforced.
+            #
+            # Omada External RADIUS commonly uses PAP. TP-Link warns that
+            # PAP/CHAP requests may not contain Message-Authenticator, so
+            # requiring it can prevent otherwise valid authentication.
+            #
+            if (&control:FreeRADIUS-Client-NAS-Type == "omada") {
+                update control {
+                    &FreeRADIUS-Client-Require-MA = no
+                }
+            }
+            else {
+                update control {
+                    &FreeRADIUS-Client-Require-MA = yes
+                }
+            }
+
+            ok
+        }
+        else {
+            #
+            # Unknown Internet source. Do not create a dynamic client.
+            #
+            reject
+        }
     }
 }

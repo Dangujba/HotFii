@@ -138,6 +138,172 @@
         </div>
         @endif
 
+
+        @if($device->vendor === \App\Domain\Enums\RouterVendor::Omada)
+            @php($omadaConfig = $device->management_config ?? [])
+
+            <div class="card metric-card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h2 class="h5 mb-0">Omada Controller Connection</h2>
+
+                    @if(
+                        filled($omadaConfig['radius_source_ip'] ?? null)
+                        && filled($omadaConfig['portal_host'] ?? null)
+                    )
+                        <span class="badge text-bg-success">
+                            Configured
+                        </span>
+                    @else
+                        <span class="badge text-bg-warning">
+                            Setup required
+                        </span>
+                    @endif
+                </div>
+
+                <div class="card-body">
+
+                    @if($errors->has('omada'))
+                        <div class="alert alert-danger">
+                            {{ $errors->first('omada') }}
+                        </div>
+                    @endif
+
+                    <p class="text-secondary">
+                        Enter the network details HotFii needs to identify
+                        your Omada RADIUS traffic and return authenticated
+                        guests to the Omada Controller.
+                    </p>
+
+                    <form method="POST"
+                          action="{{ route('network.devices.omada.setup', $device) }}">
+                        @csrf
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                RADIUS Source Public IP
+                            </label>
+
+                            <input
+                                name="radius_source_ip"
+                                class="form-control font-monospace"
+                                value="{{ old('radius_source_ip', $omadaConfig['radius_source_ip'] ?? '') }}"
+                                placeholder="e.g. 197.210.53.20"
+                                required
+                            >
+
+                            <div class="form-text">
+                                Public IPv4 address from which your Omada
+                                Controller/Gateway reaches HotFii.
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    Controller Portal Host
+                                </label>
+
+                                <input
+                                    name="portal_host"
+                                    class="form-control font-monospace"
+                                    value="{{ old('portal_host', $omadaConfig['portal_host'] ?? '') }}"
+                                    placeholder="controller.example.com"
+                                    required
+                                >
+
+                                <div class="form-text">
+                                    Do not include http://, https:// or port.
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    Scheme
+                                </label>
+
+                                @php($scheme = old(
+                                    'portal_scheme',
+                                    $omadaConfig['portal_scheme'] ?? 'https'
+                                ))
+
+                                <select
+                                    name="portal_scheme"
+                                    class="form-select"
+                                    required
+                                >
+                                    <option value="https" @selected($scheme === 'https')>
+                                        HTTPS
+                                    </option>
+
+                                    <option value="http" @selected($scheme === 'http')>
+                                        HTTP
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    Portal Port
+                                </label>
+
+                                <input
+                                    type="number"
+                                    name="portal_port"
+                                    min="1"
+                                    max="65535"
+                                    class="form-control"
+                                    value="{{ old('portal_port', $omadaConfig['portal_port'] ?? 8843) }}"
+                                    required
+                                >
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    CoA / Disconnect Public IP
+                                </label>
+
+                                <input
+                                    name="coa_host"
+                                    class="form-control font-monospace"
+                                    value="{{ old('coa_host', $omadaConfig['coa_host'] ?? '') }}"
+                                    placeholder="Optional — defaults to RADIUS source IP"
+                                >
+
+                                <div class="form-text">
+                                    HotFii sends RADIUS Disconnect-Requests
+                                    here on port {{ config('hotfii.radius.coa_port') }}.
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            class="btn btn-hotfii mt-4"
+                            type="submit"
+                        >
+                            <i class="bi bi-router me-1"></i>
+                            Save Omada settings
+                        </button>
+                    </form>
+
+                    @if(
+                        filled($omadaConfig['portal_host'] ?? null)
+                        && filled($omadaConfig['portal_port'] ?? null)
+                    )
+                        <hr>
+
+                        <div class="small text-secondary">
+                            Omada Browser Authentication Endpoint
+                        </div>
+
+                        <code class="text-break">
+                            {{ ($omadaConfig['portal_scheme'] ?? 'https').'://'.$omadaConfig['portal_host'].':'.$omadaConfig['portal_port'].'/portal/radius/browserauth' }}
+                        </code>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         <div class="card metric-card">
             <div class="card-header"><h2 class="h5 mb-0">{{ $provisioning['method'] === 'script'
     ? 'RouterOS provisioning script'
