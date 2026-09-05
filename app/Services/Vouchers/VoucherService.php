@@ -42,14 +42,13 @@ class VoucherService
             throw new RuntimeException('Voucher quantity must be between 1 and 5,000.');
         }
 
-        // A null price means "sell at the plan price"; an explicit one must
-        // still be worth something. Batch VB-260905-9A7KKQ was generated at
-        // 2 kobo against a ₦500 plan — ten vouchers sold for ₦5,000 of real
-        // cash were booked as ₦0.20, because nothing here questioned the
-        // number. Guarded in the service and not only in the request so no
-        // other caller can reintroduce it.
-        if ($priceKobo !== null && $priceKobo < 100) {
-            throw new RuntimeException('A voucher batch must be priced at ₦1 or more. Leave the price blank to sell at the plan price.');
+        // An operator may mark a voucher up, but may not reduce the sale below
+        // the paid plan it grants. Otherwise a ₦500 plan could be reported as
+        // a ₦100 sale while the operator takes the difference off-system.
+        // Keep this in the service so imports and future callers cannot bypass
+        // the same rule enforced by the web form.
+        if ($priceKobo !== null && $priceKobo < $plan->price_kobo) {
+            throw new RuntimeException('A voucher cannot be priced below its access plan. Leave the price blank to use the plan price.');
         }
 
         return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin) {
@@ -118,10 +117,6 @@ class VoucherService
             if ($organization->status === OrganizationStatus::Suspended && ! $voucher->is_complimentary) {
                 throw new RuntimeException('Paid voucher activation is unavailable while the organization is suspended.');
             }
-            if (! $organization->trial_started_at
-                && $organization->networkDevices()->where('status', 'online')->exists()) {
-                $organization = $this->trials->start($organization);
-            }
             $customer = $phone
                 ? Customer::firstOrCreate(
                     ['organization_id' => $organization->id, 'phone' => $phone],
@@ -150,6 +145,13 @@ class VoucherService
             );
 
             if (! $voucher->is_complimentary && $voucher->price_snapshot_kobo > 0) {
+                // Redeeming a paid voucher is the commercial start signal even
+                // for a cash-only operator with no payment profile or online
+                // router. Trial tracks onboarding; it never waives the fee.
+                if (! $organization->trial_started_at) {
+                    $organization = $this->trials->start($organization);
+                }
+
                 // The same two counters a card sale moves in PaymentProcessor.
                 // Without them a voucher-only operator reads as a zero-sales
                 // business to everything downstream: they never graduate off

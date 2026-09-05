@@ -24,40 +24,115 @@ class ReportsController extends Controller
     public function index(Request $request, Organization $organization): View
     {
         [$from, $to] = $this->range($request);
+        $window = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
+        $paidAt = 'COALESCE(paid_at, transactions.created_at)';
+        $day = "DATE($paidAt)";
+        $channel = "CASE
+            WHEN channel = 'cash' AND reference LIKE 'HF-VCH-%' THEN 'voucher'
+            WHEN channel = 'cash' THEN 'cash'
+            ELSE 'online'
+        END";
+
+        $transactions = fn () => $organization->transactions()
+            ->where('status', 'successful')
+            ->whereBetween(DB::raw($paidAt), $window);
+
+        $summary = $transactions()
+            ->selectRaw('COUNT(*) as sales, COALESCE(SUM(gross_amount_kobo), 0) as gross_kobo')
+            ->first();
+
+        $dailyRows = $transactions()
+            ->selectRaw("$day as day, $channel as sale_channel, SUM(gross_amount_kobo) as total")
+            ->groupBy(DB::raw($day), DB::raw($channel))
+            ->orderBy('day')
+            ->get()
+            ->keyBy(fn ($row) => Carbon::parse($row->day)->toDateString().'|'.$row->sale_channel);
+
+        $usageRows = $organization->sessions()
+            ->whereBetween(DB::raw('COALESCE(started_at, created_at)'), $window)
+            ->selectRaw('DATE(COALESCE(started_at, created_at)) as day, COUNT(*) as sessions, COALESCE(SUM(input_bytes + output_bytes), 0) as bytes')
+            ->groupBy(DB::raw('DATE(COALESCE(started_at, created_at))'))
+            ->orderBy('day')
+            ->get()
+            ->keyBy(fn ($row) => Carbon::parse($row->day)->toDateString());
+
+        $labels = [];
+        $salesSeries = ['online' => [], 'voucher' => [], 'cash' => []];
+        $sessionValues = [];
+        $megabyteValues = [];
+
+        for ($date = $from->copy()->startOfDay(); $date->lte($to); $date->addDay()) {
+            $dateKey = $date->toDateString();
+            $labels[] = $date->format('j M');
+
+            foreach (array_keys($salesSeries) as $channelKey) {
+                $salesSeries[$channelKey][] = round(
+                    (int) ($dailyRows->get($dateKey.'|'.$channelKey)?->total ?? 0) / 100,
+                    2,
+                );
+            }
+
+            $usageDay = $usageRows->get($dateKey);
+            $sessionValues[] = (int) ($usageDay?->sessions ?? 0);
+            $megabyteValues[] = round((int) ($usageDay?->bytes ?? 0) / 1_048_576, 2);
+        }
+
+        $channelRows = $transactions()
+            ->selectRaw("$channel as sale_channel, COUNT(*) as sales, SUM(gross_amount_kobo) as total")
+            ->groupBy(DB::raw($channel))
+            ->get()
+            ->keyBy('sale_channel');
+
+        $channels = collect([
+            'online' => 'Online',
+            'voucher' => 'Vouchers',
+            'cash' => 'Direct cash',
+        ])->map(function (string $label, string $key) use ($channelRows): array {
+            $row = $channelRows->get($key);
+
+            return [
+                'key' => $key,
+                'label' => $label,
+                'sales' => (int) ($row?->sales ?? 0),
+                'value' => round((int) ($row?->total ?? 0) / 100, 2),
+            ];
+        })->values();
+
+        $topPlans = $transactions()
+            ->join('access_plans', 'transactions.access_plan_id', '=', 'access_plans.id')
+            ->groupBy('access_plans.name')
+            ->selectRaw('access_plans.name, COUNT(*) as sales, SUM(transactions.gross_amount_kobo) as total')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get();
 
         return view('operator.reports', [
             'from' => $from,
             'to' => $to,
-            'dailySales' => $organization->transactions()
-                ->selectRaw('DATE(created_at) as day, SUM(gross_amount_kobo) as total')
-                ->where('status', 'successful')
-                ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
-                ->groupBy(DB::raw('DATE(created_at)'))
-                ->orderBy('day')
-                ->get(),
+            'summary' => $summary,
             'usage' => $organization->sessions()
-                ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
+                ->whereBetween(DB::raw('COALESCE(started_at, created_at)'), $window)
                 ->selectRaw('COUNT(*) as sessions, COALESCE(SUM(input_bytes + output_bytes), 0) as bytes')
                 ->first(),
-            'topPlans' => $organization->transactions()
-                ->join('access_plans', 'transactions.access_plan_id', '=', 'access_plans.id')
-                ->where('transactions.status', 'successful')
-                ->whereBetween('transactions.created_at', [$from->startOfDay(), $to->endOfDay()])
-                ->groupBy('access_plans.name')
-                ->selectRaw('access_plans.name, COUNT(*) as sales, SUM(transactions.gross_amount_kobo) as total')
-                ->orderByDesc('total')
-                ->limit(10)
-                ->get(),
+            'salesTrend' => ['labels' => $labels, 'series' => $salesSeries],
+            'channels' => $channels,
+            'topPlans' => $topPlans,
+            'usageTrend' => [
+                'labels' => $labels,
+                'sessions' => $sessionValues,
+                'megabytes' => $megabyteValues,
+            ],
         ]);
     }
 
     public function export(Request $request, Organization $organization): StreamedResponse
     {
         [$from, $to] = $this->range($request);
+        $window = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
         $transactions = $organization->transactions()
             ->with('accessPlan')
-            ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
-            ->orderBy('created_at')
+            ->whereBetween(DB::raw('COALESCE(paid_at, transactions.created_at)'), $window)
+            ->orderByRaw('COALESCE(paid_at, transactions.created_at)')
             ->cursor();
 
         return response()->streamDownload(function () use ($transactions) {
@@ -66,7 +141,9 @@ class ReportsController extends Controller
             foreach ($transactions as $transaction) {
                 fputcsv($output, [
                     $transaction->reference,
-                    $transaction->channel,
+                    str_starts_with($transaction->reference, 'HF-VCH-')
+                        ? 'Voucher'
+                        : ($transaction->channel === 'cash' ? 'Direct cash' : 'Online'),
                     $transaction->status->value,
                     $transaction->accessPlan?->name,
                     number_format($transaction->gross_amount_kobo / 100, 2, '.', ''),
@@ -81,11 +158,17 @@ class ReportsController extends Controller
     {
         [$from, $to] = $this->range($request);
         $window = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
+        $paidAt = 'COALESCE(paid_at, transactions.created_at)';
+        $channel = "CASE
+            WHEN reference LIKE 'HF-VCH-%' THEN 'voucher'
+            WHEN channel = 'cash' THEN 'cash'
+            ELSE 'online'
+        END";
         // Qualified, because the top-plans query joins access_plans and that
         // table carries a created_at and a name of its own.
-        $transactions = fn () => $organization->transactions()->whereBetween('transactions.created_at', $window);
+        $transactions = fn () => $organization->transactions()->whereBetween(DB::raw($paidAt), $window);
 
-        $rows = $transactions()->with('accessPlan')->orderBy('transactions.created_at')->limit(self::PDF_ROW_LIMIT)->get();
+        $rows = $transactions()->with('accessPlan')->orderByRaw($paidAt)->limit(self::PDF_ROW_LIMIT)->get();
 
         $pdf = Pdf::loadView('operator.report-pdf', [
             'organization' => $organization,
@@ -105,8 +188,8 @@ class ReportsController extends Controller
                 ->first(),
             'byChannel' => $transactions()
                 ->where('status', 'successful')
-                ->groupBy('channel')
-                ->selectRaw('channel, COUNT(*) as sales, SUM(gross_amount_kobo) as total')
+                ->groupBy(DB::raw($channel))
+                ->selectRaw("$channel as channel, COUNT(*) as sales, SUM(gross_amount_kobo) as total")
                 ->orderByDesc('total')
                 ->get(),
             'topPlans' => $transactions()
@@ -119,8 +202,8 @@ class ReportsController extends Controller
                 ->get(),
             'daily' => $transactions()
                 ->where('transactions.status', 'successful')
-                ->selectRaw('DATE(transactions.created_at) as day, COUNT(*) as sales, SUM(gross_amount_kobo) as total')
-                ->groupBy(DB::raw('DATE(transactions.created_at)'))
+                ->selectRaw("DATE($paidAt) as day, COUNT(*) as sales, SUM(gross_amount_kobo) as total")
+                ->groupBy(DB::raw("DATE($paidAt)"))
                 ->orderBy('day')
                 ->get(),
             'rows' => $rows,

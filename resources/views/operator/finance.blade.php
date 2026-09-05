@@ -3,7 +3,12 @@
 @section('heading', 'Finance')
 @section('subheading', 'Transparent sales, HotFii fees, invoices, and subscription status')
 @section('content')
-<div class="row g-3 mb-4"><div class="col-md-4"><div class="card metric-card"><div class="card-body"><div class="text-secondary">Billable sales this month</div><div class="fs-3 fw-bold">₦{{ number_format($current['sales'] / 100, 0) }}</div></div></div></div><div class="col-md-4"><div class="card metric-card"><div class="card-body"><div class="text-secondary">HotFii fees accrued/collected</div><div class="fs-3 fw-bold">₦{{ number_format($current['fees'] / 100, 0) }}</div></div></div></div><div class="col-md-4"><div class="card metric-card"><div class="card-body"><div class="text-secondary">Current plan</div><div class="fs-5 fw-bold">{{ str_replace('_', ' ', ucfirst($currentOrganization->billing_plan->value)) }}</div><div class="small text-secondary">{{ $subscription?->status ?? 'No separate subscription record' }}</div></div></div></div></div>
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Billable sales this month</div><div class="fs-3 fw-bold">₦{{ number_format($current['sales'] / 100, 0) }}</div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Running 2% transaction fees</div><div class="fs-3 fw-bold">₦{{ number_format($current['fees'] / 100, 0) }}</div><div class="small text-secondary">₦{{ number_format($current['accrued'] / 100, 0) }} accrued · ₦{{ number_format($current['collected'] / 100, 0) }} collected</div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Estimated month-end fee</div><div class="fs-3 fw-bold">₦{{ number_format($current['estimated_month_end_fee'] / 100, 0) }}</div><div class="small text-secondary">Estimated invoice: ₦{{ number_format($current['estimated_invoice_balance'] / 100, 0) }} after collected fees</div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Current plan</div><div class="fs-5 fw-bold">{{ str_replace('_', ' ', ucfirst($currentOrganization->billing_plan->value)) }}</div><div class="small text-secondary">{{ $subscription?->status ?? 'No separate subscription record' }}</div></div></div></div>
+</div>
 <div class="row g-4"><div class="col-xl-8"><div class="card metric-card">
 <x-filter-bar :action="route('finance.index')" :active="$ledgerFiltered" title="HotFii charge ledger">
     {{-- The invoice list filters through its own form, so carry its value across. --}}

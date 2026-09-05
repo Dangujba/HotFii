@@ -6,6 +6,7 @@ return [
     'commerce' => [
         'platform_fee_bps' => (int) env('HOTFII_PLATFORM_FEE_BPS', 200),
         'standard_minimum_kobo' => (int) env('HOTFII_STANDARD_MINIMUM_KOBO', 250000),
+        'minimum_included_sales_kobo' => (int) env('HOTFII_MINIMUM_INCLUDED_SALES_KOBO', 5000000),
         'micro_sales_limit_kobo' => (int) env('HOTFII_MICRO_SALES_LIMIT_KOBO', 5000000),
         'trial_sales_cap_kobo' => (int) env('HOTFII_TRIAL_SALES_CAP_KOBO', 10000000),
         'trial_days' => (int) env('HOTFII_TRIAL_DAYS', 14),

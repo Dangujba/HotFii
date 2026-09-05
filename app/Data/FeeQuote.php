@@ -14,7 +14,7 @@ final readonly class FeeQuote
 
     public function chargeablePercentageFeeKobo(): int
     {
-        return in_array($this->reason, ['trial_or_sandbox', 'internal_subscription'], true)
+        return $this->reason === 'internal_subscription'
             ? 0
             : $this->percentageFeeKobo;
     }

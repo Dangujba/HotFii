@@ -20,7 +20,7 @@ use Illuminate\View\View;
 class SalesController extends Controller
 {
     /** Channels a transaction can be recorded through. */
-    private const CHANNELS = ['online', 'cash'];
+    private const CHANNELS = ['online', 'voucher', 'cash'];
 
     public function index(Request $request, Organization $organization): View
     {
@@ -42,7 +42,17 @@ class SalesController extends Controller
                         ->orWhere('email', 'like', "%{$term}%")
                         ->orWhere('phone', 'like', "%{$term}%"))))
                 ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
-                ->when($filters['channel'], fn ($query, $channel) => $query->where('channel', $channel))
+                ->when($filters['channel'], function ($query, string $channel) {
+                    if ($channel === 'voucher') {
+                        return $query->where('reference', 'like', 'HF-VCH-%');
+                    }
+
+                    $query->where('channel', $channel);
+
+                    return $channel === 'cash'
+                        ? $query->where('reference', 'not like', 'HF-VCH-%')
+                        : $query;
+                })
                 ->when($filters['from'], fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
                 ->when($filters['to'], fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
                 ->latest()
@@ -65,7 +75,11 @@ class SalesController extends Controller
             'totals' => [
                 'online' => $organization->transactions()->where('channel', 'online')->where('status', 'successful')->sum('gross_amount_kobo'),
                 'voucher' => $organization->vouchers()->whereNotNull('activated_at')->count(),
-                'cash' => $organization->transactions()->where('channel', 'cash')->where('status', 'successful')->sum('gross_amount_kobo'),
+                'cash' => $organization->transactions()
+                    ->where('channel', 'cash')
+                    ->where('reference', 'not like', 'HF-VCH-%')
+                    ->where('status', 'successful')
+                    ->sum('gross_amount_kobo'),
             ],
         ]);
     }
@@ -121,7 +135,7 @@ class SalesController extends Controller
         $processor->markSuccessful($transaction, ['amount' => $plan->price_kobo, 'fees' => 0, 'channel' => 'cash']);
         $credential = $customer->credentials()->latest()->first();
 
-        return back()->with('success', 'Cash sale recorded and RADIUS access activated.')
+        return back()->with('success', 'Direct cash sale recorded and RADIUS access activated.')
             ->with('issued_credential', ['username' => $credential?->username, 'password' => $credential?->password_cipher]);
     }
 }

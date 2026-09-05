@@ -1,7 +1,6 @@
 @php
     $company = $organization->branding['portal_name'] ?? $organization->name;
     $gross = $summary->gross_kobo ?? 0;
-    $fees = ($summary->gateway_kobo ?? 0) + ($summary->platform_kobo ?? 0);
     $naira = fn ($kobo) => '₦'.number_format($kobo / 100, 2);
     $days = $from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay()) + 1;
 @endphp
@@ -46,8 +45,8 @@ table.data .num { text-align: right; } table.data .total td { border-top: 1.5px 
 
 <table class="tiles"><tr>
     <td><div class="k">Gross paid sales</div><div class="v">{{ $naira($gross) }}</div><div class="s">{{ number_format($summary->sales ?? 0) }} of {{ number_format($summary->attempts ?? 0) }} attempts settled</div></td>
-    <td><div class="k">Fees deducted</div><div class="v">{{ $naira($fees) }}</div><div class="s">{{ $naira($summary->gateway_kobo ?? 0) }} gateway · {{ $naira($summary->platform_kobo ?? 0) }} platform</div></td>
-    <td><div class="k">Net to operator</div><div class="v">{{ $naira($gross - $fees) }}</div><div class="s">{{ $gross > 0 ? number_format(($gross - $fees) / $gross * 100, 1) : '0.0' }}% of gross</div></td>
+    <td><div class="k">Running HotFii fees</div><div class="v">{{ $naira($summary->platform_kobo ?? 0) }}</div><div class="s">2% across paid sales, accrued or collected</div></td>
+    <td><div class="k">Gateway fees</div><div class="v">{{ $naira($summary->gateway_kobo ?? 0) }}</div><div class="s">Processor charges recorded on online payments</div></td>
     <td><div class="k">Access delivered</div><div class="v">{{ number_format($usage->sessions ?? 0) }}</div><div class="s">sessions · {{ \App\Support\Bytes::human($usage->bytes ?? 0) }} transferred</div></td>
 </tr></table>
 
@@ -56,7 +55,7 @@ table.data .num { text-align: right; } table.data .total td { border-top: 1.5px 
     <thead><tr><th>Channel</th><th class="num">Sales</th><th class="num">Gross</th><th class="num">Share</th></tr></thead>
     <tbody>
         @forelse($byChannel as $channel)
-        <tr class="{{ $loop->even ? 'alt' : '' }}"><td>{{ ucfirst($channel->channel) }}</td><td class="num">{{ number_format($channel->sales) }}</td><td class="num">{{ $naira($channel->total) }}</td><td class="num">{{ $gross > 0 ? number_format($channel->total / $gross * 100, 1) : '0.0' }}%</td></tr>
+        <tr class="{{ $loop->even ? 'alt' : '' }}"><td>{{ $channel->channel === 'cash' ? 'Direct cash' : ucfirst($channel->channel) }}</td><td class="num">{{ number_format($channel->sales) }}</td><td class="num">{{ $naira($channel->total) }}</td><td class="num">{{ $gross > 0 ? number_format($channel->total / $gross * 100, 1) : '0.0' }}%</td></tr>
         @empty
         <tr><td colspan="4" class="empty">No settled sales in this period.</td></tr>
         @endforelse
@@ -99,7 +98,7 @@ table.data .num { text-align: right; } table.data .total td { border-top: 1.5px 
     <thead><tr><th>Date</th><th>Reference</th><th>Plan</th><th>Channel</th><th>Status</th><th class="num">Gross</th></tr></thead>
     <tbody>
         @forelse($rows as $row)
-        <tr class="{{ $loop->even ? 'alt' : '' }}"><td>{{ $row->created_at->format('j M, H:i') }}</td><td>{{ $row->reference }}</td><td>{{ $row->accessPlan?->name ?? '—' }}</td><td>{{ ucfirst($row->channel) }}</td><td>{{ ucfirst($row->status instanceof BackedEnum ? $row->status->value : $row->status) }}</td><td class="num">{{ $naira($row->gross_amount_kobo) }}</td></tr>
+        <tr class="{{ $loop->even ? 'alt' : '' }}"><td>{{ ($row->paid_at ?? $row->created_at)->format('j M, H:i') }}</td><td>{{ $row->reference }}</td><td>{{ $row->accessPlan?->name ?? '—' }}</td><td>{{ str_starts_with($row->reference, 'HF-VCH-') ? 'Voucher' : ($row->channel === 'cash' ? 'Direct cash' : 'Online') }}</td><td>{{ ucfirst($row->status instanceof BackedEnum ? $row->status->value : $row->status) }}</td><td class="num">{{ $naira($row->gross_amount_kobo) }}</td></tr>
         @empty
         <tr><td colspan="6" class="empty">No transactions in this period.</td></tr>
         @endforelse

@@ -5,12 +5,14 @@ namespace Tests\Feature\Billing;
 use App\Domain\Enums\BillingPlan;
 use App\Domain\Enums\OrganizationMode;
 use App\Domain\Enums\OrganizationStatus;
+use App\Http\Controllers\Operator\SalesController;
 use App\Models\AccessPlan;
 use App\Models\FeeLedgerEntry;
 use App\Models\Organization;
 use App\Models\Transaction;
 use App\Services\Vouchers\VoucherService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -48,7 +50,8 @@ class VoucherSalesCountersTest extends TestCase
             'timezone' => 'Africa/Lagos',
         ]);
 
-        // Past the trial, so fees are chargeable rather than waived.
+        // A settled seller; Trial is still billable, but several counter tests
+        // below need to distinguish trial_sales_kobo from monthly sales.
         $organization->forceFill([
             'trial_started_at' => now()->subMonths(3),
             'trial_ends_at' => now()->subMonths(2),
@@ -111,6 +114,31 @@ class VoucherSalesCountersTest extends TestCase
         $this->assertNotNull($transaction->paid_at);
     }
 
+    public function test_a_voucher_is_visible_in_transactions_but_not_counted_as_direct_cash(): void
+    {
+        $organization = $this->seller();
+        $plan = $this->plan($organization);
+
+        $this->redeemOne($organization, $plan);
+
+        $view = app(SalesController::class)->index(Request::create('/sales'), $organization);
+        $this->assertSame(1, $view->getData()['totals']['voucher']);
+        $this->assertSame(0, $view->getData()['totals']['cash']);
+        $this->assertSame(1, $view->getData()['transactions']->total());
+
+        $voucherView = app(SalesController::class)->index(
+            Request::create('/sales', 'GET', ['channel' => 'voucher']),
+            $organization,
+        );
+        $cashView = app(SalesController::class)->index(
+            Request::create('/sales', 'GET', ['channel' => 'cash']),
+            $organization,
+        );
+
+        $this->assertSame(1, $voucherView->getData()['transactions']->total());
+        $this->assertSame(0, $cashView->getData()['transactions']->total());
+    }
+
     public function test_printing_vouchers_charges_and_counts_nothing(): void
     {
         $organization = $this->seller();
@@ -145,6 +173,17 @@ class VoucherSalesCountersTest extends TestCase
         $this->assertSame(50000, $organization->refresh()->monthly_sales_kobo);
     }
 
+    public function test_a_voucher_batch_cannot_undercut_its_paid_plan(): void
+    {
+        $organization = $this->seller();
+        $plan = $this->plan($organization, priceKobo: 50000);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('cannot be priced below its access plan');
+
+        app(VoucherService::class)->createBatch($organization, $plan, 1, priceKobo: 10000);
+    }
+
     public function test_a_trial_redemption_counts_towards_the_trial_ceiling(): void
     {
         $organization = $this->seller();
@@ -168,6 +207,26 @@ class VoucherSalesCountersTest extends TestCase
         );
         // Both counters move: the ceiling is per-trial, graduation is per-month.
         $this->assertSame(50000, $organization->monthly_sales_kobo);
+        $this->assertSame(1000, FeeLedgerEntry::where('organization_id', $organization->id)->sole()->fee_amount_kobo);
+    }
+
+    public function test_the_first_voucher_redemption_starts_billing_without_an_online_router(): void
+    {
+        $organization = $this->seller(BillingPlan::Sandbox);
+        $organization->forceFill([
+            'status' => OrganizationStatus::Live,
+            'trial_started_at' => null,
+            'trial_ends_at' => null,
+        ])->save();
+        $plan = $this->plan($organization->refresh());
+
+        $this->redeemOne($organization, $plan);
+
+        $organization->refresh();
+        $this->assertSame(OrganizationStatus::Trial, $organization->status);
+        $this->assertNotNull($organization->trial_started_at);
+        $this->assertSame(1000, FeeLedgerEntry::sole()->fee_amount_kobo);
+        $this->assertSame(1000, Transaction::sole()->platform_fee_kobo);
     }
 
     public function test_a_settled_account_does_not_touch_the_trial_counter(): void
@@ -204,7 +263,7 @@ class VoucherSalesCountersTest extends TestCase
         $organization = $this->seller();
         $plan = $this->plan($organization, priceKobo: 0);
 
-        $this->redeemOne($organization, $plan, priceKobo: 0);
+        $this->redeemOne($organization, $plan);
 
         $this->assertSame(0, $organization->refresh()->monthly_sales_kobo);
         $this->assertSame(0, Transaction::where('organization_id', $organization->id)->count());

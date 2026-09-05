@@ -19,8 +19,12 @@ export function tokens() {
         ink: read('--hf-ink', '#1e1a17'),
         muted: read('--hf-ink-secondary', '#6b5f56'),
         grid: read('--hf-chart-grid', '#ede5dc'),
-        // Slot 1 is money, slot 2 is usage. Assigned in this order, never cycled.
-        series: [read('--hf-chart-1', '#f4610a'), read('--hf-chart-2', '#0f9b76')],
+        // Stable categorical marks shared across dashboard and report charts.
+        series: [
+            read('--hf-chart-1', '#f4610a'),
+            read('--hf-chart-2', '#0f9b76'),
+            read('--hf-chart-3', '#356da8'),
+        ],
         // Reserved: these mean good..critical and are never used for "series 3".
         status: {
             good: read('--hf-status-good', '#0ca30c'),

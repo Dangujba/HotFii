@@ -38,8 +38,6 @@ class InvoiceSettlementTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const MONTHLY_MINIMUM_KOBO = 250000; // ₦2,500, config('hotfii.commerce.standard_minimum_kobo')
-
     private function seller(?string $subaccount = 'ACCT_test1234567'): Organization
     {
         $organization = Organization::create([
@@ -136,7 +134,8 @@ class InvoiceSettlementTest extends TestCase
         $organization = $this->seller();
         $period = now()->subMonth()->startOfMonth();
 
-        // ₦200,000 in cash: 2% is ₦4,000, well above the ₦2,500 minimum.
+        // ₦2,500 includes the first ₦50,000, then the remaining ₦150,000
+        // contributes 2% (₦3,000): ₦5,500 altogether.
         FeeLedgerEntry::create([
             'organization_id' => $organization->id,
             'source_type' => 'transaction',
@@ -152,10 +151,10 @@ class InvoiceSettlementTest extends TestCase
         $invoice = Invoice::where('organization_id', $organization->id)->first();
 
         $this->assertNotNull($invoice, 'A cash-only month must still be billed. It used to produce no invoice at all.');
-        $this->assertSame(4_000_00, $invoice->total_kobo);
+        $this->assertSame(5_500_00, $invoice->total_kobo);
     }
 
-    public function test_fees_already_taken_at_the_gateway_are_not_billed_twice(): void
+    public function test_gateway_fees_are_subtracted_from_the_final_monthly_charge(): void
     {
         $organization = $this->seller();
         $period = now()->subMonth()->startOfMonth();
@@ -172,10 +171,86 @@ class InvoiceSettlementTest extends TestCase
 
         (new GenerateMonthlyInvoices($period->toDateString()))->handle();
 
-        $this->assertNull(
-            Invoice::where('organization_id', $organization->id)->first(),
-            'The gateway already took the whole fee, so there is nothing left to invoice.',
-        );
+        $invoice = Invoice::where('organization_id', $organization->id)->sole();
+
+        $this->assertSame(1_500_00, $invoice->total_kobo);
+    }
+
+    public function test_a_small_mixed_month_invoices_the_minimum_less_online_fees_collected(): void
+    {
+        $organization = $this->seller();
+        $period = now()->subMonth()->startOfMonth();
+
+        FeeLedgerEntry::create([
+            'organization_id' => $organization->id,
+            'source_type' => 'transaction',
+            'source_id' => 1,
+            'billing_period' => $period->toDateString(),
+            'billable_sales_kobo' => 30_000_00,
+            'fee_amount_kobo' => 600_00,
+            'status' => 'collected',
+        ]);
+        FeeLedgerEntry::create([
+            'organization_id' => $organization->id,
+            'source_type' => 'voucher',
+            'source_id' => 2,
+            'billing_period' => $period->toDateString(),
+            'billable_sales_kobo' => 10_000_00,
+            'fee_amount_kobo' => 200_00,
+            'status' => 'accrued',
+        ]);
+
+        (new GenerateMonthlyInvoices($period->toDateString()))->handle();
+
+        // Final fee is ₦2,500. Paystack already retained ₦600, leaving ₦1,900.
+        $this->assertSame(1_900_00, Invoice::where('organization_id', $organization->id)->sole()->total_kobo);
+    }
+
+    public function test_a_trial_organization_is_invoiced_normally(): void
+    {
+        $organization = $this->seller();
+        $organization->forceFill([
+            'status' => OrganizationStatus::Trial,
+            'billing_plan' => BillingPlan::Sandbox,
+            'trial_started_at' => now()->subMonth(),
+            'trial_ends_at' => now()->addWeek(),
+        ])->save();
+        $period = now()->subMonth()->startOfMonth();
+
+        FeeLedgerEntry::create([
+            'organization_id' => $organization->id,
+            'source_type' => 'voucher',
+            'source_id' => 1,
+            'billing_period' => $period->toDateString(),
+            'billable_sales_kobo' => 10_000_00,
+            'fee_amount_kobo' => 200_00,
+            'status' => 'accrued',
+        ]);
+
+        (new GenerateMonthlyInvoices($period->toDateString()))->handle();
+
+        $this->assertSame(2_500_00, Invoice::where('organization_id', $organization->id)->sole()->total_kobo);
+    }
+
+    public function test_a_rejected_online_payment_profile_does_not_exempt_offline_sales(): void
+    {
+        $organization = $this->seller();
+        $organization->forceFill(['status' => OrganizationStatus::PaymentRejected])->save();
+        $period = now()->subMonth()->startOfMonth();
+
+        FeeLedgerEntry::create([
+            'organization_id' => $organization->id,
+            'source_type' => 'voucher',
+            'source_id' => 1,
+            'billing_period' => $period->toDateString(),
+            'billable_sales_kobo' => 10_000_00,
+            'fee_amount_kobo' => 200_00,
+            'status' => 'accrued',
+        ]);
+
+        (new GenerateMonthlyInvoices($period->toDateString()))->handle();
+
+        $this->assertSame(2_500_00, Invoice::where('organization_id', $organization->id)->sole()->total_kobo);
     }
 
     public function test_an_overdue_invoice_suspends_the_account_and_records_why(): void

@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class VoucherBatchController extends Controller
@@ -53,24 +54,29 @@ class VoucherBatchController extends Controller
         $data = $request->validate([
             'access_plan_id' => ['required', 'integer'],
             'quantity' => ['required', 'integer', 'min:1', 'max:5000'],
-            // Leaving this blank means "sell at the plan price". A value of 0
-            // used to be accepted and silently overrode the plan, so a batch
-            // could be generated worth nothing: VoucherService skips every
-            // sales counter and the whole fee ledger when the snapshot is 0,
-            // making real sales invisible. The floor of ₦1 is what stops that,
-            // and 'decimal:0,2' rejects sub-kobo precision that would round
-            // away to nothing.
+            // Leaving this blank means "sell at the plan price". The service
+            // also enforces that a custom price cannot undercut the plan.
             'retail_price_naira' => ['nullable', 'numeric', 'decimal:0,2', 'min:1'],
             'pin_format' => ['nullable', Rule::enum(VoucherPinFormat::class)],
             'dashed_pin' => ['nullable', 'boolean'],
         ]);
 
         $plan = $organization->accessPlans()->where('access_type', 'paid')->findOrFail($data['access_plan_id']);
+        $retailPriceKobo = isset($data['retail_price_naira'])
+            ? (int) round($data['retail_price_naira'] * 100)
+            : null;
+
+        if ($retailPriceKobo !== null && $retailPriceKobo < $plan->price_kobo) {
+            throw ValidationException::withMessages([
+                'retail_price_naira' => 'The voucher price cannot be below the selected plan price.',
+            ]);
+        }
+
         $batch = $service->createBatch(
             $organization,
             $plan,
             $data['quantity'],
-            isset($data['retail_price_naira']) ? (int) round($data['retail_price_naira'] * 100) : null,
+            $retailPriceKobo,
             VoucherPinFormat::tryFrom($data['pin_format'] ?? '') ?? VoucherPinFormat::Numbers,
             $request->has('dashed_pin') ? $request->boolean('dashed_pin') : true,
         );
