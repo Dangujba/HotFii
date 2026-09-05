@@ -11,6 +11,9 @@ use App\Http\Controllers\Operator\FinanceController;
 use App\Http\Controllers\Operator\InvoicePaymentController;
 use App\Http\Controllers\Operator\LocationController;
 use App\Http\Controllers\Operator\NetworkDeviceController;
+use App\Http\Controllers\Operator\NetworkDeviceGuideController;
+use App\Http\Controllers\Operator\OmadaSetupController;
+use App\Http\Controllers\Operator\UnifiSetupController;
 use App\Http\Controllers\Operator\NotificationController;
 use App\Http\Controllers\Operator\OrganizationContextController;
 use App\Http\Controllers\Operator\ProvisioningController;
@@ -33,6 +36,7 @@ use App\Http\Controllers\Platform\SystemController as PlatformSystemController;
 use App\Http\Controllers\Platform\TransactionController as PlatformTransactionController;
 use App\Http\Controllers\Platform\UserController as PlatformUserController;
 use App\Http\Controllers\PortalController;
+use App\Http\Controllers\UnifiPortalController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -55,6 +59,7 @@ Route::prefix('connect/{device}')->name('portal.')->middleware('throttle:120,1')
     Route::get('/status', [PortalController::class, 'status'])->name('status');
     Route::get('/connected', [PortalController::class, 'connected'])->name('connected');
     Route::get('/mikrotik/login.html', [PortalController::class, 'mikrotikLogin'])->name('mikrotik-login');
+    Route::post('/unifi/authorize', [UnifiPortalController::class, 'authorize'])->name('unifi-authorize');
     Route::post('/payment', [PaymentController::class, 'initialize'])->name('payment');
     Route::get('/payment/{transaction}/callback', [PaymentController::class, 'callback'])->name('payment.callback');
     Route::get('/payment/{transaction}/status', [PaymentController::class, 'status'])->name('payment.status');
@@ -75,6 +80,22 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
     Route::get('/network/devices/{device}', [NetworkDeviceController::class, 'show'])->name('network.devices.show');
     Route::post('/network/devices/{device}/test', [NetworkDeviceController::class, 'test'])->middleware('role:owner,manager,technician')->name('network.devices.test');
     Route::post('/network/devices/{device}/provisioning-link', ProvisioningController::class)->middleware('role:owner,manager,technician')->name('network.devices.provisioning-link');
+
+    Route::post('/network/devices/{device}/unifi/discover', [UnifiSetupController::class, 'discover'])
+        ->middleware('role:owner,manager,technician')
+        ->name('network.devices.unifi.discover');
+
+    Route::post('/network/devices/{device}/unifi/site', [UnifiSetupController::class, 'selectSite'])
+        ->middleware('role:owner,manager,technician')
+        ->name('network.devices.unifi.site');
+
+    Route::post('/network/devices/{device}/omada/setup', [OmadaSetupController::class, 'update'])
+        ->middleware('role:owner,manager,technician')
+        ->name('network.devices.omada.setup');
+
+    Route::get('/network/devices/{device}/guide', [NetworkDeviceGuideController::class, 'show'])
+        ->middleware('role:owner,manager,technician')
+        ->name('network.devices.guide');
 
     Route::get('/sessions', [SessionController::class, 'index'])->name('sessions.index');
     Route::post('/sessions/{session}/disconnect', [SessionController::class, 'disconnect'])->middleware('role:owner,manager,technician')->name('sessions.disconnect');
