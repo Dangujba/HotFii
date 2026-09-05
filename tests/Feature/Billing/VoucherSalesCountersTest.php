@@ -262,6 +262,7 @@ class VoucherSalesCountersTest extends TestCase
     {
         $organization = $this->seller();
         $plan = $this->plan($organization, priceKobo: 0);
+        $plan->update(['access_type' => 'free']);
 
         $this->redeemOne($organization, $plan);
 
