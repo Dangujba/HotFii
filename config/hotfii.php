@@ -26,7 +26,7 @@ return [
         'agent_url' => env('HOTFII_WIREGUARD_AGENT_URL', 'http://172.18.0.1:8787'),
         'agent_secret' => env('HOTFII_WIREGUARD_AGENT_SECRET'),
     ],
-    'supported_vendors' => ['generic', 'mikrotik', 'unifi', 'omada', 'ruijie', 'cambium', 'cisco', 'huawei', 'dlink'],
+    'supported_vendors' => ['generic', 'mikrotik', 'unifi', 'omada', 'openwrt'],
     'internal_plans' => [
         'organization_20' => ['price_kobo' => 500000, 'sites' => 1, 'active_identities' => 20],
         'organization_50' => ['price_kobo' => 750000, 'sites' => 1, 'active_identities' => 50],

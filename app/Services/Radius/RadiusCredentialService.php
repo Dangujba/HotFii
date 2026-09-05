@@ -71,6 +71,67 @@ class RadiusCredentialService
         });
     }
 
+    /**
+     * Refresh the per-login RADIUS limits using the allowance that remains
+     * across all previous HotFii sessions for this credential.
+     */
+    public function syncRemainingAllowance(AccessCredential $credential, array $allowance): void
+    {
+        DB::transaction(function () use ($credential, $allowance) {
+            $username = $credential->username;
+
+            $remainingSeconds = $allowance['remaining_seconds'] ?? null;
+            $remainingBytes = $allowance['remaining_bytes'] ?? null;
+
+            if ($remainingSeconds !== null) {
+                $this->reply(
+                    $username,
+                    'Session-Timeout',
+                    (string) max(1, (int) $remainingSeconds),
+                );
+            } else {
+                DB::table('radreply')
+                    ->where('username', $username)
+                    ->where('attribute', 'Session-Timeout')
+                    ->delete();
+            }
+
+            if ($remainingBytes !== null) {
+                $remainingBytes = max(1, (int) $remainingBytes);
+
+                $low = $remainingBytes % 4294967296;
+                $gigawords = intdiv($remainingBytes, 4294967296);
+
+                $this->reply(
+                    $username,
+                    'Mikrotik-Total-Limit',
+                    (string) $low,
+                );
+
+                if ($gigawords > 0) {
+                    $this->reply(
+                        $username,
+                        'Mikrotik-Total-Limit-Gigawords',
+                        (string) $gigawords,
+                    );
+                } else {
+                    DB::table('radreply')
+                        ->where('username', $username)
+                        ->where('attribute', 'Mikrotik-Total-Limit-Gigawords')
+                        ->delete();
+                }
+            } else {
+                DB::table('radreply')
+                    ->where('username', $username)
+                    ->whereIn('attribute', [
+                        'Mikrotik-Total-Limit',
+                        'Mikrotik-Total-Limit-Gigawords',
+                    ])
+                    ->delete();
+            }
+        });
+    }
+
     public function revoke(AccessCredential $credential): void
     {
         DB::transaction(function () use ($credential) {

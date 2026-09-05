@@ -53,6 +53,7 @@ Route::prefix('connect/{device}')->name('portal.')->middleware('throttle:120,1')
     Route::get('/status', [PortalController::class, 'status'])->name('status');
     Route::get('/connected', [PortalController::class, 'connected'])->name('connected');
     Route::get('/mikrotik/login.html', [PortalController::class, 'mikrotikLogin'])->name('mikrotik-login');
+    Route::post('/unifi/authorize', [\App\Http\Controllers\UnifiPortalController::class, 'authorize'])->name('unifi-authorize');
     Route::post('/payment', [PaymentController::class, 'initialize'])->name('payment');
     Route::get('/payment/{transaction}/callback', [PaymentController::class, 'callback'])->name('payment.callback');
     Route::get('/payment/{transaction}/status', [PaymentController::class, 'status'])->name('payment.status');
@@ -73,6 +74,8 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
     Route::get('/network/devices/{device}', [NetworkDeviceController::class, 'show'])->name('network.devices.show');
     Route::post('/network/devices/{device}/test', [NetworkDeviceController::class, 'test'])->middleware('role:owner,manager,technician')->name('network.devices.test');
     Route::post('/network/devices/{device}/provisioning-link', ProvisioningController::class)->middleware('role:owner,manager,technician')->name('network.devices.provisioning-link');
+    Route::post('/network/devices/{device}/unifi/discover', [\App\Http\Controllers\Operator\UnifiSetupController::class, 'discover'])->middleware('role:owner,manager,technician')->name('network.devices.unifi.discover');
+    Route::post('/network/devices/{device}/unifi/site', [\App\Http\Controllers\Operator\UnifiSetupController::class, 'selectSite'])->middleware('role:owner,manager,technician')->name('network.devices.unifi.site');
 
     Route::get('/sessions', [SessionController::class, 'index'])->name('sessions.index');
     Route::post('/sessions/{session}/disconnect', [SessionController::class, 'disconnect'])->middleware('role:owner,manager,technician')->name('sessions.disconnect');

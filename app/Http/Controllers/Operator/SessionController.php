@@ -29,6 +29,7 @@ class SessionController extends Controller
                 ->with('networkDevice', 'customer', 'accessPlan')
                 ->when($filters['search'], fn ($query, $term) => $query->where(fn ($inner) => $inner
                     ->where('radius_username', 'like', "%{$term}%")
+                    ->orWhere('external_session_id', 'like', "%{$term}%")
                     ->orWhere('mac_address', 'like', "%{$term}%")
                     ->orWhere('ip_address', 'like', "%{$term}%")
                     ->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$term}%"))))

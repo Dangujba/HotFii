@@ -575,11 +575,12 @@
                     <span class="vendor-chip">MikroTik</span>
                     <span class="vendor-chip">UniFi</span>
                     <span class="vendor-chip">Omada</span>
-                    <span class="vendor-chip">Ruijie</span>
-                    <span class="vendor-chip">Cambium</span>
-                    <span class="vendor-chip">Cisco</span>
-                    <span class="vendor-chip">Huawei</span>
-                    <span class="vendor-chip">D-Link</span>
+                    <span class="vendor-chip">OpenWrt</span>
+                    
+                    
+                    
+                    
+                    
                 </div>
             </div>
             <div class="bento-card reveal reveal-delay-2">

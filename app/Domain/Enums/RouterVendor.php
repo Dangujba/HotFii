@@ -8,6 +8,7 @@ enum RouterVendor: string
     case Mikrotik = 'mikrotik';
     case Unifi = 'unifi';
     case Omada = 'omada';
+    case Openwrt = 'openwrt';
     case Ruijie = 'ruijie';
     case Cambium = 'cambium';
     case Cisco = 'cisco';
@@ -17,7 +18,7 @@ enum RouterVendor: string
     public function label(): string
     {
         return match ($this) {
-            self::Mikrotik => 'MikroTik', self::Unifi => 'Ubiquiti UniFi', self::Omada => 'TP-Link Omada',
+            self::Mikrotik => 'MikroTik', self::Unifi => 'Ubiquiti UniFi', self::Omada => 'TP-Link Omada', self::Openwrt => 'OpenWrt',
             self::Ruijie => 'Ruijie / Reyee', self::Dlink => 'D-Link', default => ucfirst($this->value),
         };
     }

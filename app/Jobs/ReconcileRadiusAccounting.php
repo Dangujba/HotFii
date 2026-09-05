@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Enums\RouterVendor;
 use App\Events\HotspotSessionUpdated;
 use App\Models\AccessCredential;
 use App\Models\HotspotSession;
@@ -61,6 +62,9 @@ class ReconcileRadiusAccounting implements ShouldQueue
                         [
                             'organization_id' => $device->organization_id,
                             'network_device_id' => $device->id,
+                            'source' => $device->vendor === RouterVendor::Omada
+                                ? 'omada'
+                                : 'radius',
                             'customer_id' => $credential->customer_id,
                             'access_plan_id' => $credential->access_plan_id,
                             'radius_username' => $record->username,

@@ -5,6 +5,7 @@ use App\Jobs\ExpireAccessRecords;
 use App\Jobs\GenerateMonthlyInvoices;
 use App\Jobs\MarkOfflineNetworkDevices;
 use App\Jobs\ReconcileRadiusAccounting;
+use App\Jobs\SyncUnifiSessions;
 use App\Jobs\RecoverPaymentWebhooks;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -13,6 +14,7 @@ Schedule::job(new MarkOfflineNetworkDevices)->everyMinute()->withoutOverlapping(
 Schedule::job(new ExpireAccessRecords)->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::job(new RecoverPaymentWebhooks)->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::job(new ReconcileRadiusAccounting)->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+Schedule::job(new \App\Jobs\SyncUnifiSessions)->everyMinute()->withoutOverlapping();
 Schedule::job(new EnforceSubscriptionGrace)->hourly()->withoutOverlapping()->onOneServer();
 Schedule::job(new GenerateMonthlyInvoices)->monthlyOn(1, '00:10')->withoutOverlapping()->onOneServer();
 

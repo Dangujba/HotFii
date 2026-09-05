@@ -92,6 +92,84 @@ ROS, [
 :do {
 :local hotfiiComment "HotFii managed - do not rename"
 
+# ------------------------------------------------------------------
+# Bootstrap LAN/DHCP/HotSpot only when this router has no HotSpot.
+# Existing customer HotSpot configurations are left untouched.
+# ------------------------------------------------------------------
+:if ([:len [/ip hotspot find]] = 0) do={
+
+    :local hotfiiWan "ether1"
+    :local hotfiiLan "ether2"
+    :local hotfiiLanTarget $hotfiiLan
+
+    :if ([:len [/interface find where name=$hotfiiWan]] = 0) do={
+        :error ("HotFii WAN interface not found: " . $hotfiiWan)
+    }
+
+    :if ([:len [/interface find where name=$hotfiiLan]] = 0) do={
+        :error ("HotFii LAN interface not found: " . $hotfiiLan)
+    }
+
+    # If ether2 belongs to a bridge, HotSpot must run on the bridge.
+    :local bridgePort [/interface bridge port find where interface=$hotfiiLan]
+    :if ([:len $bridgePort] > 0) do={
+        :set hotfiiLanTarget [/interface bridge port get [:pick $bridgePort 0] bridge]
+    }
+
+    :local lanAddressId [/ip address find where interface=$hotfiiLanTarget]
+    :local hotspotAddress ""
+    :local hotspotPool "none"
+
+    # Completely clean LAN: create HotFii's fallback network.
+    :if ([:len $lanAddressId] = 0) do={
+
+        /ip address add address="10.20.20.1/24" interface=$hotfiiLanTarget comment=$hotfiiComment
+        :set hotspotAddress "10.20.20.1"
+
+        :if ([:len [/ip pool find where name="hotfii-hotspot-pool"]] = 0) do={
+            /ip pool add name="hotfii-hotspot-pool" ranges=10.20.20.2-10.20.20.254
+        }
+
+        :set hotspotPool "hotfii-hotspot-pool"
+
+        :if ([:len [/ip dhcp-server find where interface=$hotfiiLanTarget]] = 0) do={
+            /ip dhcp-server add name="hotfii-dhcp" interface=$hotfiiLanTarget address-pool="hotfii-hotspot-pool" lease-time=30m disabled=no
+        }
+
+        :if ([:len [/ip dhcp-server network find where address="10.20.20.0/24"]] = 0) do={
+            /ip dhcp-server network add address=10.20.20.0/24 gateway=10.20.20.1 dns-server=10.20.20.1
+        }
+
+    } else={
+
+        # Existing/default MikroTik LAN: preserve its IP and DHCP.
+        :local lanCidr [/ip address get [:pick $lanAddressId 0] address]
+        :set hotspotAddress [:pick $lanCidr 0 [:find $lanCidr "/"]]
+
+        :if ([:len [/ip dhcp-server find where interface=$hotfiiLanTarget]] = 0) do={
+            :error "HotFii found an existing LAN IP but no DHCP server. Configure DHCP or use a dedicated LAN interface."
+        }
+    }
+
+    /ip dns set allow-remote-requests=yes
+
+    :if ([:len [/ip hotspot profile find where name="hotfii-hsprof"]] = 0) do={
+        /ip hotspot profile add name="hotfii-hsprof" hotspot-address=$hotspotAddress dns-name="{{HOTSPOT_DNS_NAME}}" html-directory=hotspot login-by=http-pap,cookie use-radius=yes radius-accounting=yes radius-interim-update=1m
+    } else={
+        /ip hotspot profile set [find where name="hotfii-hsprof"] hotspot-address=$hotspotAddress dns-name="{{HOTSPOT_DNS_NAME}}" login-by=http-pap,cookie use-radius=yes radius-accounting=yes radius-interim-update=1m
+    }
+
+    /ip hotspot add name="hotfii-hotspot" interface=$hotfiiLanTarget profile="hotfii-hsprof" address-pool=$hotspotPool disabled=no
+
+    # Fresh/no-default configuration needs internet masquerading.
+    # Preserve an existing NAT rule if the router already has one.
+    :if ([:len [/ip firewall nat find where chain="srcnat" action="masquerade"]] = 0) do={
+        /ip firewall nat add chain=srcnat out-interface=$hotfiiWan action=masquerade comment=$hotfiiComment
+    }
+
+    :put ("HotFii HotSpot created on " . $hotfiiLanTarget)
+}
+
 {{WIREGUARD_BLOCK}}
 
 # Configure HotFii RADIUS.
@@ -162,6 +240,7 @@ ROS;
 
         $script = strtr($template, [
             '{{WIREGUARD_BLOCK}}' => $wireguardBlock,
+            '{{HOTSPOT_DNS_NAME}}' => $quote('login-'.$device->nas_identifier.'.hotfii.test'),
             '{{RADIUS_HOST}}' => $quote($radiusHost),
             '{{RADIUS_SECRET}}' => $quote($device->radius_secret),
             '{{AUTH_PORT}}' => (string) $base['authentication_port'],

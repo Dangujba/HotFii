@@ -12,13 +12,19 @@ class HotspotSession extends Model
 
     protected $fillable = [
         'organization_id', 'network_device_id', 'customer_id', 'access_plan_id',
-        'radius_username', 'acct_session_id', 'mac_address', 'ip_address', 'status',
+        'source', 'radius_username', 'acct_session_id', 'external_session_id',
+        'session_meta', 'mac_address', 'ip_address', 'status',
         'input_bytes', 'output_bytes', 'started_at', 'expires_at', 'stopped_at', 'terminate_cause',
     ];
 
     protected function casts(): array
     {
-        return ['started_at' => 'datetime', 'expires_at' => 'datetime', 'stopped_at' => 'datetime'];
+        return [
+            'session_meta' => 'array',
+            'started_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'stopped_at' => 'datetime',
+        ];
     }
 
     public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }

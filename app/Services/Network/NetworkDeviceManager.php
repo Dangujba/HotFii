@@ -32,7 +32,15 @@ class NetworkDeviceManager
                 'vendor' => $vendor,
                 'model' => $attributes['model'] ?? null,
                 'adapter' => $adapter->key(),
-                'support_level' => $vendor === RouterVendor::Mikrotik ? SupportLevel::Beta : SupportLevel::Compatible,
+                'support_level' => in_array(
+                    $vendor,
+                    [
+                        RouterVendor::Mikrotik,
+                        RouterVendor::Unifi,
+                        RouterVendor::Omada,
+                    ],
+                    true
+                ) ? SupportLevel::Beta : SupportLevel::Compatible,
                 'status' => NetworkDeviceStatus::Pending,
                 'nas_identifier' => 'hf-'.Str::lower(Str::random(12)),
                 'radius_secret' => Str::password(32, true, true, false),

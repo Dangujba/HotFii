@@ -19,10 +19,13 @@ class NetworkDeviceController extends Controller
 {
     public function index(Request $request, Organization $organization): View
     {
+        $vendors = $this->enabledVendors();
+        $vendorValues = array_map(fn (RouterVendor $vendor) => $vendor->value, $vendors);
+
         $filters = [
             'search' => ListFilters::text($request, 'search'),
             'status' => ListFilters::choice($request, 'status', ListFilters::enumValues(NetworkDeviceStatus::class)),
-            'vendor' => ListFilters::choice($request, 'vendor', ListFilters::enumValues(RouterVendor::class)),
+            'vendor' => ListFilters::choice($request, 'vendor', $vendorValues),
             'location' => ListFilters::id($request, 'location'),
         ];
 
@@ -40,7 +43,7 @@ class NetworkDeviceController extends Controller
                 ->paginate(20)
                 ->withQueryString(),
             'locations' => $organization->locations()->orderBy('name')->get(),
-            'vendors' => RouterVendor::cases(),
+            'vendors' => $vendors,
             'statuses' => NetworkDeviceStatus::cases(),
             'filters' => $filters,
             'filtered' => ListFilters::any($filters),
@@ -49,10 +52,13 @@ class NetworkDeviceController extends Controller
 
     public function store(Request $request, Organization $organization, NetworkDeviceManager $manager): RedirectResponse
     {
+        $vendors = $this->enabledVendors();
+        $vendorValues = array_map(fn (RouterVendor $vendor) => $vendor->value, $vendors);
+
         $data = $request->validate([
             'location_id' => ['required', 'integer'],
             'name' => ['required', 'string', 'max:255'],
-            'vendor' => ['required', 'in:'.implode(',', array_column(RouterVendor::cases(), 'value'))],
+            'vendor' => ['required', 'in:'.implode(',', $vendorValues)],
             'model' => ['nullable', 'string', 'max:255'],
             'management_address' => ['nullable', 'string', 'max:255'],
         ]);
@@ -86,6 +92,16 @@ class NetworkDeviceController extends Controller
         RunNetworkDeviceTests::dispatch($device);
 
         return back()->with('success', 'Readiness tests queued. Pending checks complete as router traffic arrives.');
+    }
+
+    private function enabledVendors(): array
+    {
+        $enabled = config('hotfii.supported_vendors', []);
+
+        return collect(RouterVendor::cases())
+            ->filter(fn (RouterVendor $vendor) => in_array($vendor->value, $enabled, true))
+            ->values()
+            ->all();
     }
 
     private function assertTenant(Request $request, NetworkDevice $device): void

@@ -12,6 +12,7 @@ use App\Models\FeeLedgerEntry;
 use App\Models\Organization;
 use App\Models\Voucher;
 use App\Models\VoucherBatch;
+use App\Services\Access\AllowanceService;
 use App\Services\Billing\CommerceFeeCalculator;
 use App\Services\Billing\TrialManager;
 use App\Services\Radius\RadiusCredentialService;
@@ -25,6 +26,7 @@ class VoucherService
 
     public function __construct(
         private readonly RadiusCredentialService $credentials,
+        private readonly AllowanceService $allowances,
         private readonly CommerceFeeCalculator $fees,
         private readonly TrialManager $trials,
     ) {}
@@ -85,7 +87,36 @@ class VoucherService
             }
 
             if ($voucher->status === VoucherStatus::Active) {
-                throw new RuntimeException('This voucher has already been activated.');
+                $voucher->loadMissing('credential.accessPlan', 'batch.accessPlan');
+
+                $credential = $voucher->credential;
+
+                if (! $credential || $credential->status !== 'active') {
+                    throw new RuntimeException('This voucher access record is no longer active.');
+                }
+
+                $allowance = $this->allowances->forCredential($credential);
+
+                if (! $allowance) {
+                    throw new RuntimeException('The remaining voucher allowance could not be determined.');
+                }
+
+                $timeExhausted = $allowance['remaining_seconds'] !== null
+                    && $allowance['remaining_seconds'] <= 0;
+
+                $dataExhausted = $allowance['remaining_bytes'] !== null
+                    && $allowance['remaining_bytes'] <= 0;
+
+                if ($timeExhausted || $dataExhausted) {
+                    $voucher->update(['status' => VoucherStatus::Expired]);
+                    $this->credentials->revoke($credential);
+
+                    throw new RuntimeException('This voucher has no remaining internet allowance.');
+                }
+
+                $this->credentials->syncRemainingAllowance($credential, $allowance);
+
+                return $voucher->refresh()->load('credential', 'batch.accessPlan');
             }
 
             $plan = $voucher->batch->accessPlan;
