@@ -64,7 +64,7 @@ class SalesController extends Controller
             'filtered' => ListFilters::any($filters),
             'totals' => [
                 'online' => $organization->transactions()->where('channel', 'online')->where('status', 'successful')->sum('gross_amount_kobo'),
-                'voucher' => $organization->vouchers()->whereNotNull('activated_at')->where('is_complimentary', false)->sum('price_snapshot_kobo'),
+                'voucher' => $organization->vouchers()->whereNotNull('activated_at')->count(),
                 'cash' => $organization->transactions()->where('channel', 'cash')->where('status', 'successful')->sum('gross_amount_kobo'),
             ],
         ]);
