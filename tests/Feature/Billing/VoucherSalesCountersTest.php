@@ -114,7 +114,7 @@ class VoucherSalesCountersTest extends TestCase
         $this->assertNotNull($transaction->paid_at);
     }
 
-    public function test_a_voucher_is_visible_in_transactions_but_not_counted_as_direct_cash(): void
+    public function test_a_voucher_is_visible_in_transactions_and_counted_as_cash_sales(): void
     {
         $organization = $this->seller();
         $plan = $this->plan($organization);
@@ -123,7 +123,7 @@ class VoucherSalesCountersTest extends TestCase
 
         $view = app(SalesController::class)->index(Request::create('/sales'), $organization);
         $this->assertSame(1, $view->getData()['totals']['voucher']);
-        $this->assertSame(0, $view->getData()['totals']['cash']);
+        $this->assertSame(50000, $view->getData()['totals']['cash']);
         $this->assertSame(1, $view->getData()['transactions']->total());
 
         $voucherView = app(SalesController::class)->index(

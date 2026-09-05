@@ -77,7 +77,6 @@ class SalesController extends Controller
                 'voucher' => $organization->vouchers()->whereNotNull('activated_at')->count(),
                 'cash' => $organization->transactions()
                     ->where('channel', 'cash')
-                    ->where('reference', 'not like', 'HF-VCH-%')
                     ->where('status', 'successful')
                     ->sum('gross_amount_kobo'),
             ],
