@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Enums\RouterVendor;
+use App\Models\HotspotSession;
 use App\Models\NetworkDevice;
 use App\Services\Access\AllowanceService;
 use App\Services\Network\NetworkDeviceManager;
@@ -17,12 +19,23 @@ class PortalController extends Controller
 {
     public function show(Request $request, NetworkDevice $device, NetworkDeviceManager $manager): View
     {
-        if ($request->filled(['link_login', 'mac'])) {
+        // MikroTik sends the client MAC as `mac`; UniFi and Omada send it as
+        // `id`. Either is the same fact about the same phone.
+        $portalMac = $request->query('mac') ?: $request->query('id');
+
+        if (
+            $request->filled(['link_login', 'mac'])
+            || $request->filled(['id', 'ssid'])
+        ) {
             $manager->markEvidence(
                 $device,
                 'captive_portal',
                 'A router redirect reached the HotFii captive portal.',
-                ['mac' => $request->query('mac')],
+                [
+                    'mac' => $portalMac,
+                    'ssid' => $request->query('ssid'),
+                    'ap' => $request->query('ap'),
+                ],
             );
         }
 
@@ -35,7 +48,10 @@ class PortalController extends Controller
             // Hides the card-payment tab entirely when there is no settlement
             // account, rather than letting a customer pay into nowhere.
             'canBuyOnline' => $device->organization->canCollectLivePayments(),
-            'portalContext' => $request->only(['link_login', 'link_orig', 'mac', 'ip']),
+            'portalContext' => $request->only([
+                'link_login', 'link_orig', 'mac', 'ip',
+                'id', 'ap', 'ssid', 'url',
+            ]),
         ]);
     }
 
@@ -48,6 +64,10 @@ class PortalController extends Controller
             'link_orig' => ['nullable', 'url:http,https', 'max:500'],
             'mac' => ['nullable', 'string', 'max:32'],
             'ip' => ['nullable', 'ip'],
+            'id' => ['nullable', 'string', 'max:32'],
+            'ap' => ['nullable', 'string', 'max:32'],
+            'ssid' => ['nullable', 'string', 'max:255'],
+            'url' => ['nullable', 'url:http,https', 'max:1000'],
         ]);
 
         try {
@@ -63,7 +83,10 @@ class PortalController extends Controller
         return redirect()->route('portal.status', [
             'device' => $device,
             'voucher' => $voucher->uuid,
-            ...collect($data)->only(['link_login', 'link_orig', 'mac', 'ip'])->filter()->all(),
+            ...collect($data)->only([
+                'link_login', 'link_orig', 'mac', 'ip',
+                'id', 'ap', 'ssid', 'url',
+            ])->filter()->all(),
         ]);
     }
 
@@ -137,7 +160,25 @@ HTML;
 
         $connected = false;
 
-        if ($voucher?->credential && $nasIp) {
+        // UniFi guests are authorized through the controller API, not through
+        // FreeRADIUS, so nothing lands in radacct for them. SyncUnifiSessions
+        // writes their state to hotspot_sessions instead — reading radacct here
+        // would report a connected UniFi guest as offline.
+        if ($device->vendor === RouterVendor::Unifi && $voucher?->credential) {
+            $query = HotspotSession::query()
+                ->where('network_device_id', $device->id)
+                ->where('source', 'unifi')
+                ->where('radius_username', $voucher->credential->username)
+                ->where('status', 'active')
+                ->where('started_at', '>=', now()->subMinutes(5));
+
+            if ($mac) {
+                $query->whereRaw('LOWER(mac_address) = ?', [strtolower($mac)]);
+            }
+
+            $connected = $query->exists();
+
+        } elseif ($voucher?->credential && $nasIp) {
             $query = DB::table('radacct')
                 ->where('username', $voucher->credential->username)
                 ->where('nasipaddress', $nasIp)
@@ -185,7 +226,10 @@ HTML;
         return view('portal.status', [
             'device' => $device,
             'voucher' => $voucher,
-            'portalContext' => $request->only(['link_login', 'link_orig', 'mac', 'ip']),
+            'portalContext' => $request->only([
+                'link_login', 'link_orig', 'mac', 'ip',
+                'id', 'ap', 'ssid', 'url',
+            ]),
             'allowance' => $allowances->forCredential($voucher?->credential),
         ]);
     }

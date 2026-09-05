@@ -37,3 +37,11 @@ Thumbs.db
 # Throwaway VPS helper scripts. They hold host credentials, so they must
 # never reach the repository.
 /.vps_*.py
+
+# Manual pre-edit backup copies made while patching live on the VPS
+# (PortalController.php.before-omada-browserauth and friends), plus the
+# archives used to move them off the server. Useful to read, never to commit.
+*.before-*
+/hotfii-sidecars.tgz
+/hotfii-full.tgz
+/*.patch

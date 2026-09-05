@@ -5,7 +5,12 @@
 <div class="row g-2 text-start my-4">
 @if($allowance && $allowance['remaining_seconds'] !== null)<div class="col-6"><div class="p-3 rounded bg-body-tertiary"><div class="small text-secondary">Time remaining</div><strong>{{ gmdate('H:i:s', $allowance['remaining_seconds']) }}</strong></div></div>@endif
 @if($allowance && $allowance['remaining_bytes'] !== null)<div class="col-6"><div class="p-3 rounded bg-body-tertiary"><div class="small text-secondary">Data remaining</div><strong>{{ number_format($allowance['remaining_bytes'] / 1048576, 1) }} MB</strong></div></div>@endif<div class="col-6"><div class="p-3 rounded bg-body-tertiary"><div class="small text-secondary">Valid until</div><strong>{{ $voucher->expires_at?->format('d M Y, H:i') ?? 'Plan allowance used' }}</strong></div></div><div class="col-6"><div class="p-3 rounded bg-body-tertiary"><div class="small text-secondary">Device limit</div><strong>{{ $voucher->batch->accessPlan->simultaneous_use }}</strong></div></div></div>
-@if($portalContext['link_login'] ?? null)<form method="POST" action="{{ $portalContext['link_login'] }}"><input type="hidden" name="username" value="{{ $voucher->credential->username }}"><input type="hidden" name="password" value="{{ $voucher->credential->password_cipher }}"><input type="hidden" name="dst" value="{{ route('portal.connected', [
+{{-- UniFi has no link_login to post to: the client MAC arrives as `id` and
+     HotFii authorizes the guest through the controller API instead. --}}
+@if($device->vendor === \App\Domain\Enums\RouterVendor::Unifi && ($portalContext['id'] ?? null))
+@if($errors->has('unifi'))<div class="alert alert-danger text-start">{{ $errors->first('unifi') }}</div>@endif
+<form method="POST" action="{{ route('portal.unifi-authorize', $device) }}">@csrf<input type="hidden" name="voucher" value="{{ $voucher->uuid }}"><input type="hidden" name="id" value="{{ $portalContext['id'] }}"><input type="hidden" name="ap" value="{{ $portalContext['ap'] ?? '' }}"><input type="hidden" name="ssid" value="{{ $portalContext['ssid'] ?? '' }}"><input type="hidden" name="url" value="{{ $portalContext['url'] ?? '' }}"><button class="btn btn-hotfii btn-lg w-100">Connect to Internet</button></form>
+@elseif($portalContext['link_login'] ?? null)<form method="POST" action="{{ $portalContext['link_login'] }}"><input type="hidden" name="username" value="{{ $voucher->credential->username }}"><input type="hidden" name="password" value="{{ $voucher->credential->password_cipher }}"><input type="hidden" name="dst" value="{{ route('portal.connected', [
     'device' => $device,
     'voucher' => $voucher->uuid,
     'orig' => $portalContext['link_orig'] ?? null,
