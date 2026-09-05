@@ -122,7 +122,11 @@ class LivePaymentAutoApprovalTest extends TestCase
 
         $organization->refresh();
 
-        $this->assertSame(OrganizationStatus::PaymentReview, $organization->status);
+        // Submitting bank details does not take the account offline — see
+        // SettingsController::submitPaymentProfile. The organization carries on
+        // exactly as it was; it is the profile that holds the review state, and
+        // the missing subaccount that keeps card payments shut.
+        $this->assertSame(OrganizationStatus::Sandbox, $organization->status);
         $this->assertNull($organization->paystack_subaccount_code);
         $this->assertFalse($organization->canCollectLivePayments());
 
@@ -150,7 +154,7 @@ class LivePaymentAutoApprovalTest extends TestCase
 
         $organization->refresh();
 
-        $this->assertSame(OrganizationStatus::PaymentReview, $organization->status);
+        $this->assertSame(OrganizationStatus::Sandbox, $organization->status);
         $this->assertNull($organization->paystack_subaccount_code);
         $this->assertSame('submitted', $organization->paymentProfile->refresh()->status);
     }

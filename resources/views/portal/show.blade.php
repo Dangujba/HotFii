@@ -51,6 +51,9 @@
 <hr class="my-4"><div class="small text-center text-secondary"><i class="bi bi-shield-check me-1"></i>Powered by HotFii · Router: {{ $device->name }}</div>
 </div></div></div>
 <script>
+@if($canBuyOnline)
+{{-- Only shipped when there is a payment form to drive. Guarded because the
+     button copy below is otherwise served to portals that cannot take cards. --}}
 document.getElementById('payment-form')?.addEventListener('submit', async function(event) {
     event.preventDefault();
     const button = this.querySelector('button[type="submit"]');
@@ -66,6 +69,7 @@ document.getElementById('payment-form')?.addEventListener('submit', async functi
         button.disabled = false; button.querySelector('.payment-label').textContent = 'Pay securely with Paystack'; button.querySelector('.spinner-border').classList.add('d-none');
     }
 });
+@endif
 document.getElementById('qr-file')?.addEventListener('change', async function() {
     const message = document.getElementById('qr-message');
     if (!('BarcodeDetector' in window)) { message.textContent = 'QR scanning is not supported by this browser. Type the printed code instead.'; return; }

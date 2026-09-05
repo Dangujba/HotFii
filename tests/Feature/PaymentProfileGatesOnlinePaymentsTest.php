@@ -67,10 +67,7 @@ class PaymentProfileGatesOnlinePaymentsTest extends TestCase
         ]);
 
         $organization = $this->organization();
-        $organization->update([
-            'paystack_subaccount_code' => 'ACCT_live123',
-            'live_payments_enabled_at' => now(),
-        ]);
+        $organization->activateLivePayments('ACCT_live123');
 
         [$device, $plan] = $this->deviceWithPaidPlan($organization->refresh());
 
@@ -85,11 +82,10 @@ class PaymentProfileGatesOnlinePaymentsTest extends TestCase
     public function test_a_suspended_organization_cannot_collect_even_with_a_profile(): void
     {
         $organization = $this->organization();
-        $organization->update([
-            'paystack_subaccount_code' => 'ACCT_live123',
-            'live_payments_enabled_at' => now(),
-            'status' => OrganizationStatus::Suspended,
-        ]);
+        // Fully activated, then suspended: proves the suspension alone closes
+        // collection, rather than the profile being incomplete.
+        $organization->activateLivePayments('ACCT_live123');
+        $organization->update(['status' => OrganizationStatus::Suspended]);
 
         [$device, $plan] = $this->deviceWithPaidPlan($organization->refresh());
 

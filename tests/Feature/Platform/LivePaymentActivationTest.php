@@ -97,6 +97,8 @@ class LivePaymentActivationTest extends TestCase
             'bank_code' => '044',
             'account_name' => 'Damaturu Mesh',
             'account_number_cipher' => '0123456789',
+            'identity_type' => 'nin',
+            'identity_number_cipher' => '12345678901',
             'status' => 'submitted',
             'submitted_at' => now(),
         ]);
@@ -129,6 +131,8 @@ class LivePaymentActivationTest extends TestCase
             'bank_name' => 'Access Bank',
             'account_name' => 'Damaturu Mesh',
             'account_number_cipher' => '0123456789',
+            'identity_type' => 'nin',
+            'identity_number_cipher' => '12345678901',
             'status' => 'approved',
             'reviewed_at' => now()->subMonth(),
             'submitted_at' => now()->subMonth(),
@@ -158,6 +162,8 @@ class LivePaymentActivationTest extends TestCase
             'bank_name' => 'Access Bank',
             'account_name' => 'Damaturu Mesh',
             'account_number_cipher' => '0123456789',
+            'identity_type' => 'nin',
+            'identity_number_cipher' => '12345678901',
             'status' => 'submitted',
             'submitted_at' => now(),
         ]);
