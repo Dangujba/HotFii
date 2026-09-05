@@ -41,6 +41,16 @@ class VoucherService
             throw new RuntimeException('Voucher quantity must be between 1 and 5,000.');
         }
 
+        // A null price means "sell at the plan price"; an explicit one must
+        // still be worth something. Batch VB-260905-9A7KKQ was generated at
+        // 2 kobo against a ₦500 plan — ten vouchers sold for ₦5,000 of real
+        // cash were booked as ₦0.20, because nothing here questioned the
+        // number. Guarded in the service and not only in the request so no
+        // other caller can reintroduce it.
+        if ($priceKobo !== null && $priceKobo < 100) {
+            throw new RuntimeException('A voucher batch must be priced at ₦1 or more. Leave the price blank to sell at the plan price.');
+        }
+
         return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin) {
             $batch = VoucherBatch::create([
                 'organization_id' => $organization->id,
@@ -89,6 +99,21 @@ class VoucherService
             }
 
             $plan = $voucher->batch->accessPlan;
+
+            // Last line of defence for the batch-pricing hole above. A paid
+            // voucher that reaches activation worth under ₦1 would otherwise
+            // activate silently and skip every sales counter and fee entry, so
+            // the operator sees ₦0 sales and HotFii bills nothing. Refusing is
+            // the lesser harm: the operator hits a clear error and can reprice
+            // the batch, rather than giving away access and revenue unnoticed.
+            if (
+                ! $voucher->is_complimentary
+                && $plan->access_type === 'paid'
+                && $voucher->price_snapshot_kobo < 100
+            ) {
+                throw new RuntimeException('This voucher was generated with an invalid price and cannot be activated. Regenerate the batch at the correct price.');
+            }
+
             if ($organization->status === OrganizationStatus::Suspended && ! $voucher->is_complimentary) {
                 throw new RuntimeException('Paid voucher activation is unavailable while the organization is suspended.');
             }

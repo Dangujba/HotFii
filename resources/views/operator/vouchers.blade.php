@@ -18,7 +18,7 @@
         @if($plans->isEmpty())<div class="alert alert-warning">Create an active access plan first.</div>@else<form method="POST" action="{{ route('vouchers.store') }}">@csrf
             <div class="mb-3"><label class="form-label">Access plan</label><select class="form-select" name="access_plan_id">@foreach($plans as $plan)<option value="{{ $plan->id }}">{{ $plan->name }} · ₦{{ number_format($plan->price_kobo / 100, 0) }}</option>@endforeach</select></div>
             <div class="mb-3"><label class="form-label">Quantity</label><input type="number" class="form-control" name="quantity" min="1" max="5000" value="20" required></div>
-            <div class="mb-3"><label class="form-label">Retail price per voucher (₦)</label><input type="number" class="form-control" name="retail_price_naira" min="0" step="0.01" placeholder="Use plan price"></div>
+            <div class="mb-3"><label class="form-label">Retail price per voucher (₦)</label><input type="number" class="form-control" name="retail_price_naira" min="1" step="0.01" placeholder="Use plan price"></div>
             <div class="row g-2 mb-3">
                 <div class="col-7"><label class="form-label">Pin characters</label><select class="form-select" name="pin_format">@foreach($pinFormats as $format)<option value="{{ $format->value }}" @selected($format->value === 'numbers')>{{ $format->label() }}</option>@endforeach</select></div>
                 <div class="col-5"><label class="form-label">Grouping</label><select class="form-select" name="dashed_pin"><option value="1" selected>Add dashes</option><option value="0">No dashes</option></select></div>

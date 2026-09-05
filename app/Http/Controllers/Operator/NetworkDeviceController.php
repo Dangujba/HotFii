@@ -40,7 +40,11 @@ class NetworkDeviceController extends Controller
                 ->paginate(20)
                 ->withQueryString(),
             'locations' => $organization->locations()->orderBy('name')->get(),
+            // The filter lists every vendor so a device added before a vendor
+            // was hidden can still be found; the add form offers only the
+            // vendors proven on real hardware.
             'vendors' => RouterVendor::cases(),
+            'selectableVendors' => RouterVendor::selectable(),
             'statuses' => NetworkDeviceStatus::cases(),
             'filters' => $filters,
             'filtered' => ListFilters::any($filters),
@@ -52,7 +56,9 @@ class NetworkDeviceController extends Controller
         $data = $request->validate([
             'location_id' => ['required', 'integer'],
             'name' => ['required', 'string', 'max:255'],
-            'vendor' => ['required', 'in:'.implode(',', array_column(RouterVendor::cases(), 'value'))],
+            // Hidden vendors are rejected here too, or a crafted POST could
+            // enrol a device against an adapter no one has tested.
+            'vendor' => ['required', 'in:'.implode(',', array_column(RouterVendor::selectable(), 'value'))],
             'model' => ['nullable', 'string', 'max:255'],
             'management_address' => ['nullable', 'string', 'max:255'],
         ]);

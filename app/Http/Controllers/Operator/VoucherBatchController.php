@@ -53,7 +53,14 @@ class VoucherBatchController extends Controller
         $data = $request->validate([
             'access_plan_id' => ['required', 'integer'],
             'quantity' => ['required', 'integer', 'min:1', 'max:5000'],
-            'retail_price_naira' => ['nullable', 'numeric', 'min:0'],
+            // Leaving this blank means "sell at the plan price". A value of 0
+            // used to be accepted and silently overrode the plan, so a batch
+            // could be generated worth nothing: VoucherService skips every
+            // sales counter and the whole fee ledger when the snapshot is 0,
+            // making real sales invisible. The floor of ₦1 is what stops that,
+            // and 'decimal:0,2' rejects sub-kobo precision that would round
+            // away to nothing.
+            'retail_price_naira' => ['nullable', 'numeric', 'decimal:0,2', 'min:1'],
             'pin_format' => ['nullable', Rule::enum(VoucherPinFormat::class)],
             'dashed_pin' => ['nullable', 'boolean'],
         ]);

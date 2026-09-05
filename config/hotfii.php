@@ -26,7 +26,15 @@ return [
         'agent_url' => env('HOTFII_WIREGUARD_AGENT_URL', 'http://172.18.0.1:8787'),
         'agent_secret' => env('HOTFII_WIREGUARD_AGENT_SECRET'),
     ],
+    // Every vendor the codebase knows about. Adapters, guides and enum cases
+    // stay in place for all of them.
     'supported_vendors' => ['generic', 'mikrotik', 'unifi', 'omada', 'ruijie', 'cambium', 'cisco', 'huawei', 'dlink'],
+
+    // The subset an operator may actually pick when adding a device. The rest
+    // are hidden rather than removed: their adapters are untested against real
+    // hardware, so offering them would promise support that does not exist yet.
+    // Add a vendor here once it has been proven on a live device.
+    'selectable_vendors' => ['generic', 'mikrotik', 'omada', 'unifi'],
     'internal_plans' => [
         'organization_20' => ['price_kobo' => 500000, 'sites' => 1, 'active_identities' => 20],
         'organization_50' => ['price_kobo' => 750000, 'sites' => 1, 'active_identities' => 50],

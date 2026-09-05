@@ -7,6 +7,7 @@ use App\Models\Organization;
 use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class AccessPlanController extends Controller
@@ -37,7 +38,11 @@ class AccessPlanController extends Controller
 
     public function store(Request $request, Organization $organization): RedirectResponse
     {
-        $data=$request->validate(['name'=>['required','string','max:255'],'access_type'=>['required','in:paid,free,internal'],'price_naira'=>['required','numeric','min:0'],'duration_minutes'=>['nullable','integer','min:1'],'data_limit_mb'=>['nullable','integer','min:1'],'download_kbps'=>['nullable','integer','min:64'],'upload_kbps'=>['nullable','integer','min:64'],'simultaneous_use'=>['required','integer','min:1','max:20'],'validity_days'=>['nullable','integer','min:1']]);
+        // A paid plan priced at 0 is a contradiction that costs money: every
+        // voucher generated from it snapshots 0, and VoucherService then skips
+        // the sales counters and the fee ledger entirely. Free and internal
+        // plans are the legitimate home for 0, so the floor is conditional.
+        $data=$request->validate(['name'=>['required','string','max:255'],'access_type'=>['required','in:paid,free,internal'],'price_naira'=>['required','numeric','decimal:0,2',Rule::when($request->input('access_type')==='paid',['min:1'],['min:0'])],'duration_minutes'=>['nullable','integer','min:1'],'data_limit_mb'=>['nullable','integer','min:1'],'download_kbps'=>['nullable','integer','min:64'],'upload_kbps'=>['nullable','integer','min:64'],'simultaneous_use'=>['required','integer','min:1','max:20'],'validity_days'=>['nullable','integer','min:1']]);
         $organization->accessPlans()->create(['name'=>$data['name'],'access_type'=>$data['access_type'],'price_kobo'=>(int)round($data['price_naira']*100),'duration_minutes'=>$data['duration_minutes']??null,'data_limit_bytes'=>isset($data['data_limit_mb'])?$data['data_limit_mb']*1024*1024:null,'download_kbps'=>$data['download_kbps']??null,'upload_kbps'=>$data['upload_kbps']??null,'simultaneous_use'=>$data['simultaneous_use'],'validity_days'=>$data['validity_days']??null]);
         return back()->with('success','Access plan created.');
     }
