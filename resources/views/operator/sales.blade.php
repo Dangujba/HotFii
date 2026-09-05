@@ -3,7 +3,7 @@
 @section('heading', 'Sales & Agents')
 @section('subheading', 'Direct payments and voucher activation activity')
 @section('content')
-<div class="row g-3 mb-4">@foreach([['Online sales','₦'.number_format($totals['online'] / 100, 0),'credit-card','success'],['Voucher activations',number_format($totals['voucher']),'ticket-perforated','warning'],['Direct cash sales','₦'.number_format($totals['cash'] / 100, 0),'cash','primary']] as [$label,$value,$icon,$color])<div class="col-md-4"><div class="card metric-card"><div class="card-body"><div class="text-secondary">{{ $label }}</div><div class="fs-3 fw-bold">{{ $value }}</div><i class="bi bi-{{ $icon }} text-{{ $color }}"></i></div></div></div>@endforeach</div>
+<div class="row g-3 mb-4">@foreach([['Online sales','₦'.number_format($totals['online'] / 100, 0),'credit-card','success'],['Voucher activations',number_format($totals['voucher']),'ticket-perforated','warning'],['Cash sales','₦'.number_format($totals['cash'] / 100, 0),'cash','primary']] as [$label,$value,$icon,$color])<div class="col-md-4"><div class="card metric-card"><div class="card-body"><div class="text-secondary">{{ $label }}</div><div class="fs-3 fw-bold">{{ $value }}</div><i class="bi bi-{{ $icon }} text-{{ $color }}"></i></div></div></div>@endforeach</div>
 @if(session('issued_credential'))<div class="alert alert-success"><strong>Customer access credentials:</strong> <code>{{ session('issued_credential.username') }}</code> / <code>{{ session('issued_credential.password') }}</code>. Give these to the customer now.</div>@endif
 <div class="card metric-card mb-4"><div class="card-header"><h2 class="h5 mb-0">Record cash-plan activation</h2></div><div class="card-body">
 @if($plans->isEmpty() || $devices->isEmpty())<div class="alert alert-warning mb-0">You need an active paid plan and an online, fully tested router before recording live cash access.</div>@else
@@ -15,7 +15,7 @@
 </div></div>
 <div class="row g-4">
 <div class="col-xl-7"><div class="card metric-card">
-<x-filter-bar :action="route('sales.index')" :active="$filtered" title="Direct online & cash transactions">
+<x-filter-bar :action="route('sales.index')" :active="$filtered" title="Online & cash transactions">
     <div class="col-md-4"><input class="form-control form-control-sm" name="search" value="{{ $filters['search'] }}" placeholder="Reference or customer"></div>
     <div class="col-md-3"><select class="form-select form-select-sm" name="status"><option value="">Any status</option>@foreach($statuses as $status)<option value="{{ $status->value }}" @selected($filters['status'] === $status->value)>{{ ucfirst($status->value) }}</option>@endforeach</select></div>
     <div class="col-md-3"><select class="form-select form-select-sm" name="channel"><option value="">All channels</option>@foreach($channels as $channel)<option value="{{ $channel }}" @selected($filters['channel'] === $channel)>{{ ucfirst($channel) }}</option>@endforeach</select></div>

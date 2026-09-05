@@ -27,6 +27,7 @@ class VoucherService
         private readonly RadiusCredentialService $credentials,
         private readonly CommerceFeeCalculator $fees,
         private readonly TrialManager $trials,
+        private readonly VoucherSaleTransactionRecorder $sales,
     ) {}
 
     public function createBatch(
@@ -161,6 +162,8 @@ class VoucherService
                 }
 
                 $quote = $this->fees->quote($organization, $voucher->price_snapshot_kobo);
+                $this->sales->record($voucher, $quote->chargeablePercentageFeeKobo());
+
                 FeeLedgerEntry::updateOrCreate(
                     [
                         'organization_id' => $organization->id,

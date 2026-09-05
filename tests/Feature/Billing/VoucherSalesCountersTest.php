@@ -8,6 +8,7 @@ use App\Domain\Enums\OrganizationStatus;
 use App\Models\AccessPlan;
 use App\Models\FeeLedgerEntry;
 use App\Models\Organization;
+use App\Models\Transaction;
 use App\Services\Vouchers\VoucherService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -89,6 +90,25 @@ class VoucherSalesCountersTest extends TestCase
             $organization->refresh()->monthly_sales_kobo,
             'Voucher sales were invisible to plan graduation, so a micro seller never outgrew micro pricing.',
         );
+    }
+
+    public function test_redeeming_a_paid_voucher_records_a_successful_cash_transaction(): void
+    {
+        $organization = $this->seller();
+        $plan = $this->plan($organization);
+
+        $this->redeemOne($organization, $plan);
+
+        $transaction = Transaction::sole();
+
+        $this->assertSame('manual', $transaction->provider);
+        $this->assertSame('cash', $transaction->channel);
+        $this->assertSame('successful', $transaction->status->value);
+        $this->assertSame(50000, $transaction->gross_amount_kobo);
+        $this->assertSame(50000, $transaction->billable_sales_kobo);
+        $this->assertSame('voucher_redemption', $transaction->metadata['source_type']);
+        $this->assertTrue($transaction->metadata['recorded_automatically']);
+        $this->assertNotNull($transaction->paid_at);
     }
 
     public function test_printing_vouchers_charges_and_counts_nothing(): void
@@ -176,6 +196,7 @@ class VoucherSalesCountersTest extends TestCase
 
         $this->assertSame(0, $organization->monthly_sales_kobo, 'A giveaway is not revenue.');
         $this->assertSame(0, FeeLedgerEntry::where('organization_id', $organization->id)->count());
+        $this->assertSame(0, Transaction::where('organization_id', $organization->id)->count());
     }
 
     public function test_a_free_plan_voucher_counts_as_no_sale(): void
@@ -186,6 +207,7 @@ class VoucherSalesCountersTest extends TestCase
         $this->redeemOne($organization, $plan, priceKobo: 0);
 
         $this->assertSame(0, $organization->refresh()->monthly_sales_kobo);
+        $this->assertSame(0, Transaction::where('organization_id', $organization->id)->count());
     }
 
     public function test_a_voucher_cannot_be_counted_twice(): void
@@ -211,5 +233,6 @@ class VoucherSalesCountersTest extends TestCase
             'A second activation attempt must not bill or count the sale again.',
         );
         $this->assertSame(1, FeeLedgerEntry::where('organization_id', $organization->id)->count());
+        $this->assertSame(1, Transaction::where('organization_id', $organization->id)->count());
     }
 }
