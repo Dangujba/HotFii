@@ -6,6 +6,27 @@
 @section('content')
 <livewire:dashboard-pulse :organization-uuid="$currentOrganization->uuid" />
 
+@if($currentOrganization->billing_suspended_at)
+    {{-- Being held over an unpaid bill used to be silent: sales simply started
+         failing with no explanation anywhere in the product, and there was no
+         way to pay. Both halves of that are fixed, so say so plainly. --}}
+    <div class="alert alert-danger border-0 shadow-sm">
+        <div class="d-flex align-items-center"><i class="bi bi-exclamation-octagon fs-3 me-3"></i>
+            <div class="flex-grow-1">
+                <strong>{{ $currentOrganization->status === \App\Domain\Enums\OrganizationStatus::Suspended ? 'Your account is suspended over an unpaid invoice.' : 'You have an overdue invoice.' }}</strong>
+                <div>
+                    @if($currentOrganization->status === \App\Domain\Enums\OrganizationStatus::Suspended)
+                        Counter sales, voucher activation and portal payments are all blocked until it is settled. Customers already online are unaffected.
+                    @else
+                        Counter sales are blocked. Your account is suspended once the grace period ends. Settling the invoice restores it within the hour.
+                    @endif
+                </div>
+            </div>
+            <a href="{{ route('finance.index') }}" class="btn btn-light ms-3 flex-shrink-0">Pay invoice</a>
+        </div>
+    </div>
+@endif
+
 @if($currentOrganization->sellsAccess() && ! $currentOrganization->paymentProfileActivated())
     <div class="alert alert-warning border-0 shadow-sm">
         <div class="d-flex align-items-center"><i class="bi bi-credit-card-2-front fs-3 me-3"></i>

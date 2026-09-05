@@ -28,6 +28,27 @@ class Transaction extends Model
         ];
     }
 
+    /**
+     * Whether the platform's fee was actually taken out of this sale as it
+     * happened, rather than merely owed on it.
+     *
+     * Paystack only splits the fee off when PaystackService::initialize() sends
+     * a transaction_charge, which it does for a gateway payment against an
+     * organization holding a settlement subaccount. A counter sale hands cash
+     * straight to the operator and touches no gateway at all, so nothing is
+     * taken and the fee has to be invoiced.
+     *
+     * Getting this wrong is expensive in one direction only: a fee recorded as
+     * collected is subtracted from the monthly invoice in
+     * GenerateMonthlyInvoices, so marking cash 'collected' does not merely
+     * under-bill it — it cancels the invoice out, minimum included.
+     */
+    public function feeWasTakenAtGateway(): bool
+    {
+        return $this->provider !== 'manual'
+            && filled($this->organization?->paystack_subaccount_code);
+    }
+
     public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
     public function networkDevice(): BelongsTo { return $this->belongsTo(NetworkDevice::class); }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }

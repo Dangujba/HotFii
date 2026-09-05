@@ -62,7 +62,12 @@ class PaymentProcessor
                     'billing_period' => now()->startOfMonth()->toDateString(),
                     'billable_sales_kobo' => $transaction->billable_sales_kobo,
                     'fee_amount_kobo' => $transaction->platform_fee_kobo,
-                    'status' => 'collected',
+                    // Only a gateway split has actually taken the money. A cash
+                    // sale owes it, exactly as a redeemed voucher does in
+                    // VoucherService. Recorded as 'collected' it was subtracted
+                    // from the monthly invoice as if already paid, so a
+                    // cash-only operator was billed nothing at all.
+                    'status' => $transaction->feeWasTakenAtGateway() ? 'collected' : 'accrued',
                     'metadata' => ['provider' => $transaction->provider, 'channel' => $transaction->channel],
                 ],
             );

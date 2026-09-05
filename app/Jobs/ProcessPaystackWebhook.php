@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\Invoice;
 use App\Models\PaymentWebhook;
 use App\Models\Transaction;
+use App\Services\Billing\InvoiceSettlement;
 use App\Services\Payments\PaymentProcessor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -40,7 +42,7 @@ class ProcessPaystackWebhook implements ShouldQueue
         return ['payment-webhook:'.$this->webhook->id];
     }
 
-    public function handle(PaymentProcessor $processor): void
+    public function handle(PaymentProcessor $processor, InvoiceSettlement $settlement): void
     {
         $webhook = $this->webhook->refresh();
         if ($webhook->processed_at) {
@@ -49,13 +51,22 @@ class ProcessPaystackWebhook implements ShouldQueue
 
         $payload = $webhook->payload;
         $data = $payload['data'] ?? [];
-        $transaction = Transaction::where('reference', $data['reference'] ?? '')->first();
+        $reference = (string) ($data['reference'] ?? '');
 
         try {
-            if ($transaction && $webhook->event_type === 'charge.success') {
-                $processor->markSuccessful($transaction, $data);
-            } elseif ($transaction && in_array($webhook->event_type, ['charge.failed', 'charge.abandoned'], true)) {
-                $processor->markFailed($transaction, $data);
+            if ($webhook->event_type === 'charge.success' && $invoice = $this->invoiceFor($data, $reference)) {
+                // A platform invoice, not a guest sale. Verified against the
+                // amount for the same reason markSuccessful() does: a charge
+                // for less than the invoice must not clear it.
+                if ((int) ($data['amount'] ?? 0) >= $invoice->total_kobo) {
+                    $settlement->settle($invoice, 'paystack', $reference);
+                }
+            } elseif ($transaction = Transaction::where('reference', $reference)->first()) {
+                if ($webhook->event_type === 'charge.success') {
+                    $processor->markSuccessful($transaction, $data);
+                } elseif (in_array($webhook->event_type, ['charge.failed', 'charge.abandoned'], true)) {
+                    $processor->markFailed($transaction, $data);
+                }
             }
 
             $webhook->update([
@@ -72,5 +83,28 @@ class ProcessPaystackWebhook implements ShouldQueue
             ]);
             throw $exception;
         }
+    }
+
+    /**
+     * The invoice a charge settles, or null when the charge is an ordinary
+     * access sale.
+     *
+     * The stored reference is checked first because it is ours and cannot be
+     * spoofed; the metadata flag Paystack echoes back is the fallback for a
+     * charge whose reference never made it onto the invoice.
+     */
+    private function invoiceFor(array $data, string $reference): ?Invoice
+    {
+        if ($reference !== '' && $invoice = Invoice::where('payment_reference', $reference)->first()) {
+            return $invoice;
+        }
+
+        if (($data['metadata']['hotfii_purpose'] ?? null) !== 'invoice') {
+            return null;
+        }
+
+        $uuid = $data['metadata']['invoice_uuid'] ?? null;
+
+        return $uuid ? Invoice::where('uuid', $uuid)->first() : null;
     }
 }

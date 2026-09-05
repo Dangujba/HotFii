@@ -8,6 +8,7 @@ use App\Http\Controllers\Operator\AccessPlanController;
 use App\Http\Controllers\Operator\CustomerController;
 use App\Http\Controllers\Operator\DashboardController;
 use App\Http\Controllers\Operator\FinanceController;
+use App\Http\Controllers\Operator\InvoicePaymentController;
 use App\Http\Controllers\Operator\LocationController;
 use App\Http\Controllers\Operator\NetworkDeviceController;
 use App\Http\Controllers\Operator\NotificationController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Platform\AuditController as PlatformAuditController;
 use App\Http\Controllers\Platform\BillingController as PlatformBillingController;
 use App\Http\Controllers\Platform\DashboardController as PlatformDashboardController;
 use App\Http\Controllers\Platform\ImpersonationController;
+use App\Http\Controllers\Platform\InvoiceController as PlatformInvoiceController;
 use App\Http\Controllers\Platform\OrganizationController as PlatformOrganizationController;
 use App\Http\Controllers\Platform\PaymentReviewController;
 use App\Http\Controllers\Platform\SystemController as PlatformSystemController;
@@ -93,6 +95,10 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
     Route::get('/sales', [SalesController::class, 'index'])->name('sales.index');
     Route::post('/sales/cash', [SalesController::class, 'store'])->middleware('role:owner,manager,agent')->name('sales.cash.store');
     Route::get('/finance', FinanceController::class)->middleware('role:owner,manager,accountant,viewer')->name('finance.index');
+    // Paying the platform's own invoice. Owners and managers only: it moves the
+    // organization's money out, unlike the rest of the finance page.
+    Route::post('/finance/invoices/{invoice}/pay', [InvoicePaymentController::class, 'initialize'])->middleware('role:owner,manager')->name('finance.invoices.pay');
+    Route::get('/finance/invoices/{invoice}/callback', [InvoicePaymentController::class, 'callback'])->name('finance.invoices.callback');
     Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
     Route::get('/reports/export', [ReportsController::class, 'export'])->name('reports.export');
     Route::get('/reports/export/pdf', [ReportsController::class, 'exportPdf'])->name('reports.export.pdf');
@@ -126,6 +132,9 @@ Route::middleware(['auth', 'verified', 'platform-admin'])->prefix('platform')->n
     Route::post('/organizations/{organization}/payment/reject', [PaymentReviewController::class, 'reject'])->name('payment.reject');
 
     Route::get('/billing', PlatformBillingController::class)->name('billing.index');
+    // The one billing write: recording a transfer that already landed. See
+    // Platform\InvoiceController for why this exception was made.
+    Route::patch('/invoices/{invoice}/paid', [PlatformInvoiceController::class, 'pay'])->name('invoices.pay');
     Route::get('/transactions', PlatformTransactionController::class)->name('transactions.index');
     Route::get('/users', PlatformUserController::class)->name('users.index');
     Route::get('/audit', PlatformAuditController::class)->name('audit.index');

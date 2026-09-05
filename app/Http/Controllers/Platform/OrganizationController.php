@@ -126,9 +126,16 @@ class OrganizationController extends Controller
         $before = $organization->status;
         $after = $data['action'] === 'suspend'
             ? OrganizationStatus::Suspended
-            : $this->reactivatedStatus($organization);
+            : $organization->restoredStatus();
 
-        $organization->update(['status' => $after]);
+        // forceFill, because billing_suspended_at has to come off with the
+        // suspension. Leaving it set would let EnforceSubscriptionGrace lift a
+        // suspension a person imposed, the moment the account's invoices
+        // happened to be clear.
+        $organization->forceFill([
+            'status' => $after,
+            'billing_suspended_at' => null,
+        ])->save();
 
         AuditLog::create([
             'organization_id' => $organization->id,
@@ -142,27 +149,20 @@ class OrganizationController extends Controller
             'after' => ['status' => $after->value],
         ]);
 
-        return back()->with('success', $data['action'] === 'suspend'
-            ? $organization->name.' is suspended. Their portal stops taking payments immediately.'
-            : $organization->name.' is active again, as '.str_replace('_', ' ', $after->value).'.');
-    }
-
-    /**
-     * Where a reactivated organization lands.
-     *
-     * Suspension does not record what the status was before it, so this is
-     * derived from the account itself rather than guessed: an approved
-     * settlement account means Live, a started trial means Trial, and anything
-     * untouched goes back to Sandbox.
-     */
-    private function reactivatedStatus(Organization $organization): OrganizationStatus
-    {
-        if ($organization->live_payments_enabled_at !== null && filled($organization->paystack_subaccount_code)) {
-            return OrganizationStatus::Live;
+        if ($data['action'] === 'suspend') {
+            return back()->with('success', $organization->name.' is suspended. Their portal stops taking payments immediately.');
         }
 
-        return $organization->trial_started_at !== null
-            ? OrganizationStatus::Trial
-            : OrganizationStatus::Sandbox;
+        // Reactivating over an unpaid invoice does not hold: the hourly job
+        // suspends the account again as soon as it runs. Say so rather than
+        // letting the button look like it worked.
+        $overdue = $organization->overdueInvoices()->count();
+
+        return back()->with(
+            $overdue > 0 ? 'error' : 'success',
+            $overdue > 0
+                ? $organization->name.' is active again, but '.$overdue.' overdue invoice(s) remain. Billing enforcement will suspend the account again within the hour unless they are settled on the Billing page.'
+                : $organization->name.' is active again, as '.str_replace('_', ' ', $after->value).'.',
+        );
     }
 }

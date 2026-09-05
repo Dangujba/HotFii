@@ -9,7 +9,7 @@ return [
         'micro_sales_limit_kobo' => (int) env('HOTFII_MICRO_SALES_LIMIT_KOBO', 5000000),
         'trial_sales_cap_kobo' => (int) env('HOTFII_TRIAL_SALES_CAP_KOBO', 10000000),
         'trial_days' => (int) env('HOTFII_TRIAL_DAYS', 14),
-        'grace_days' => 7,
+        'grace_days' => (int) env('HOTFII_GRACE_DAYS', 7),
     ],
     'radius' => [
         'host' => env('HOTFII_RADIUS_HOST', '127.0.0.1'),

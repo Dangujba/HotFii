@@ -130,7 +130,7 @@
         <div class="col-md-3"><input class="form-control form-control-sm" type="month" name="invoice_period" value="{{ $filters['invoice_period'] }}" aria-label="Invoice month"></div>
     </x-filter-bar>
     <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
-        <thead><tr><th>Number</th><th>Organization</th><th>Period</th><th class="text-end">Subtotal</th><th class="text-end">Total</th><th>Status</th><th>Due</th><th>Paid</th></tr></thead>
+        <thead><tr><th>Number</th><th>Organization</th><th>Period</th><th class="text-end">Subtotal</th><th class="text-end">Total</th><th>Status</th><th>Due</th><th>Paid</th><th class="text-end">Record payment</th></tr></thead>
         <tbody>@forelse($invoices as $invoice)
             <tr>
                 <td><code class="small">{{ $invoice->number }}</code></td>
@@ -138,15 +138,44 @@
                 <td class="small">{{ $invoice->billing_period->format('M Y') }}</td>
                 <td class="text-end">{{ \App\Support\Naira::from($invoice->subtotal_kobo) }}</td>
                 <td class="text-end fw-semibold">{{ \App\Support\Naira::from($invoice->total_kobo) }}</td>
-                <td><span class="badge text-bg-{{ $invoice->status === 'paid' ? 'success' : ($invoice->status === 'open' ? 'warning' : 'secondary') }}">{{ ucfirst($invoice->status) }}</span></td>
+                <td>
+                    <span class="badge text-bg-{{ $invoice->status === 'paid' ? 'success' : ($invoice->status === 'open' ? 'warning' : 'secondary') }}">{{ ucfirst($invoice->status) }}</span>
+                    @if($invoice->isOverdue())<span class="badge text-bg-danger ms-1">Overdue</span>@endif
+                </td>
                 <td class="small text-secondary">{{ $invoice->due_at?->format('j M Y') ?? '—' }}</td>
-                <td class="small text-secondary">{{ $invoice->paid_at?->format('j M Y') ?? '—' }}</td>
+                <td class="small text-secondary">
+                    {{ $invoice->paid_at?->format('j M Y') ?? '—' }}
+                    @if($invoice->isPaid() && $invoice->payment_method)
+                        <div class="text-body-tertiary">{{ $invoice->payment_method === 'manual' ? 'Transfer' : 'Card' }} · <code>{{ $invoice->payment_reference ?? '—' }}</code></div>
+                    @endif
+                </td>
+                <td class="text-end">
+                    @if($invoice->isPaid())
+                        <span class="small text-secondary">Settled</span>
+                    @else
+                        {{-- A transfer that already landed in the bank, being
+                             written down. The reference and reason are required
+                             because this is the one place money can be declared
+                             received without a gateway proving it. --}}
+                        <form method="POST" action="{{ route('platform.invoices.pay', $invoice) }}" class="row g-1 justify-content-end flex-nowrap">
+                            @csrf
+                            @method('PATCH')
+                            <div class="col-auto"><input class="form-control form-control-sm" name="reference" required minlength="3" maxlength="120" placeholder="Bank reference" aria-label="Bank reference for {{ $invoice->number }}" style="width:9rem"></div>
+                            <div class="col-auto"><input class="form-control form-control-sm" name="reason" required minlength="10" maxlength="2000" placeholder="How it was confirmed" aria-label="Reason for marking {{ $invoice->number }} paid" style="width:11rem"></div>
+                            <div class="col-auto"><button class="btn btn-sm btn-outline-success" type="submit"
+                                data-confirm="Mark {{ $invoice->number }} ({{ \App\Support\Naira::from($invoice->total_kobo) }}) paid? This lifts any billing suspension on the account."
+                                data-confirm-title="Record a payment"
+                                data-confirm-icon="bi-cash-coin"
+                                data-confirm-button="Mark paid"><i class="bi bi-check2"></i></button></div>
+                        </form>
+                    @endif
+                </td>
             </tr>
         @empty
-            <tr><td colspan="8" class="text-center py-5 text-secondary">{{ $invoicesFiltered ? 'No invoices match these filters.' : 'No invoices have been generated yet. GenerateMonthlyInvoices writes them on the first of each month.' }}</td></tr>
+            <tr><td colspan="9" class="text-center py-5 text-secondary">{{ $invoicesFiltered ? 'No invoices match these filters.' : 'No invoices have been generated yet. GenerateMonthlyInvoices writes them on the first of each month.' }}</td></tr>
         @endforelse</tbody>
     </table></div></div>
-    <div class="card-footer small text-secondary"><i class="bi bi-lock me-1"></i>Read-only. Invoices are settled by the gateway or reconciled on the server; there is no mark-paid button here on purpose.</div>
+    <div class="card-footer small text-secondary"><i class="bi bi-info-circle me-1"></i>Amounts are computed from the fee ledger and cannot be edited here. Recording a payment only writes down a transfer that already arrived — it is audited with the reference and reason, and lifts a billing suspension once nothing else is overdue.</div>
 </div>
 <div class="mt-3">{{ $invoices->links() }}</div>
 @endsection

@@ -19,5 +19,26 @@
     <input type="hidden" name="period" value="{{ $filters['period'] }}">
     <div class="col"><select class="form-select form-select-sm" name="invoice_status"><option value="">Any status</option>@foreach($invoiceStatuses as $status)<option value="{{ $status }}" @selected($filters['invoice_status'] === $status)>{{ ucfirst($status) }}</option>@endforeach</select></div>
 </x-filter-bar>
-<div class="list-group list-group-flush">@forelse($invoices as $invoice)<div class="list-group-item"><div class="d-flex justify-content-between"><strong>{{ $invoice->number }}</strong><span class="badge text-bg-{{ $invoice->status === 'paid' ? 'success' : 'warning' }}">{{ ucfirst($invoice->status) }}</span></div><div class="d-flex justify-content-between mt-2"><span>{{ $invoice->billing_period->format('M Y') }}</span><strong>₦{{ number_format($invoice->total_kobo / 100, 0) }}</strong></div><div class="small text-secondary">Due {{ $invoice->due_at?->format('d M Y') }}</div></div>@empty<div class="p-5 text-center text-secondary">{{ $invoicesFiltered ? 'No invoices with that status.' : 'No invoices.' }}</div>@endforelse</div></div><div class="mt-3">{{ $invoices->links() }}</div></div></div>
+<div class="list-group list-group-flush">@forelse($invoices as $invoice)
+    <div class="list-group-item">
+        <div class="d-flex justify-content-between"><strong>{{ $invoice->number }}</strong><span class="badge text-bg-{{ $invoice->status === 'paid' ? 'success' : ($invoice->isOverdue() ? 'danger' : 'warning') }}">{{ $invoice->isOverdue() ? 'Overdue' : ucfirst($invoice->status) }}</span></div>
+        <div class="d-flex justify-content-between mt-2"><span>{{ $invoice->billing_period->format('M Y') }}</span><strong>₦{{ number_format($invoice->total_kobo / 100, 0) }}</strong></div>
+        <div class="small text-secondary">Due {{ $invoice->due_at?->format('d M Y') }}</div>
+        @if($invoice->isPaid())
+            <div class="small text-success mt-2"><i class="bi bi-check-circle me-1"></i>Paid {{ $invoice->paid_at?->format('d M Y') }}@if($invoice->payment_method === 'manual') by transfer@endif</div>
+        @elseif($canPayInvoices)
+            {{-- The account is suspended over this bill until it is settled, so
+                 the way to settle it belongs next to it rather than in an email. --}}
+            <form class="mt-2" method="POST" action="{{ route('finance.invoices.pay', $invoice) }}">
+                @csrf
+                <button class="btn btn-sm btn-hotfii" type="submit"
+                    data-confirm="Pay {{ $invoice->number }} — ₦{{ number_format($invoice->total_kobo / 100, 0) }}? You will be taken to Paystack to complete the payment."
+                    data-confirm-title="Pay this invoice"
+                    data-confirm-icon="bi-credit-card"
+                    data-confirm-button="Continue to Paystack">Pay ₦{{ number_format($invoice->total_kobo / 100, 0) }}</button>
+                @if($invoice->isOverdue())<div class="small text-danger mt-1">Overdue. Paid access sales are restricted until this is settled.</div>@endif
+            </form>
+        @endif
+    </div>
+@empty<div class="p-5 text-center text-secondary">{{ $invoicesFiltered ? 'No invoices with that status.' : 'No invoices.' }}</div>@endforelse</div></div><div class="mt-3">{{ $invoices->links() }}</div></div></div>
 @endsection

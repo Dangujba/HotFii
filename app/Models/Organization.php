@@ -28,6 +28,7 @@ class Organization extends Model
             'status' => OrganizationStatus::class,
             'billing_plan' => BillingPlan::class,
             'live_payments_enabled_at' => 'datetime',
+            'billing_suspended_at' => 'datetime',
             'trial_started_at' => 'datetime',
             'trial_ends_at' => 'datetime',
             'branding' => 'array',
@@ -51,6 +52,7 @@ class Organization extends Model
     public function sessions(): HasMany { return $this->hasMany(HotspotSession::class); }
     public function credentials(): HasMany { return $this->hasMany(AccessCredential::class); }
     public function subscriptions(): HasMany { return $this->hasMany(Subscription::class); }
+    public function invoices(): HasMany { return $this->hasMany(Invoice::class); }
     public function paymentProfile(): HasOne { return $this->hasOne(PaymentProfile::class); }
 
     public function sellsAccess(): bool
@@ -121,5 +123,74 @@ class Organization extends Model
             'status' => $status,
             'live_payments_enabled_at' => null,
         ])->save();
+    }
+
+    /**
+     * Where an account lands when a suspension is lifted.
+     *
+     * Nothing records the status held before a suspension, so this is derived
+     * from the account rather than guessed: an approved settlement account
+     * means Live, a started trial means Trial, anything untouched Sandbox.
+     * Shared by the console's reactivate button and the automatic restore in
+     * EnforceSubscriptionGrace so the two can never disagree.
+     */
+    public function restoredStatus(): OrganizationStatus
+    {
+        if ($this->paymentProfileActivated()) {
+            return OrganizationStatus::Live;
+        }
+
+        return $this->trial_started_at !== null
+            ? OrganizationStatus::Trial
+            : OrganizationStatus::Sandbox;
+    }
+
+    /**
+     * Put the account into Grace or Suspended over an unpaid invoice, and mark
+     * why — billing_suspended_at is what later allows the restriction to lift
+     * itself once the invoice is settled.
+     *
+     * The timestamp is stamped once and kept: it records when billing trouble
+     * began, so an account that slides from Grace into Suspended does not have
+     * its history rewritten on the way.
+     */
+    public function markBillingSuspended(OrganizationStatus $status): bool
+    {
+        if ($this->status === $status && $this->billing_suspended_at !== null) {
+            return true;
+        }
+
+        return $this->forceFill([
+            'status' => $status,
+            'billing_suspended_at' => $this->billing_suspended_at ?? now(),
+        ])->save();
+    }
+
+    /**
+     * Lift a billing restriction and forget it, once nothing is overdue.
+     *
+     * Returns false without touching anything when the account was suspended by
+     * hand from the console: billing_suspended_at is null there, and a job must
+     * not undo a decision a person made about abuse or fraud.
+     */
+    public function clearBillingSuspension(): bool
+    {
+        if ($this->billing_suspended_at === null) {
+            return false;
+        }
+
+        return $this->forceFill([
+            'status' => $this->restoredStatus(),
+            'billing_suspended_at' => null,
+        ])->save();
+    }
+
+    /**
+     * Invoices raised, past their due date, and still unpaid. The presence of
+     * one is the whole reason an account is held in Grace or Suspended.
+     */
+    public function overdueInvoices(): HasMany
+    {
+        return $this->invoices()->where('status', 'open')->where('due_at', '<=', now());
     }
 }

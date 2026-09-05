@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Cache;
@@ -211,6 +212,40 @@ class PaystackService
 
         if (! $response->successful() || ! $response->json('status')) {
             throw new RuntimeException($response->json('message', 'Paystack could not initialize this payment.'));
+        }
+
+        return $response->json('data');
+    }
+
+    /**
+     * Start a checkout for a platform invoice — the organization paying HotFii,
+     * rather than a guest paying the organization.
+     *
+     * Deliberately no subaccount and no transaction_charge: this money is owed
+     * to the platform in full, so splitting any of it back to the tenant's
+     * settlement account would refund them their own bill.
+     */
+    public function initializeInvoice(Invoice $invoice, string $reference, string $email, string $callbackUrl): array
+    {
+        $response = Http::withToken((string) config('services.paystack.secret'))
+            ->acceptJson()
+            ->post(rtrim((string) config('services.paystack.url'), '/').'/transaction/initialize', [
+                'email' => $email,
+                'amount' => $invoice->total_kobo,
+                'reference' => $reference,
+                'callback_url' => $callbackUrl,
+                'metadata' => [
+                    'invoice_uuid' => $invoice->uuid,
+                    'invoice_number' => $invoice->number,
+                    'organization_uuid' => $invoice->organization?->uuid,
+                    // Read by ProcessPaystackWebhook to tell an invoice
+                    // settlement apart from a guest access sale.
+                    'hotfii_purpose' => 'invoice',
+                ],
+            ]);
+
+        if (! $response->successful() || ! $response->json('status')) {
+            throw new RuntimeException($response->json('message', 'Paystack could not start this invoice payment.'));
         }
 
         return $response->json('data');

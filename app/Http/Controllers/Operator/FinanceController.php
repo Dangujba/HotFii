@@ -45,6 +45,13 @@ class FinanceController extends Controller
                 ->paginate(12, ['*'], 'invoices')
                 ->withQueryString(),
             'subscription' => $organization->subscriptions()->latest()->first(),
+            // Paying moves the organization's money, so it is owner/manager
+            // only. This mirrors RequireOrganizationRole exactly, impersonation
+            // clause included: a platform admin who merely holds a viewer seat
+            // in this organization would otherwise be shown a button that 403s.
+            // Accountants and viewers see the invoice and its balance without it.
+            'canPayInvoices' => ($request->user()->is_platform_admin && $request->session()->has('impersonated_organization_id'))
+                || in_array($request->user()->roleFor($organization), ['owner', 'manager'], true),
             'entryStatuses' => self::ENTRY_STATUSES,
             'invoiceStatuses' => self::INVOICE_STATUSES,
             'filters' => $filters,
