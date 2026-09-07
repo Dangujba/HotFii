@@ -185,7 +185,13 @@ class NetworkDeviceManager
 
     public function refreshStatus(NetworkDevice $device, string $run): void
     {
-        $tests = $device->tests()->where('run_uuid', $run)->get();
+        // Disconnect is an operational session action, not a prerequisite for
+        // declaring a functioning router ready. Ignore legacy rows left by
+        // readiness runs from older releases.
+        $tests = $device->tests()
+            ->where('run_uuid', $run)
+            ->whereNotIn('test_key', ['coa', 'disconnect'])
+            ->get();
         $status = match (true) {
             $tests->contains('status', 'failed') => NetworkDeviceStatus::Failed,
             $tests->isNotEmpty() && $tests->every(fn ($test) => $test->status === 'passed') => NetworkDeviceStatus::Online,

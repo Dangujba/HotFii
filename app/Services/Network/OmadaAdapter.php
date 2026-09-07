@@ -306,13 +306,6 @@ class OmadaAdapter extends GenericRadiusAdapter
                         ? 'HotFii has synchronized an Omada RADIUS session.'
                         : 'Waiting for Omada accounting traffic to create a HotFii session.',
             ],
-
-            [
-                'key' => 'coa',
-                'status' => 'pending',
-                'message' =>
-                    'Waiting for a live Omada Disconnect-Request test.',
-            ],
         ];
     }
 

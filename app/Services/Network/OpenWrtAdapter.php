@@ -521,13 +521,6 @@ SH;
                 'message' =>
                     'Waiting for CoovaChilli accounting traffic to create a HotFii session.',
             ],
-
-            [
-                'key' => 'coa',
-                'status' => 'pending',
-                'message' =>
-                    'Waiting for a live CoovaChilli Disconnect-Request test.',
-            ],
         ];
     }
 

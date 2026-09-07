@@ -84,7 +84,6 @@ class GenericRadiusAdapter implements RouterAdapter
             $this->testRadiusAuthentication($device),
             $this->testAccounting($device),
             $this->testCaptivePortal($device),
-            ['key' => 'coa', 'status' => 'pending', 'message' => 'A live test session is required for disconnect verification.'],
         ];
     }
 

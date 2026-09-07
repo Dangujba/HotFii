@@ -76,7 +76,11 @@ class NetworkDeviceController extends Controller
 
         $latestRun = $device->tests()->latest('id')->value('run_uuid');
         $tests = $latestRun
-            ? $device->tests()->where('run_uuid', $latestRun)->orderBy('id')->get()
+            ? $device->tests()
+                ->where('run_uuid', $latestRun)
+                ->whereNotIn('test_key', ['coa', 'disconnect'])
+                ->orderBy('id')
+                ->get()
             : collect();
 
         return view('network.show', [

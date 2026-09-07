@@ -211,12 +211,6 @@ class UnifiAdapter extends GenericRadiusAdapter
                 ?? null
             );
 
-        $disconnected = $device->sessions()
-            ->where('source', 'unifi')
-            ->where('status', 'stopped')
-            ->where('terminate_cause', 'Admin-Reset')
-            ->exists();
-
         return [
             [
                 'key' => 'configuration',
@@ -230,14 +224,6 @@ class UnifiAdapter extends GenericRadiusAdapter
             $this->testCaptivePortal($device),
             $this->testRadiusAuthentication($device),
             $this->testAccounting($device),
-
-            [
-                'key' => 'disconnect',
-                'status' => $disconnected ? 'passed' : 'pending',
-                'message' => $disconnected
-                    ? 'A UniFi guest disconnect was completed successfully.'
-                    : 'Waiting for a live dashboard disconnect test.',
-            ],
         ];
     }
 
