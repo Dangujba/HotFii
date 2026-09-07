@@ -32,7 +32,16 @@ class NetworkDeviceManager
                 'vendor' => $vendor,
                 'model' => $attributes['model'] ?? null,
                 'adapter' => $adapter->key(),
-                'support_level' => $vendor === RouterVendor::Mikrotik ? SupportLevel::Beta : SupportLevel::Compatible,
+                'support_level' => in_array(
+                    $vendor,
+                    [
+                        RouterVendor::Mikrotik,
+                        RouterVendor::Openwrt,
+                    ],
+                    true
+                )
+                    ? SupportLevel::Beta
+                    : SupportLevel::Compatible,
                 'status' => NetworkDeviceStatus::Pending,
                 'nas_identifier' => 'hf-'.Str::lower(Str::random(12)),
                 'radius_secret' => Str::password(32, true, true, false),
@@ -40,23 +49,88 @@ class NetworkDeviceManager
                 'capabilities' => $adapter->capabilities(),
             ]);
 
-            if ($vendor === RouterVendor::Mikrotik) {
-                $thirdOctet = intdiv($device->id, 250) % 250;
-                $fourthOctet = ($device->id % 250) + 2;
-                $device->update(['management_config' => [
-                    'api_username' => 'hotfii-monitor',
-                    'api_password' => Str::password(24, true, true, false),
-                    'wireguard_address' => "10.77.{$thirdOctet}.{$fourthOctet}/32",
-                ]]);
+            if (in_array(
+                $vendor,
+                [
+                    RouterVendor::Mikrotik,
+                    RouterVendor::Openwrt,
+                ],
+                true
+            )) {
+                $thirdOctet =
+                    intdiv($device->id, 250) % 250;
+
+                $fourthOctet =
+                    ($device->id % 250) + 2;
+
+                if ($vendor === RouterVendor::Mikrotik) {
+                    $device->update([
+                        'management_config' => [
+                            'api_username' =>
+                                'hotfii-monitor',
+
+                            'api_password' =>
+                                Str::password(
+                                    24,
+                                    true,
+                                    true,
+                                    false
+                                ),
+
+                            'wireguard_address' =>
+                                "10.77.{$thirdOctet}.{$fourthOctet}/32",
+                        ],
+                    ]);
+                }
+
+                if ($vendor === RouterVendor::Openwrt) {
+                    $device->update([
+                        'management_config' => [
+                            'wireguard_address' =>
+                                "10.77.{$thirdOctet}.{$fourthOctet}/32",
+
+                            'uam_secret' =>
+                                Str::password(
+                                    32,
+                                    true,
+                                    true,
+                                    false
+                                ),
+
+                            'uam_listen' =>
+                                '192.168.182.1',
+
+                            'uam_port' =>
+                                3990,
+
+                            'guest_network' =>
+                                'hotfii_guest',
+                        ],
+                    ]);
+                }
             }
 
             $nasName = $device->management_address ?: $device->nas_identifier;
 
-            if ($vendor === RouterVendor::Mikrotik) {
-                $wireguardAddress = ($device->management_config ?? [])['wireguard_address'] ?? null;
+            if (in_array(
+                $vendor,
+                [
+                    RouterVendor::Mikrotik,
+                    RouterVendor::Openwrt,
+                ],
+                true
+            )) {
+                $wireguardAddress =
+                    ($device->management_config ?? [])
+                    ['wireguard_address']
+                    ?? null;
 
                 if ($wireguardAddress) {
-                    $nasName = Str::before($wireguardAddress, '/');
+                    $nasName =
+                        Str::before(
+                            $wireguardAddress,
+                            '/'
+                        );
                 }
             }
 

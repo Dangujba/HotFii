@@ -29,7 +29,7 @@ return [
     ],
     // Every vendor the codebase knows about. Adapters, guides and enum cases
     // stay in place for all of them.
-    'supported_vendors' => ['generic', 'mikrotik', 'unifi', 'omada', 'ruijie', 'cambium', 'cisco', 'huawei', 'dlink'],
+    'supported_vendors' => ['generic', 'mikrotik', 'unifi', 'omada', 'openwrt', 'ruijie', 'cambium', 'cisco', 'huawei', 'dlink'],
 
     // The subset an operator may actually pick when adding a device. The rest
     // are hidden rather than removed: their adapters are untested against real

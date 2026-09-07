@@ -118,15 +118,105 @@ class VoucherService
                 $voucher->update(['status' => VoucherStatus::Expired]);
             }
 
-            if (in_array($voucher->status, [VoucherStatus::Expired, VoucherStatus::Revoked], true)) {
-                throw new RuntimeException('This voucher is no longer valid.');
+            if (in_array(
+                $voucher->status,
+                [
+                    VoucherStatus::Expired,
+                    VoucherStatus::Revoked,
+                ],
+                true
+            )) {
+                throw new RuntimeException(
+                    'This voucher is no longer valid.'
+                );
             }
 
+            $plan =
+                $voucher
+                    ->batch
+                    ->accessPlan;
+
+            /*
+             * Resume an already-activated unlimited voucher.
+             *
+             * Unlimited means the plan has neither a cumulative
+             * session-time allowance nor a data allowance.
+             *
+             * IMPORTANT:
+             * - do not activate the voucher again
+             * - do not issue another RADIUS credential
+             * - do not restart validity
+             * - do not extend expires_at
+             * - do not record another sale/fee
+             * - do not dispatch VoucherActivated again
+             *
+             * The existing credential is simply returned so the
+             * router can create a new network session.
+             */
             if ($voucher->status === VoucherStatus::Active) {
-                throw new RuntimeException('This voucher has already been activated.');
-            }
+                $isUnlimited =
+                    $plan->duration_minutes === null
+                    && $plan->data_limit_bytes === null;
 
-            $plan = $voucher->batch->accessPlan;
+                if (! $isUnlimited) {
+                    /*
+                     * Preserve the existing behaviour for capped
+                     * plans. Their resume/allowance handling must
+                     * not be changed here.
+                     */
+                    throw new RuntimeException(
+                        'This voucher has already been activated.'
+                    );
+                }
+
+                $voucher->loadMissing('credential');
+
+                $credential =
+                    $voucher->credential;
+
+                if (! $credential) {
+                    throw new RuntimeException(
+                        'This voucher is active but its access credential is unavailable.'
+                    );
+                }
+
+                $credentialStatus =
+                    $credential->status instanceof \BackedEnum
+                        ? $credential->status->value
+                        : (string) $credential->status;
+
+                if ($credentialStatus !== 'active') {
+                    throw new RuntimeException(
+                        'This voucher is no longer valid.'
+                    );
+                }
+
+                /*
+                 * Normally voucher.expires_at and
+                 * credential.expires_at are identical.
+                 *
+                 * Check the credential as well so an expired
+                 * credential can never be resumed because of
+                 * inconsistent historical data.
+                 */
+                if ($credential->expires_at?->isPast()) {
+                    $voucher->update([
+                        'status' =>
+                            VoucherStatus::Expired,
+                    ]);
+
+                    throw new RuntimeException(
+                        'This voucher is no longer valid.'
+                    );
+                }
+
+                return $voucher
+                    ->refresh()
+                    ->load(
+                        'credential',
+                        'batch.accessPlan'
+                    );
+            }
 
             // Last line of defence for the batch-pricing hole above. A paid
             // voucher that reaches activation worth under ₦1 would otherwise

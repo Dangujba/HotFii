@@ -50,6 +50,8 @@ class RadiusCredentialService
                 ['op' => ':=', 'value' => (string) $plan->simultaneous_use],
             );
 
+            $this->reply($username, 'Acct-Interim-Interval', '60');
+
             $timeout = $plan->duration_minutes ? $plan->duration_minutes * 60 : null;
             if ($credential->expires_at) {
                 // Unix seconds avoid depending on the RADIUS server's timezone.
@@ -65,17 +67,81 @@ class RadiusCredentialService
             }
 
             if ($plan->download_kbps || $plan->upload_kbps) {
-                $upload = $plan->upload_kbps ?: $plan->download_kbps;
-                $download = $plan->download_kbps ?: $plan->upload_kbps;
-                $this->reply($username, 'Mikrotik-Rate-Limit', "{$upload}k/{$download}k");
+                $upload =
+                    $plan->upload_kbps
+                    ?: $plan->download_kbps;
+
+                $download =
+                    $plan->download_kbps
+                    ?: $plan->upload_kbps;
+
+                /*
+                 * MikroTik.
+                 */
+                $this->reply(
+                    $username,
+                    'Mikrotik-Rate-Limit',
+                    "{$upload}k/{$download}k"
+                );
+
+                /*
+                 * CoovaChilli / WISPr.
+                 * WISPr values are bits per second.
+                 */
+                $this->reply(
+                    $username,
+                    'WISPr-Bandwidth-Max-Up',
+                    (string) ($upload * 1000)
+                );
+
+                $this->reply(
+                    $username,
+                    'WISPr-Bandwidth-Max-Down',
+                    (string) ($download * 1000)
+                );
             }
 
             if ($plan->data_limit_bytes) {
-                $low = $plan->data_limit_bytes % 4294967296;
-                $gigawords = intdiv($plan->data_limit_bytes, 4294967296);
-                $this->reply($username, 'Mikrotik-Total-Limit', (string) $low);
+                /*
+                 * MikroTik supports the lower 32 bits plus Gigawords.
+                 */
+                $low =
+                    $plan->data_limit_bytes
+                    % 4294967296;
+
+                $gigawords =
+                    intdiv(
+                        $plan->data_limit_bytes,
+                        4294967296
+                    );
+
+                $this->reply(
+                    $username,
+                    'Mikrotik-Total-Limit',
+                    (string) $low
+                );
+
                 if ($gigawords > 0) {
-                    $this->reply($username, 'Mikrotik-Total-Limit-Gigawords', (string) $gigawords);
+                    $this->reply(
+                        $username,
+                        'Mikrotik-Total-Limit-Gigawords',
+                        (string) $gigawords
+                    );
+                }
+
+                /*
+                 * Current CoovaChilli VSA is a 32-bit Integer.
+                 * Apply the NAS-side hard limit when the plan fits.
+                 *
+                 * Larger quotas will later be enforced by HotFii using
+                 * accounting + Disconnect rather than truncating the value.
+                 */
+                if ($plan->data_limit_bytes <= 4294967295) {
+                    $this->reply(
+                        $username,
+                        'CoovaChilli-Max-Total-Octets',
+                        (string) $plan->data_limit_bytes
+                    );
                 }
             }
 

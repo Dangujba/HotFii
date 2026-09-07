@@ -101,11 +101,17 @@ ROS, [
  /radius add address="{{RADIUS_HOST}}" secret="{{RADIUS_SECRET}}" service=hotspot authentication-port={{AUTH_PORT}} accounting-port={{ACCT_PORT}} timeout=3s require-message-auth=yes-for-request-resp comment=$hotfiiComment
  /radius incoming set accept=yes port={{COA_PORT}}
 
-# Enable RADIUS on the default profile and every profile used by a HotSpot server.
+# Enable HotFii RADIUS on the default profile.
  /ip hotspot profile set [find where name="default"] use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie
+
+# Normalize every profile actively used by a HotSpot server.
+# Keep the customer's existing HotSpot server, interface, address pool,
+# DHCP, LAN and WAN configuration, but replace legacy captive-portal
+# branding/files with the HotFii-managed portal.
 :foreach hotspotId in=[/ip hotspot find] do={
     :local profileName [/ip hotspot get $hotspotId profile]
-    /ip hotspot profile set [find where name=$profileName] use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie
+
+    /ip hotspot profile set [find where name=$profileName]         use-radius=yes         radius-accounting=yes         radius-interim-update=1m         login-by=http-pap,cookie         dns-name=""         html-directory=hotspot         html-directory-override=""
 }
 
  /ip hotspot walled-garden remove [find where comment=$hotfiiComment]

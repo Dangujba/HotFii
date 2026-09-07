@@ -13,6 +13,7 @@ class RouterAdapterRegistry
         private readonly MikrotikRouterOsAdapter $mikrotik,
         private readonly UnifiAdapter $unifi,
         private readonly OmadaAdapter $omada,
+        private readonly OpenWrtAdapter $openwrt,
     ) {}
 
     public function for(RouterVendor|string $vendor): RouterAdapter
@@ -25,6 +26,7 @@ class RouterAdapterRegistry
             RouterVendor::Mikrotik => $this->mikrotik,
             RouterVendor::Unifi => $this->unifi,
             RouterVendor::Omada => $this->omada,
+            RouterVendor::Openwrt => $this->openwrt,
             default => $this->generic,
         };
     }
@@ -35,6 +37,7 @@ class RouterAdapterRegistry
             'mikrotik-routeros' => $this->mikrotik,
             'unifi-network' => $this->unifi,
             'tp-link-omada' => $this->omada,
+            'openwrt-coovachilli' => $this->openwrt,
             'generic-radius' => $this->generic,
             default => throw new InvalidArgumentException(
                 "Unknown router adapter: {$key}"

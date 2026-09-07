@@ -23,20 +23,91 @@ class AccessGroupRadiusService
                 );
             }
 
+            DB::table('radreply')->updateOrInsert(
+                [
+                    'username' => $credential->username,
+                    'attribute' => 'Acct-Interim-Interval',
+                ],
+                [
+                    'op' => ':=',
+                    'value' => '60',
+                ],
+            );
+
             if ($group->download_kbps || $group->upload_kbps) {
-                $upload = $group->upload_kbps ?: $group->download_kbps;
-                $download = $group->download_kbps ?: $group->upload_kbps;
+                $upload =
+                    $group->upload_kbps
+                    ?: $group->download_kbps;
+
+                $download =
+                    $group->download_kbps
+                    ?: $group->upload_kbps;
+
                 DB::table('radreply')->updateOrInsert(
-                    ['username' => $credential->username, 'attribute' => 'Mikrotik-Rate-Limit'],
-                    ['op' => ':=', 'value' => "{$upload}k/{$download}k"],
+                    [
+                        'username' => $credential->username,
+                        'attribute' => 'Mikrotik-Rate-Limit',
+                    ],
+                    [
+                        'op' => ':=',
+                        'value' => "{$upload}k/{$download}k",
+                    ],
+                );
+
+                DB::table('radreply')->updateOrInsert(
+                    [
+                        'username' => $credential->username,
+                        'attribute' => 'WISPr-Bandwidth-Max-Up',
+                    ],
+                    [
+                        'op' => ':=',
+                        'value' => (string) ($upload * 1000),
+                    ],
+                );
+
+                DB::table('radreply')->updateOrInsert(
+                    [
+                        'username' => $credential->username,
+                        'attribute' => 'WISPr-Bandwidth-Max-Down',
+                    ],
+                    [
+                        'op' => ':=',
+                        'value' => (string) ($download * 1000),
+                    ],
                 );
             }
 
             if ($group->data_limit_bytes) {
                 DB::table('radreply')->updateOrInsert(
-                    ['username' => $credential->username, 'attribute' => 'Mikrotik-Total-Limit'],
-                    ['op' => ':=', 'value' => (string) ($group->data_limit_bytes % 4294967296)],
+                    [
+                        'username' => $credential->username,
+                        'attribute' => 'Mikrotik-Total-Limit',
+                    ],
+                    [
+                        'op' => ':=',
+                        'value' => (string) (
+                            $group->data_limit_bytes
+                            % 4294967296
+                        ),
+                    ],
                 );
+
+                if ($group->data_limit_bytes <= 4294967295) {
+                    DB::table('radreply')->updateOrInsert(
+                        [
+                            'username' =>
+                                $credential->username,
+
+                            'attribute' =>
+                                'CoovaChilli-Max-Total-Octets',
+                        ],
+                        [
+                            'op' => ':=',
+                            'value' =>
+                                (string) $group->data_limit_bytes,
+                        ],
+                    );
+                }
             }
         }
     }

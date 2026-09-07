@@ -330,19 +330,60 @@
         @endif
 
         <div class="card metric-card">
-            <div class="card-header"><h2 class="h5 mb-0">{{ $provisioning['method'] === 'script'
-    ? 'RouterOS provisioning script'
-    : (($provisioning['integration'] ?? null) === 'unifi-network-api'
-        ? 'UniFi Hotspot configuration'
-        : 'Guided RADIUS configuration') }}</h2></div>
+            <div class="card-header">
+                <h2 class="h5 mb-0">
+                    @if(($provisioning['integration'] ?? null) === 'openwrt-coovachilli')
+                        OpenWrt / CoovaChilli provisioning script
+                    @elseif($provisioning['method'] === 'script')
+                        RouterOS provisioning script
+                    @elseif(($provisioning['integration'] ?? null) === 'unifi-network-api')
+                        UniFi Hotspot configuration
+                    @else
+                        Guided RADIUS configuration
+                    @endif
+                </h2>
+            </div>
             <div class="card-body">
                 @if($provisioning['method'] === 'script')
-                    <div class="alert alert-warning"><i class="bi bi-shield-lock me-2"></i>This script contains the RADIUS secret. Run it only on the intended RouterOS 7 device.</div>
+
+                    @if(($provisioning['integration'] ?? null) === 'openwrt-coovachilli')
+                        <div class="alert alert-warning">
+                            <i class="bi bi-shield-lock me-2"></i>
+                            This script contains this device's RADIUS/UAM credentials.
+                            Run it only on the intended OpenWrt router.
+                        </div>
+
+                        <div class="alert alert-info">
+                            HotFii creates a dedicated
+                            <code>hotfii_guest</code> /
+                            <code>br-hotfii</code> network and deliberately
+                            does not take over <code>br-lan</code>.
+                        </div>
+                    @else
+                        <div class="alert alert-warning">
+                            <i class="bi bi-shield-lock me-2"></i>
+                            This script contains the RADIUS secret.
+                            Run it only on the intended RouterOS 7 device.
+                        </div>
+                    @endif
                     <div class="code-block">
                         <button class="btn-copy" type="button" data-copy-target="#provisioning-script" data-copy-message="Provisioning script copied"><i class="bi bi-clipboard me-1"></i><span data-copy-label>Copy script</span></button>
                         <pre class="provisioning-script"><code id="provisioning-script">{{ $provisioning['script'] }}</code></pre>
                     </div>
-                    <p class="small text-secondary mt-2 mb-0">Paste the whole block into <span class="font-monospace">New Terminal</span> in Winbox or WebFig.</p>
+                    @if(($provisioning['integration'] ?? null) === 'openwrt-coovachilli')
+                        <p class="small text-secondary mt-2 mb-0">
+                            SSH into the intended OpenWrt router as
+                            <code>root</code>, paste the whole block,
+                            then attach the customer SSID or dedicated
+                            Ethernet port to <code>hotfii_guest</code>.
+                        </p>
+                    @else
+                        <p class="small text-secondary mt-2 mb-0">
+                            Paste the whole block into
+                            <span class="font-monospace">New Terminal</span>
+                            in Winbox or WebFig.
+                        </p>
+                    @endif
 
                 @elseif(($provisioning['integration'] ?? null) === 'unifi-network-api')
 
