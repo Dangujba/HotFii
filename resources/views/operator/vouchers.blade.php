@@ -20,10 +20,10 @@
             <div class="mb-3"><label class="form-label">Quantity</label><input type="number" class="form-control" name="quantity" min="1" max="5000" value="20" required></div>
             <div class="mb-3"><label class="form-label">Retail price per voucher (₦)</label><input type="number" class="form-control" name="retail_price_naira" min="1" step="0.01" placeholder="Use plan price"></div>
             <div class="row g-2 mb-3">
-                <div class="col-7"><label class="form-label">Pin characters</label><select class="form-select" name="pin_format">@foreach($pinFormats as $format)<option value="{{ $format->value }}" @selected($format->value === 'numbers')>{{ $format->label() }}</option>@endforeach</select></div>
-                <div class="col-5"><label class="form-label">Grouping</label><select class="form-select" name="dashed_pin"><option value="1" selected>Add dashes</option><option value="0">No dashes</option></select></div>
+                <div class="col-12"><label class="form-label" for="pin-format">PIN characters</label><select class="form-select" id="pin-format" name="pin_format">@foreach($pinFormats as $format)<option value="{{ $format->value }}" @selected(old('pin_format', 'numbers') === $format->value)>{{ $format->label() }}</option>@endforeach</select></div>
+                <div class="col-6"><label class="form-label" for="pin-length">PIN length</label><select class="form-select" id="pin-length" name="pin_length">@foreach($pinLengths as $length)<option value="{{ $length }}" @selected((int) old('pin_length', 12) === $length)>{{ $length }}</option>@endforeach</select></div>
+                <div class="col-6"><label class="form-label">Grouping</label><select class="form-select" name="dashed_pin"><option value="1" @selected((string) old('dashed_pin', '1') === '1')>Add dashes</option><option value="0" @selected((string) old('dashed_pin', '1') === '0')>No dashes</option></select></div>
             </div>
-            <p class="small text-secondary"><i class="bi bi-info-circle me-1"></i>Pins are 12 characters, printed two per row. Validity begins on first successful activation. Default simultaneous use comes from the plan.</p>
             <button class="btn btn-hotfii w-100" data-confirm-title="Generate this voucher batch?" data-confirm="Codes are minted straight away and cannot be un-minted. Print them before handing any out." data-confirm-icon="question" data-confirm-button="Generate batch">Generate and print</button>
         </form>@endif
     </div></div></div>

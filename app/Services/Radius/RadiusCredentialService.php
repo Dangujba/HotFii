@@ -32,7 +32,9 @@ class RadiusCredentialService
                 'password_cipher' => $password,
                 'status' => 'active',
                 'starts_at' => now(),
-                'expires_at' => $plan->validity_days ? now()->addDays($plan->validity_days) : $customer?->expires_at,
+                'expires_at' => $voucher?->expires_at
+                    ?? $plan->expiresAt(now(), $organization->timezone ?: config('app.timezone'))
+                    ?? $customer?->expires_at,
             ];
 
             $credential = $voucher
@@ -48,8 +50,18 @@ class RadiusCredentialService
                 ['op' => ':=', 'value' => (string) $plan->simultaneous_use],
             );
 
-            if ($plan->duration_minutes) {
-                $this->reply($username, 'Session-Timeout', (string) ($plan->duration_minutes * 60));
+            $timeout = $plan->duration_minutes ? $plan->duration_minutes * 60 : null;
+            if ($credential->expires_at) {
+                // Unix seconds avoid depending on the RADIUS server's timezone.
+                DB::table('radcheck')->updateOrInsert(
+                    ['username' => $username, 'attribute' => 'Expiration'],
+                    ['op' => ':=', 'value' => (string) $credential->expires_at->timestamp],
+                );
+                $remaining = max(0, (int) now()->diffInSeconds($credential->expires_at));
+                $timeout = $timeout === null ? $remaining : min($timeout, $remaining);
+            }
+            if ($timeout !== null) {
+                $this->reply($username, 'Session-Timeout', (string) $timeout);
             }
 
             if ($plan->download_kbps || $plan->upload_kbps) {

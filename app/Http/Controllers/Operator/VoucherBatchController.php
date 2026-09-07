@@ -6,6 +6,7 @@ use App\Domain\Enums\VoucherPinFormat;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\VoucherBatch;
+use App\Services\Vouchers\VoucherPinGenerator;
 use App\Services\Vouchers\VoucherService;
 use App\Support\ListFilters;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -43,6 +44,7 @@ class VoucherBatchController extends Controller
             // list is not the same as the list you can generate against.
             'filterPlans' => $organization->accessPlans()->orderBy('name')->get(['id', 'name']),
             'pinFormats' => VoucherPinFormat::cases(),
+            'pinLengths' => VoucherPinGenerator::LENGTHS,
             'statuses' => self::BATCH_STATUSES,
             'filters' => $filters,
             'filtered' => ListFilters::any($filters),
@@ -58,6 +60,7 @@ class VoucherBatchController extends Controller
             // also enforces that a custom price cannot undercut the plan.
             'retail_price_naira' => ['nullable', 'numeric', 'decimal:0,2', 'min:1'],
             'pin_format' => ['nullable', Rule::enum(VoucherPinFormat::class)],
+            'pin_length' => ['nullable', 'integer', Rule::in(VoucherPinGenerator::LENGTHS)],
             'dashed_pin' => ['nullable', 'boolean'],
         ]);
 
@@ -79,6 +82,7 @@ class VoucherBatchController extends Controller
             $retailPriceKobo,
             VoucherPinFormat::tryFrom($data['pin_format'] ?? '') ?? VoucherPinFormat::Numbers,
             $request->has('dashed_pin') ? $request->boolean('dashed_pin') : true,
+            (int) ($data['pin_length'] ?? 12),
         );
 
         // Redirecting straight at the PDF leaves the browser downloading a file

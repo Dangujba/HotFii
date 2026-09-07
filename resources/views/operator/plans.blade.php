@@ -16,7 +16,7 @@
             <td class="fw-semibold">{{ $plan->name }}<div class="small fw-normal text-secondary">{{ $plan->is_active ? 'Active' : 'Inactive' }}</div></td>
             <td><span class="badge text-bg-{{ $plan->access_type === 'paid' ? 'success' : ($plan->access_type === 'internal' ? 'primary' : 'secondary') }}">{{ ucfirst($plan->access_type) }}</span></td>
             <td>{{ $plan->price_kobo ? '₦'.number_format($plan->price_kobo / 100, 0) : 'Free' }}</td>
-            <td>@if($plan->duration_minutes){{ number_format($plan->duration_minutes) }} min @endif @if($plan->dataAllowance())<div>{{ $plan->dataAllowance() }}</div>@endif @if(!$plan->duration_minutes && !$plan->data_limit_bytes)Unlimited @endif</td>
+            <td>@if($plan->duration_minutes){{ number_format($plan->duration_minutes) }} min @endif @if($plan->dataAllowance())<div>{{ $plan->dataAllowance() }}</div>@endif @if(!$plan->duration_minutes && !$plan->data_limit_bytes)Unlimited @endif<div class="small text-secondary">{{ $plan->validityLabel() }}</div></td>
             <td>{{ $plan->download_kbps ? number_format($plan->download_kbps / 1000, 1).' / '.number_format($plan->upload_kbps / 1000, 1).' Mbps' : 'Uncapped' }}</td>
             <td>{{ $plan->simultaneous_use }}</td>
         </tr>@empty<tr><td colspan="6" class="text-center py-5 text-secondary">{{ $filtered ? 'No plans match these filters.' : 'Create the first access plan.' }}</td></tr>@endforelse</tbody>
@@ -27,6 +27,15 @@
             <div class="mb-3"><label class="form-label">Plan name</label><input class="form-control" name="name" value="{{ old('name') }}" required placeholder="e.g. 2 Hours"></div>
             <div class="row g-3"><div class="col-6"><label class="form-label">Access type</label><select class="form-select" name="access_type"><option value="paid">Paid</option><option value="free">Free</option><option value="internal">Internal</option></select></div><div class="col-6"><label class="form-label">Price (₦)</label><input class="form-control" type="number" min="0" step="0.01" name="price_naira" value="{{ old('price_naira') }}" placeholder="e.g. 500" required><div class="form-text">Free and internal plans only may be ₦0.</div></div></div>
             <hr><div class="row g-3"><div class="col-6"><label class="form-label">Minutes</label><input class="form-control" type="number" min="1" name="duration_minutes"></div><div class="col-6"><label class="form-label">Data (MB)</label><input class="form-control" type="number" min="1" name="data_limit_mb"></div><div class="col-6"><label class="form-label">Download Kbps</label><input class="form-control" type="number" min="64" name="download_kbps"></div><div class="col-6"><label class="form-label">Upload Kbps</label><input class="form-control" type="number" min="64" name="upload_kbps"></div><div class="col-6"><label class="form-label">Devices</label><input class="form-control" type="number" min="1" max="20" name="simultaneous_use" value="1" required></div><div class="col-6"><label class="form-label">Validity days</label><input class="form-control" type="number" min="1" name="validity_days"></div></div>
+            <div class="mt-3">
+                <label class="form-label" for="validity-mode">Validity expiry</label>
+                <select class="form-select" id="validity-mode" name="validity_mode">
+                    @foreach($validityModes as $mode)
+                        <option value="{{ $mode->value }}" @selected(old('validity_mode', 'midnight') === $mode->value)>{{ $mode->label() }}</option>
+                    @endforeach
+                </select>
+                <div class="form-text">Timezone: {{ $currentOrganization->timezone }}</div>
+            </div>
             <button class="btn btn-hotfii w-100 mt-4">Create access plan</button>
         </form>
     </div></div></div>

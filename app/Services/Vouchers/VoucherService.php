@@ -15,19 +15,20 @@ use App\Models\VoucherBatch;
 use App\Services\Billing\CommerceFeeCalculator;
 use App\Services\Billing\TrialManager;
 use App\Services\Radius\RadiusCredentialService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class VoucherService
 {
-    private const PIN_LENGTH = 12;
-
     public function __construct(
         private readonly RadiusCredentialService $credentials,
         private readonly CommerceFeeCalculator $fees,
         private readonly TrialManager $trials,
         private readonly VoucherSaleTransactionRecorder $sales,
+        private readonly VoucherPinGenerator $pins,
     ) {}
 
     public function createBatch(
@@ -37,9 +38,17 @@ class VoucherService
         ?int $priceKobo = null,
         VoucherPinFormat $pinFormat = VoucherPinFormat::Numbers,
         bool $dashedPin = true,
+        int $pinLength = 12,
     ): VoucherBatch {
         if ($quantity < 1 || $quantity > 5000) {
             throw new RuntimeException('Voucher quantity must be between 1 and 5,000.');
+        }
+
+        if (! in_array($pinLength, VoucherPinGenerator::LENGTHS, true)) {
+            throw ValidationException::withMessages(['pin_length' => 'Choose a PIN length of 2, 4, 6, 8, 10, or 12.']);
+        }
+        if ($quantity > $this->pins->capacity($pinFormat, $pinLength)) {
+            throw ValidationException::withMessages(['quantity' => 'This PIN length cannot provide enough unique codes. Choose a longer PIN or fewer vouchers.']);
         }
 
         // An operator may mark a voucher up, but may not reduce the sale below
@@ -51,29 +60,48 @@ class VoucherService
             throw new RuntimeException('A voucher cannot be priced below its access plan. Leave the price blank to use the plan price.');
         }
 
-        return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin) {
+        return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin, $pinLength) {
             $batch = VoucherBatch::create([
                 'organization_id' => $organization->id,
                 'access_plan_id' => $plan->id,
                 'reference' => 'VB-'.now()->format('ymd').'-'.Str::upper(Str::random(6)),
                 'quantity' => $quantity,
+                'pin_length' => $pinLength,
                 'retail_price_kobo' => $priceKobo ?? $plan->price_kobo,
                 'status' => VoucherStatus::Generated->value,
             ]);
 
-            for ($index = 0; $index < $quantity; $index++) {
-                $code = $this->newCode($pinFormat, $dashedPin);
-                $batch->vouchers()->create([
-                    'organization_id' => $organization->id,
-                    'code_lookup' => $this->lookup($code),
-                    'code_cipher' => $code,
-                    'code_last_four' => substr($code, -4),
-                    'status' => VoucherStatus::Generated,
-                    'price_snapshot_kobo' => $batch->retail_price_kobo,
-                ]);
+            $created = 0;
+            foreach ($this->pins->candidates($pinFormat, $pinLength, $dashedPin, $quantity) as $code) {
+                $lookup = $this->lookup($code);
+                if (Voucher::where('code_lookup', $lookup)->exists()) {
+                    continue;
+                }
+
+                try {
+                    // A savepoint lets concurrent batch collisions retry on PostgreSQL.
+                    DB::transaction(fn () => $batch->vouchers()->create([
+                        'organization_id' => $organization->id,
+                        'code_lookup' => $lookup,
+                        'code_cipher' => $code,
+                        'code_last_four' => substr($code, -4),
+                        'status' => VoucherStatus::Generated,
+                        'price_snapshot_kobo' => $batch->retail_price_kobo,
+                    ]));
+                } catch (UniqueConstraintViolationException $exception) {
+                    if (! Voucher::where('code_lookup', $lookup)->exists()) {
+                        throw $exception;
+                    }
+
+                    continue;
+                }
+
+                if (++$created === $quantity) {
+                    return $batch->load('vouchers', 'accessPlan');
+                }
             }
 
-            return $batch->load('vouchers', 'accessPlan');
+            throw ValidationException::withMessages(['pin_length' => 'Not enough unused PINs remain for this batch. Choose a longer PIN or fewer vouchers.']);
         });
     }
 
@@ -125,12 +153,13 @@ class VoucherService
                 : null;
 
             $wasRecordedSold = $voucher->sold_at !== null;
-            $expiresAt = $plan->validity_days ? now()->addDays($plan->validity_days) : null;
+            $activatedAt = now();
+            $expiresAt = $plan->expiresAt($activatedAt, $organization->timezone ?: config('app.timezone'));
 
             $voucher->update([
                 'customer_id' => $customer?->id,
                 'status' => VoucherStatus::Active,
-                'activated_at' => now(),
+                'activated_at' => $activatedAt,
                 'sold_at' => $voucher->sold_at ?? now(),
                 'expires_at' => $expiresAt,
             ]);
@@ -186,22 +215,6 @@ class VoucherService
             VoucherActivated::dispatch($voucher);
             return $voucher;
         });
-    }
-
-    private function newCode(VoucherPinFormat $format, bool $dashed): string
-    {
-        $alphabet = $format->alphabet();
-        $highest = strlen($alphabet) - 1;
-
-        do {
-            $pin = '';
-            for ($position = 0; $position < self::PIN_LENGTH; $position++) {
-                $pin .= $alphabet[random_int(0, $highest)];
-            }
-            $code = $dashed ? implode('-', str_split($pin, 4)) : $pin;
-        } while (Voucher::where('code_lookup', $this->lookup($code))->exists());
-
-        return $code;
     }
 
     private function lookup(string $code): string

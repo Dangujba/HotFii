@@ -35,7 +35,7 @@
                 <tr><td class="label">Plan</td><td>{{ $plan->name }}</td><td class="qr" rowspan="5">{!! QrCode::size(72)->margin(0)->generate($voucher->code_cipher) !!}</td></tr>
                 <tr><td class="label">Pin</td><td class="pin">{{ $voucher->code_cipher }}</td></tr>
                 <tr><td class="label">Duration</td><td>{{ $duration }}</td></tr>
-                <tr><td class="label">Validity</td><td>{{ $plan->validity_days ? number_format($plan->validity_days).' days from first use' : 'No expiry' }}</td></tr>
+                <tr><td class="label">Validity</td><td>{{ $plan->validityLabel() }}</td></tr>
                 <tr><td class="label">Value</td><td>{{ $voucher->price_snapshot_kobo ? '₦'.number_format($voucher->price_snapshot_kobo / 100, 0) : 'Complimentary' }}</td></tr>
             </table>
             <div class="hint">Connect to Wi-Fi, open the sign-in page, and enter or scan this pin. Validity begins on first use.</div>
