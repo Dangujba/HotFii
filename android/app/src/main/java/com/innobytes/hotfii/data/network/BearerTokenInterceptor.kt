@@ -9,13 +9,14 @@ class BearerTokenInterceptor(
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = sessionStore.readToken()
-        val request = if (token == null) {
-            chain.request()
-        } else {
-            chain.request().newBuilder()
-                .header("Authorization", "Bearer $token")
-                .build()
-        }
+        val request = chain.request().newBuilder()
+            .header("Accept", "application/json")
+            .apply {
+                if (token != null) {
+                    header("Authorization", "Bearer $token")
+                }
+            }
+            .build()
 
         return chain.proceed(request)
     }
