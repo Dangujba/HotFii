@@ -1,6 +1,7 @@
 package com.innobytes.hotfii
 
 import android.os.Bundle
+import android.os.Process
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,9 +26,14 @@ class MainActivity : ComponentActivity() {
             HotFiiTheme {
                 HotFiiApp(
                     viewModel = viewModel,
-                    onCloseApp = ::finishAffinity,
+                    onCloseApp = ::closeApp,
                 )
             }
         }
+    }
+
+    private fun closeApp() {
+        finishAndRemoveTask()
+        Process.killProcess(Process.myPid())
     }
 }

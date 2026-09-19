@@ -17,12 +17,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,10 +61,35 @@ fun LoginScreen(
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var showCloseConfirmation by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val submit = {
         focusManager.clearFocus()
         onSignIn(email, password)
+    }
+
+    if (showCloseConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showCloseConfirmation = false },
+            title = { Text("Close HotFii?") },
+            text = { Text("This will completely close the app.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCloseConfirmation = false
+                        onCloseApp()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text("Close app")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloseConfirmation = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 
     Box(
@@ -72,7 +100,7 @@ fun LoginScreen(
         contentAlignment = Alignment.Center,
     ) {
         IconButton(
-            onClick = onCloseApp,
+            onClick = { showCloseConfirmation = true },
             modifier = Modifier.align(Alignment.TopEnd),
         ) {
             Icon(Icons.Outlined.Close, contentDescription = "Close HotFii")
