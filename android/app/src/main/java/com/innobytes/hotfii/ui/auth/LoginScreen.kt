@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -52,6 +53,7 @@ fun LoginScreen(
     isSubmitting: Boolean,
     error: String?,
     onSignIn: (String, String) -> Unit,
+    onCloseApp: () -> Unit,
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -69,6 +71,13 @@ fun LoginScreen(
             .padding(horizontal = 24.dp, vertical = 48.dp),
         contentAlignment = Alignment.Center,
     ) {
+        IconButton(
+            onClick = onCloseApp,
+            modifier = Modifier.align(Alignment.TopEnd),
+        ) {
+            Icon(Icons.Outlined.Close, contentDescription = "Close HotFii")
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -76,8 +85,9 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center,
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.Center,
             ) {
                 Image(
                     painter = painterResource(R.drawable.hotfii_icon),
@@ -88,6 +98,8 @@ fun LoginScreen(
                     text = "HotFii",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 12.dp),
                 )
             }
 

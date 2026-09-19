@@ -11,10 +11,11 @@ import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.POST
 import retrofit2.http.Query
+import retrofit2.Response
 
 interface HotFiiApi {
     @POST("auth/login")
-    suspend fun login(@Body request: LoginRequestDto): ApiEnvelope<LoginSessionDto>
+    suspend fun login(@Body request: LoginRequestDto): Response<ApiEnvelope<LoginSessionDto>>
 
     @GET("session")
     suspend fun session(): ApiEnvelope<SessionDto>

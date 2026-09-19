@@ -7,7 +7,10 @@ import com.innobytes.hotfii.ui.auth.LoginScreen
 import com.innobytes.hotfii.ui.workspace.WorkspaceScreen
 
 @Composable
-fun HotFiiApp(viewModel: MainViewModel) {
+fun HotFiiApp(
+    viewModel: MainViewModel,
+    onCloseApp: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val session = state.session
 
@@ -17,6 +20,7 @@ fun HotFiiApp(viewModel: MainViewModel) {
             isSubmitting = state.isSubmitting,
             error = state.error,
             onSignIn = viewModel::signIn,
+            onCloseApp = onCloseApp,
         )
         else -> WorkspaceScreen(
             session = session,

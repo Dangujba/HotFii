@@ -23,7 +23,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             HotFiiTheme {
-                HotFiiApp(viewModel)
+                HotFiiApp(
+                    viewModel = viewModel,
+                    onCloseApp = ::finishAffinity,
+                )
             }
         }
     }

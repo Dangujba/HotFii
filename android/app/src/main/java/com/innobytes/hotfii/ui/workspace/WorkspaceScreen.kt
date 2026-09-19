@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -88,6 +89,32 @@ fun WorkspaceScreen(
     onDashboardRefresh: () -> Unit,
     onSignOut: () -> Unit,
 ) {
+    var showSignOutConfirmation by remember { mutableStateOf(false) }
+
+    if (showSignOutConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirmation = false },
+            title = { Text("Sign out of HotFii?") },
+            text = { Text("You will need to sign in again on this device.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSignOutConfirmation = false
+                        onSignOut()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text("Sign out")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutConfirmation = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -109,7 +136,7 @@ fun WorkspaceScreen(
                         Icon(Icons.Outlined.Refresh, contentDescription = "Refresh account and dashboard")
                     }
                     TextButton(
-                        onClick = onSignOut,
+                        onClick = { showSignOutConfirmation = true },
                         enabled = !isRefreshing,
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     ) {
