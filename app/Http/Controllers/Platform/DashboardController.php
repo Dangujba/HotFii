@@ -140,7 +140,7 @@ class DashboardController extends Controller
                     ->get(),
 
             'transactions' =>
-                Transaction::with('organization')
+                Transaction::with('organization', 'networkDevice')
                     ->latest()
                     ->limit(5)
                     ->get(),

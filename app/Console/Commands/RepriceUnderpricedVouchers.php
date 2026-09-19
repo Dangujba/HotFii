@@ -161,6 +161,7 @@ class RepriceUnderpricedVouchers extends Command
                 'source_id' => $voucher->id,
             ],
             [
+                'network_device_id' => $voucher->activated_network_device_id ?? $voucher->network_device_id,
                 'billing_period' => $voucher->activated_at->startOfMonth()->toDateString(),
                 'billable_sales_kobo' => $plan->price_kobo,
                 'fee_amount_kobo' => $quote->chargeablePercentageFeeKobo(),

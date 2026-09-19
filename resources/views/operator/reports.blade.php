@@ -3,16 +3,17 @@
 @section('heading', 'Reports')
 @section('subheading', 'Revenue, access usage, and plan performance')
 @section('actions')
-    <a class="btn btn-hotfii" href="{{ route('reports.export.pdf', request()->only('from','to')) }}" download><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</a>
-    <a class="btn btn-outline-secondary" href="{{ route('reports.export', request()->only('from','to')) }}" download><i class="bi bi-filetype-csv me-1"></i>Export CSV</a>
+    <a class="btn btn-hotfii" href="{{ route('reports.export.pdf', request()->only('from','to','router')) }}" download><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</a>
+    <a class="btn btn-outline-secondary" href="{{ route('reports.export', request()->only('from','to','router')) }}" download><i class="bi bi-filetype-csv me-1"></i>Export CSV</a>
 @endsection
 @section('content')
 <div class="card metric-card mb-4">
     <div class="card-body">
         <form class="row g-3 align-items-end">
-            <div class="col-md-4"><label class="form-label">From</label><input class="form-control" type="date" name="from" value="{{ $from->format('Y-m-d') }}"></div>
-            <div class="col-md-4"><label class="form-label">To</label><input class="form-control" type="date" name="to" value="{{ $to->format('Y-m-d') }}"></div>
-            <div class="col-md-4"><button class="btn btn-hotfii w-100"><i class="bi bi-funnel me-1"></i>Apply date range</button></div>
+            <div class="col-md-3"><label class="form-label">From</label><input class="form-control" type="date" name="from" value="{{ $from->format('Y-m-d') }}"></div>
+            <div class="col-md-3"><label class="form-label">To</label><input class="form-control" type="date" name="to" value="{{ $to->format('Y-m-d') }}"></div>
+            <div class="col-md-4"><label class="form-label">Router</label><select class="form-select" name="router"><option value="">All routers</option>@foreach($routers as $router)<option value="{{ $router->id }}" @selected($selectedRouter?->id === $router->id)>{{ $router->name }}@if($router->location) · {{ $router->location->name }}@endif</option>@endforeach</select></div>
+            <div class="col-md-2"><button class="btn btn-hotfii w-100"><i class="bi bi-funnel me-1"></i>Apply</button></div>
         </form>
     </div>
 </div>
@@ -27,7 +28,7 @@
 <div class="row g-4 mb-4">
     <div class="col-xl-8">
         <div class="card metric-card h-100">
-            <div class="card-header border-0 pt-4 px-4"><span class="hf-chart-eyebrow">{{ $from->format('j M') }} – {{ $to->format('j M Y') }}</span><h2 class="h5 mb-0">Daily paid sales by channel</h2></div>
+            <div class="card-header border-0 pt-4 px-4"><span class="hf-chart-eyebrow">{{ $from->format('j M') }} – {{ $to->format('j M Y') }}{{ $selectedRouter ? ' · '.$selectedRouter->name : '' }}</span><h2 class="h5 mb-0">Daily paid sales by channel</h2></div>
             <div class="card-body pt-2 px-3 pb-3">
                 <div id="hf-report-sales-chart" class="hf-chart" role="img" aria-label="Daily paid sales split between online, voucher, and direct cash channels."
                      data-labels='@json($salesTrend['labels'])' data-series='@json($salesTrend['series'])'></div>

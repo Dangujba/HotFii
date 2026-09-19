@@ -3,22 +3,28 @@
 namespace App\Services\Vouchers;
 
 use App\Domain\Enums\PaymentStatus;
+use App\Models\NetworkDevice;
 use App\Models\Transaction;
 use App\Models\Voucher;
-use LogicException;
 use Illuminate\Support\Str;
+use LogicException;
 
 final class VoucherSaleTransactionRecorder
 {
-    public function record(Voucher $voucher, int $platformFeeKobo): Transaction
+    public function record(Voucher $voucher, int $platformFeeKobo, ?NetworkDevice $device = null): Transaction
     {
         if ($voucher->is_complimentary || $voucher->activated_at === null || $voucher->price_snapshot_kobo <= 0) {
             throw new LogicException('Only an activated paid voucher can be recorded as a sale.');
         }
 
         $reference = $this->reference($voucher);
+        $routerId = $device?->id ?? $voucher->activated_network_device_id;
 
         if ($transaction = Transaction::where('reference', $reference)->first()) {
+            if ($transaction->network_device_id === null && $routerId !== null) {
+                $transaction->update(['network_device_id' => $routerId]);
+            }
+
             return $transaction;
         }
 
@@ -26,6 +32,7 @@ final class VoucherSaleTransactionRecorder
 
         $transaction = new Transaction([
             'organization_id' => $voucher->organization_id,
+            'network_device_id' => $routerId,
             'customer_id' => $voucher->customer_id,
             'access_plan_id' => $voucher->batch->access_plan_id,
             'reference' => $reference,

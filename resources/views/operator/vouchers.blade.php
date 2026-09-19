@@ -9,6 +9,7 @@
             <div class="col-md-4"><input class="form-control form-control-sm" name="search" value="{{ $filters['search'] }}" placeholder="Batch reference"></div>
             <div class="col-md-3"><select class="form-select form-select-sm" name="status"><option value="">Any status</option>@foreach($statuses as $status)<option value="{{ $status }}" @selected($filters['status'] === $status)>{{ ucfirst($status) }}</option>@endforeach</select></div>
             <div class="col-md-3"><select class="form-select form-select-sm" name="plan"><option value="">All plans</option>@foreach($filterPlans as $option)<option value="{{ $option->id }}" @selected($filters['plan'] === $option->id)>{{ $option->name }}</option>@endforeach</select></div>
+            <div class="col-md-3"><select class="form-select form-select-sm" name="router"><option value="">All router coverage</option>@foreach($routers as $router)<option value="{{ $router->id }}" @selected($filters['router'] === $router->id)>{{ $router->name }}</option>@endforeach</select></div>
         </x-filter-bar>
         <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
         <thead><tr><th>Reference</th><th>Coverage</th><th>Plan</th><th>Quantity</th><th>Retail value</th><th>Status</th><th></th></tr></thead>

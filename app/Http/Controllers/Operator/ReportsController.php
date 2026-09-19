@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Support\OrganizationRouterFilter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class ReportsController extends Controller
     public function index(Request $request, Organization $organization): View
     {
         [$from, $to] = $this->range($request);
+        [$routers, $routerId] = OrganizationRouterFilter::resolve($request, $organization);
         $window = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
         $paidAt = 'COALESCE(paid_at, transactions.created_at)';
         $day = "DATE($paidAt)";
@@ -35,6 +37,7 @@ class ReportsController extends Controller
 
         $transactions = fn () => $organization->transactions()
             ->where('status', 'successful')
+            ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
             ->whereBetween(DB::raw($paidAt), $window);
 
         $summary = $transactions()
@@ -49,6 +52,7 @@ class ReportsController extends Controller
             ->keyBy(fn ($row) => Carbon::parse($row->day)->toDateString().'|'.$row->sale_channel);
 
         $usageRows = $organization->sessions()
+            ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
             ->whereBetween(DB::raw('COALESCE(started_at, created_at)'), $window)
             ->selectRaw('DATE(COALESCE(started_at, created_at)) as day, COUNT(*) as sessions, COALESCE(SUM(input_bytes + output_bytes), 0) as bytes')
             ->groupBy(DB::raw('DATE(COALESCE(started_at, created_at))'))
@@ -111,12 +115,15 @@ class ReportsController extends Controller
             'to' => $to,
             'summary' => $summary,
             'usage' => $organization->sessions()
+                ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
                 ->whereBetween(DB::raw('COALESCE(started_at, created_at)'), $window)
                 ->selectRaw('COUNT(*) as sessions, COALESCE(SUM(input_bytes + output_bytes), 0) as bytes')
                 ->first(),
             'salesTrend' => ['labels' => $labels, 'series' => $salesSeries],
             'channels' => $channels,
             'topPlans' => $topPlans,
+            'routers' => $routers,
+            'selectedRouter' => $routers->firstWhere('id', $routerId),
             'usageTrend' => [
                 'labels' => $labels,
                 'sessions' => $sessionValues,
@@ -128,19 +135,22 @@ class ReportsController extends Controller
     public function export(Request $request, Organization $organization): StreamedResponse
     {
         [$from, $to] = $this->range($request);
+        [, $routerId] = OrganizationRouterFilter::resolve($request, $organization);
         $window = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
         $transactions = $organization->transactions()
-            ->with('accessPlan')
+            ->with('accessPlan', 'networkDevice')
+            ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
             ->whereBetween(DB::raw('COALESCE(paid_at, transactions.created_at)'), $window)
             ->orderByRaw('COALESCE(paid_at, transactions.created_at)')
-            ->cursor();
+            ->lazy(500);
 
         return response()->streamDownload(function () use ($transactions) {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['Reference', 'Channel', 'Status', 'Plan', 'Amount NGN', 'Paid at']);
+            fputcsv($output, ['Reference', 'Router', 'Channel', 'Status', 'Plan', 'Amount NGN', 'Paid at']);
             foreach ($transactions as $transaction) {
                 fputcsv($output, [
                     $transaction->reference,
+                    $transaction->networkDevice?->name ?? 'Unattributed',
                     str_starts_with($transaction->reference, 'HF-VCH-')
                         ? 'Voucher'
                         : ($transaction->channel === 'cash' ? 'Direct cash' : 'Online'),
@@ -157,6 +167,7 @@ class ReportsController extends Controller
     public function exportPdf(Request $request, Organization $organization): Response
     {
         [$from, $to] = $this->range($request);
+        [$routers, $routerId] = OrganizationRouterFilter::resolve($request, $organization);
         $window = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
         $paidAt = 'COALESCE(paid_at, transactions.created_at)';
         $channel = "CASE
@@ -166,15 +177,18 @@ class ReportsController extends Controller
         END";
         // Qualified, because the top-plans query joins access_plans and that
         // table carries a created_at and a name of its own.
-        $transactions = fn () => $organization->transactions()->whereBetween(DB::raw($paidAt), $window);
+        $transactions = fn () => $organization->transactions()
+            ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
+            ->whereBetween(DB::raw($paidAt), $window);
 
-        $rows = $transactions()->with('accessPlan')->orderByRaw($paidAt)->limit(self::PDF_ROW_LIMIT)->get();
+        $rows = $transactions()->with('accessPlan', 'networkDevice')->orderByRaw($paidAt)->limit(self::PDF_ROW_LIMIT)->get();
 
         $pdf = Pdf::loadView('operator.report-pdf', [
             'organization' => $organization,
             'from' => $from,
             'to' => $to,
             'generatedAt' => now(),
+            'selectedRouter' => $routers->firstWhere('id', $routerId),
             'summary' => $transactions()->selectRaw(
                 "COUNT(*) as attempts,
                  COALESCE(SUM(CASE WHEN status = 'successful' THEN 1 ELSE 0 END), 0) as sales,
@@ -183,6 +197,7 @@ class ReportsController extends Controller
                  COALESCE(SUM(CASE WHEN status = 'successful' THEN platform_fee_kobo ELSE 0 END), 0) as platform_kobo"
             )->first(),
             'usage' => $organization->sessions()
+                ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
                 ->whereBetween('created_at', $window)
                 ->selectRaw('COUNT(*) as sessions, COALESCE(SUM(input_bytes + output_bytes), 0) as bytes')
                 ->first(),

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Support\OrganizationRouterFilter;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -32,15 +34,30 @@ class DashboardController extends Controller
         'failed' => ['Failed', 'critical', 'exclamation-triangle-fill'],
     ];
 
-    public function __invoke(Organization $organization): View
+    public function __invoke(Request $request, Organization $organization): View
     {
+        [$routers, $routerId] = OrganizationRouterFilter::resolve($request, $organization);
+
         return view('dashboard.index', [
-            'revenue' => $this->revenueTrend($organization),
-            'fleet' => $this->fleet($organization),
-            'hourly' => $this->hourly($organization),
-            'plans' => $this->topPlans($organization),
-            'devices' => $organization->networkDevices()->with('location')->latest()->limit(6)->get(),
-            'transactions' => $organization->transactions()->latest()->limit(6)->get(),
+            'revenue' => $this->revenueTrend($organization, $routerId),
+            'fleet' => $this->fleet($organization, $routerId),
+            'hourly' => $this->hourly($organization, $routerId),
+            'plans' => $this->topPlans($organization, $routerId),
+            'devices' => $organization->networkDevices()
+                ->with('location')
+                ->when($routerId, fn ($query, $router) => $query->whereKey($router))
+                ->latest()
+                ->limit(6)
+                ->get(),
+            'transactions' => $organization->transactions()
+                ->with('networkDevice')
+                ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
+                ->latest()
+                ->limit(6)
+                ->get(),
+            'routers' => $routers,
+            'selectedRouter' => $routers->firstWhere('id', $routerId),
+            'selectedRouterId' => $routerId,
         ]);
     }
 
@@ -52,12 +69,13 @@ class DashboardController extends Controller
      *
      * @return array{labels: list<string>, values: list<float>, total: float, best: float}
      */
-    private function revenueTrend(Organization $organization): array
+    private function revenueTrend(Organization $organization, ?int $routerId = null): array
     {
         $start = CarbonImmutable::today()->subDays(self::TREND_DAYS - 1);
 
         $sums = $organization->transactions()
             ->where('status', 'successful')
+            ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
             ->whereBetween('paid_at', [$start->startOfDay(), CarbonImmutable::today()->endOfDay()])
             ->selectRaw('DATE(paid_at) as day, SUM(gross_amount_kobo) as kobo')
             ->groupBy(DB::raw('DATE(paid_at)'))
@@ -88,9 +106,10 @@ class DashboardController extends Controller
      *
      * @return array{rows: list<array{key: string, label: string, tone: string, icon: string, value: int}>, slices: list<array{label: string, tone: string, value: int}>, total: int}
      */
-    private function fleet(Organization $organization): array
+    private function fleet(Organization $organization, ?int $routerId = null): array
     {
         $counts = $organization->networkDevices()
+            ->when($routerId, fn ($query, $router) => $query->whereKey($router))
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
             // pluck() casts the value column but never the key, so these stay
@@ -124,7 +143,7 @@ class DashboardController extends Controller
      *
      * @return array{labels: list<string>, values: list<int>, total: int, peak: ?array{hour: int, value: int}}
      */
-    private function hourly(Organization $organization): array
+    private function hourly(Organization $organization, ?int $routerId = null): array
     {
         // Hour extraction is the one piece of this dashboard that no two database
         // engines spell the same way.
@@ -135,6 +154,7 @@ class DashboardController extends Controller
         };
 
         $counts = $organization->sessions()
+            ->when($routerId, fn ($query, $router) => $query->where('network_device_id', $router))
             ->whereBetween('started_at', [CarbonImmutable::today()->startOfDay(), CarbonImmutable::today()->endOfDay()])
             ->selectRaw("$expression as hour, COUNT(*) as total")
             ->groupBy(DB::raw($expression))
@@ -164,11 +184,12 @@ class DashboardController extends Controller
      *
      * @return array{labels: list<string>, values: list<float>, days: int}
      */
-    private function topPlans(Organization $organization): array
+    private function topPlans(Organization $organization, ?int $routerId = null): array
     {
         $plans = $organization->transactions()
             ->join('access_plans', 'transactions.access_plan_id', '=', 'access_plans.id')
             ->where('transactions.status', 'successful')
+            ->when($routerId, fn ($query, $router) => $query->where('transactions.network_device_id', $router))
             ->whereBetween('transactions.created_at', [
                 CarbonImmutable::today()->subDays(self::PLAN_WINDOW_DAYS - 1)->startOfDay(),
                 CarbonImmutable::today()->endOfDay(),

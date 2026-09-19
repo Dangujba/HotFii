@@ -41,7 +41,7 @@ table.data .num { text-align: right; } table.data .total td { border-top: 1.5px 
 </tr></table>
 
 <h1>Sales &amp; Usage Report</h1>
-<div class="period">{{ $from->format('j M Y') }} – {{ $to->format('j M Y') }} · {{ number_format($days) }} {{ $days == 1 ? 'day' : 'days' }}</div>
+<div class="period">{{ $from->format('j M Y') }} – {{ $to->format('j M Y') }} · {{ number_format($days) }} {{ $days == 1 ? 'day' : 'days' }} · Router: {{ $selectedRouter?->name ?? 'All routers' }}</div>
 
 <table class="tiles"><tr>
     <td><div class="k">Gross paid sales</div><div class="v">{{ $naira($gross) }}</div><div class="s">{{ number_format($summary->sales ?? 0) }} of {{ number_format($summary->attempts ?? 0) }} attempts settled</div></td>
@@ -95,12 +95,12 @@ table.data .num { text-align: right; } table.data .total td { border-top: 1.5px 
 
 <h2>Transactions</h2>
 <table class="data">
-    <thead><tr><th>Date</th><th>Reference</th><th>Plan</th><th>Channel</th><th>Status</th><th class="num">Gross</th></tr></thead>
+    <thead><tr><th>Date</th><th>Reference</th><th>Router</th><th>Plan</th><th>Channel</th><th>Status</th><th class="num">Gross</th></tr></thead>
     <tbody>
         @forelse($rows as $row)
-        <tr class="{{ $loop->even ? 'alt' : '' }}"><td>{{ ($row->paid_at ?? $row->created_at)->format('j M, H:i') }}</td><td>{{ $row->reference }}</td><td>{{ $row->accessPlan?->name ?? '—' }}</td><td>{{ str_starts_with($row->reference, 'HF-VCH-') ? 'Voucher' : ($row->channel === 'cash' ? 'Direct cash' : 'Online') }}</td><td>{{ ucfirst($row->status instanceof BackedEnum ? $row->status->value : $row->status) }}</td><td class="num">{{ $naira($row->gross_amount_kobo) }}</td></tr>
+        <tr class="{{ $loop->even ? 'alt' : '' }}"><td>{{ ($row->paid_at ?? $row->created_at)->format('j M, H:i') }}</td><td>{{ $row->reference }}</td><td>{{ $row->networkDevice?->name ?? 'Unattributed' }}</td><td>{{ $row->accessPlan?->name ?? '—' }}</td><td>{{ str_starts_with($row->reference, 'HF-VCH-') ? 'Voucher' : ($row->channel === 'cash' ? 'Direct cash' : 'Online') }}</td><td>{{ ucfirst($row->status instanceof BackedEnum ? $row->status->value : $row->status) }}</td><td class="num">{{ $naira($row->gross_amount_kobo) }}</td></tr>
         @empty
-        <tr><td colspan="6" class="empty">No transactions in this period.</td></tr>
+        <tr><td colspan="7" class="empty">No transactions in this period.</td></tr>
         @endforelse
     </tbody>
 </table>

@@ -30,15 +30,17 @@
             <option value="">Any status</option>
             @foreach($statuses as $status)<option value="{{ $status->value }}" @selected($filters['status'] === $status->value)>{{ ucfirst($status->value) }}</option>@endforeach
         </select></div>
+        <div class="col-md-3"><select class="form-select form-select-sm" name="router"><option value="">All routers</option>@foreach($routers as $router)<option value="{{ $router->id }}" @selected($filters['router'] === $router->id)>{{ $router->organization?->name }} · {{ $router->name }}</option>@endforeach</select></div>
         <div class="col-md-2"><input class="form-control form-control-sm" type="date" name="from" value="{{ $filters['from'] }}" aria-label="From date"></div>
         <div class="col-md-2"><input class="form-control form-control-sm" type="date" name="to" value="{{ $filters['to'] }}" aria-label="To date"></div>
     </x-filter-bar>
     <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
-        <thead><tr><th>Reference</th><th>Organization</th><th>Plan</th><th>Channel</th><th class="text-end">Amount</th><th class="text-end">Platform fee</th><th>Status</th><th>Paid</th></tr></thead>
+        <thead><tr><th>Reference</th><th>Organization</th><th>Router</th><th>Plan</th><th>Channel</th><th class="text-end">Amount</th><th class="text-end">Platform fee</th><th>Status</th><th>Paid</th></tr></thead>
         <tbody>@forelse($transactions as $transaction)
             <tr>
                 <td><code class="small">{{ $transaction->reference }}</code><button type="button" class="btn btn-sm btn-link p-0 ms-1 text-decoration-none" data-copy-text="{{ $transaction->reference }}" aria-label="Copy reference"><i class="bi bi-clipboard"></i></button></td>
                 <td>@if($transaction->organization)<a class="text-decoration-none" href="{{ route('platform.organizations.show', $transaction->organization) }}">{{ $transaction->organization->name }}</a>@else<span class="text-secondary">Deleted organization #{{ $transaction->organization_id }}</span>@endif</td>
+                <td class="small">{{ $transaction->networkDevice?->name ?? 'Unattributed' }}</td>
                 <td class="small">{{ $transaction->accessPlan?->name ?? '—' }}</td>
                 <td class="small">{{ ucfirst($transaction->channel) }}</td>
                 <td class="text-end">{{ \App\Support\Naira::from($transaction->gross_amount_kobo) }}</td>
@@ -47,7 +49,7 @@
                 <td class="small text-secondary">{{ $transaction->paid_at?->format('j M Y, H:i') ?? $transaction->created_at->format('j M Y, H:i') }}</td>
             </tr>
         @empty
-            <tr><td colspan="8" class="text-center py-5 text-secondary">{{ $filtered ? 'No payments match these filters.' : 'No payments have been taken yet.' }}</td></tr>
+            <tr><td colspan="9" class="text-center py-5 text-secondary">{{ $filtered ? 'No payments match these filters.' : 'No payments have been taken yet.' }}</td></tr>
         @endforelse</tbody>
     </table></div></div>
 </div>

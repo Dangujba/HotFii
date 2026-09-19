@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Organization;
 use App\Services\Billing\CommerceMonthlyFeeCalculator;
 use App\Support\ListFilters;
+use App\Support\OrganizationRouterFilter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -27,36 +28,44 @@ class FinanceController extends Controller
     ): View
     {
         $period = now()->startOfMonth()->toDateString();
+        [$routers, $routerId] = OrganizationRouterFilter::resolve($request, $organization);
 
         $filters = [
             'status' => ListFilters::choice($request, 'status', self::ENTRY_STATUSES),
             'period' => ListFilters::month($request, 'period'),
             'invoice_status' => ListFilters::choice($request, 'invoice_status', self::INVOICE_STATUSES),
+            'router' => $routerId,
         ];
 
-        $currentEntries = FeeLedgerEntry::where('organization_id', $organization->id)
+        $allCurrentEntries = FeeLedgerEntry::where('organization_id', $organization->id)
             ->whereDate('billing_period', $period)
             ->get();
+        $currentEntries = $routerId
+            ? $allCurrentEntries->where('network_device_id', $routerId)
+            : $allCurrentEntries;
         $currentSales = (int) $currentEntries->sum('billable_sales_kobo');
         $currentCollected = (int) $currentEntries->where('status', 'collected')->sum('fee_amount_kobo');
-        $billingStarted = $organization->trial_started_at !== null || $currentSales > 0;
+        $allCurrentCollected = (int) $allCurrentEntries->where('status', 'collected')->sum('fee_amount_kobo');
+        $billingStarted = $organization->trial_started_at !== null || $allCurrentEntries->sum('billable_sales_kobo') > 0;
         $subscriptionBase = $billingStarted
             ? (int) (config('hotfii.internal_plans.'.$organization->billing_plan->value.'.price_kobo') ?? 0)
             : 0;
         $sellerFee = match ($organization->mode) {
-            OrganizationMode::Commerce => $billingStarted ? $monthlyFees->calculate($currentSales) : 0,
-            OrganizationMode::Hybrid => (int) $currentEntries->sum('fee_amount_kobo'),
+            OrganizationMode::Commerce => $billingStarted ? $monthlyFees->calculate((int) $allCurrentEntries->sum('billable_sales_kobo')) : 0,
+            OrganizationMode::Hybrid => (int) $allCurrentEntries->sum('fee_amount_kobo'),
             default => 0,
         };
         $estimatedMonthEndFee = $subscriptionBase + $sellerFee;
 
         return view('operator.finance', [
             'entries' => FeeLedgerEntry::where('organization_id', $organization->id)
+                ->with('networkDevice')
                 ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
                 ->when($filters['period'], fn ($query, $month) => $query->whereBetween('billing_period', [
                     Carbon::parse($month.'-01')->startOfMonth()->toDateString(),
                     Carbon::parse($month.'-01')->endOfMonth()->toDateString(),
                 ]))
+                ->when($filters['router'], fn ($query, $router) => $query->where('network_device_id', $router))
                 ->latest()
                 ->paginate(25)
                 ->withQueryString(),
@@ -76,8 +85,10 @@ class FinanceController extends Controller
                 || in_array($request->user()->roleFor($organization), ['owner', 'manager'], true),
             'entryStatuses' => self::ENTRY_STATUSES,
             'invoiceStatuses' => self::INVOICE_STATUSES,
+            'routers' => $routers,
+            'selectedRouter' => $routers->firstWhere('id', $routerId),
             'filters' => $filters,
-            'ledgerFiltered' => ListFilters::any(['status' => $filters['status'], 'period' => $filters['period']]),
+            'ledgerFiltered' => ListFilters::any(['status' => $filters['status'], 'period' => $filters['period'], 'router' => $filters['router']]),
             'invoicesFiltered' => $filters['invoice_status'] !== '',
             'current' => [
                 'sales' => $currentSales,
@@ -85,7 +96,7 @@ class FinanceController extends Controller
                 'accrued' => (int) $currentEntries->where('status', 'accrued')->sum('fee_amount_kobo'),
                 'collected' => $currentCollected,
                 'estimated_month_end_fee' => $estimatedMonthEndFee,
-                'estimated_invoice_balance' => max(0, $estimatedMonthEndFee - $currentCollected),
+                'estimated_invoice_balance' => max(0, $estimatedMonthEndFee - $allCurrentCollected),
             ],
         ]);
     }

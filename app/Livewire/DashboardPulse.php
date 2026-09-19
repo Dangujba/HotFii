@@ -11,9 +11,12 @@ class DashboardPulse extends Component
 {
     public string $organizationUuid;
 
-    public function mount(string $organizationUuid): void
+    public ?int $networkDeviceId = null;
+
+    public function mount(string $organizationUuid, ?int $networkDeviceId = null): void
     {
         $this->organizationUuid = $organizationUuid;
+        $this->networkDeviceId = $networkDeviceId;
     }
 
     #[On('dashboard-refresh')]
@@ -37,6 +40,7 @@ class DashboardPulse extends Component
 
         $money = $organization->transactions()
             ->where('status', 'successful')
+            ->when($this->networkDeviceId, fn ($query, $router) => $query->where('network_device_id', $router))
             ->whereBetween('paid_at', $window)
             ->selectRaw(
                 'COALESCE(SUM(CASE WHEN DATE(paid_at) = ? THEN gross_amount_kobo ELSE 0 END), 0) as today_kobo,
@@ -49,9 +53,13 @@ class DashboardPulse extends Component
 
         // Active sessions stay their own query: (organization, status) is indexed,
         // and folding it into the windowed scan above would cost a full table pass.
-        $active = $organization->sessions()->where('status', 'active')->count();
+        $active = $organization->sessions()
+            ->where('status', 'active')
+            ->when($this->networkDeviceId, fn ($query, $router) => $query->where('network_device_id', $router))
+            ->count();
 
         $starts = $organization->sessions()
+            ->when($this->networkDeviceId, fn ($query, $router) => $query->where('network_device_id', $router))
             ->whereBetween('started_at', $window)
             ->selectRaw(
                 'COALESCE(SUM(CASE WHEN DATE(started_at) = ? THEN 1 ELSE 0 END), 0) as today_starts,
@@ -61,12 +69,16 @@ class DashboardPulse extends Component
             ->first();
 
         $devices = $organization->networkDevices()
+            ->when($this->networkDeviceId, fn ($query, $router) => $query->whereKey($router))
             ->selectRaw("COUNT(*) as fleet, COALESCE(SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END), 0) as online")
             ->first();
 
         // "Available" keeps its original meaning: still redeemable. A sold voucher
         // has not been used yet, so it belongs here; an active one does not.
         $vouchers = $organization->vouchers()
+            ->when($this->networkDeviceId, fn ($query, $router) => $query->where(function ($inner) use ($router) {
+                $inner->where('network_device_id', $router)->orWhereNull('network_device_id');
+            }))
             ->selectRaw(
                 "COALESCE(SUM(CASE WHEN status IN ('generated', 'printed', 'assigned', 'sold') THEN 1 ELSE 0 END), 0) as available,
                  COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) as in_use"

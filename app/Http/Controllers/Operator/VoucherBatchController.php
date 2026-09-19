@@ -10,6 +10,7 @@ use App\Models\VoucherBatch;
 use App\Services\Vouchers\VoucherPinGenerator;
 use App\Services\Vouchers\VoucherService;
 use App\Support\ListFilters;
+use App\Support\OrganizationRouterFilter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,10 +32,13 @@ class VoucherBatchController extends Controller
 
     public function index(Request $request, Organization $organization): View
     {
+        [$routers, $routerId] = OrganizationRouterFilter::resolve($request, $organization);
+
         $filters = [
             'search' => ListFilters::text($request, 'search'),
             'status' => ListFilters::choice($request, 'status', self::BATCH_STATUSES),
             'plan' => ListFilters::id($request, 'plan'),
+            'router' => $routerId,
         ];
 
         return view('operator.vouchers', [
@@ -43,18 +47,11 @@ class VoucherBatchController extends Controller
                 ->when($filters['search'], fn ($query, $term) => $query->where('reference', 'like', "%{$term}%"))
                 ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
                 ->when($filters['plan'], fn ($query, $plan) => $query->where('access_plan_id', $plan))
+                ->when($filters['router'], fn ($query, $router) => $query->where('network_device_id', $router))
                 ->latest()
                 ->paginate(20)
                 ->withQueryString(),
-            'routers' => NetworkDevice::query()
-                ->where('organization_id', $organization->id)
-                ->orderBy('name')
-                ->get([
-                    'id',
-                    'name',
-                    'vendor',
-                    'nas_identifier',
-                ]),
+            'routers' => $routers,
             'plans' => $organization->accessPlans()->where('is_active', true)->where('access_type', 'paid')->orderBy('name')->get(),
             // Batches outlive the plans they were minted from, so the filter
             // list is not the same as the list you can generate against.

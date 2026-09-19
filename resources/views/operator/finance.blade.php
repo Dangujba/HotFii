@@ -3,25 +3,35 @@
 @section('heading', 'Finance')
 @section('subheading', 'Transparent sales, HotFii fees, invoices, and subscription status')
 @section('content')
+<div class="card metric-card mb-4"><div class="card-body">
+    <form class="row g-2 align-items-end" method="GET" action="{{ route('finance.index') }}">
+        <div class="col-md-5"><label class="form-label" for="finance-router">Router</label><select class="form-select" id="finance-router" name="router"><option value="">All routers</option>@foreach($routers as $router)<option value="{{ $router->id }}" @selected($filters['router'] === $router->id)>{{ $router->name }}@if($router->location) · {{ $router->location->name }}@endif</option>@endforeach</select></div>
+        <div class="col-auto"><button class="btn btn-hotfii" type="submit"><i class="bi bi-funnel me-1"></i>Apply router</button></div>
+        @if($selectedRouter)<div class="col-auto"><a class="btn btn-outline-secondary" href="{{ route('finance.index') }}">All routers</a></div>@endif
+        <div class="col-md ms-md-auto text-md-end text-secondary small pb-2">{{ $selectedRouter ? 'Sales and charges from '.$selectedRouter->name : 'Showing the whole organization' }}</div>
+    </form>
+</div></div>
 <div class="row g-3 mb-4">
-    <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Billable sales this month</div><div class="fs-3 fw-bold">₦{{ number_format($current['sales'] / 100, 0) }}</div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Billable sales this month{{ $selectedRouter ? ' · '.$selectedRouter->name : '' }}</div><div class="fs-3 fw-bold">₦{{ number_format($current['sales'] / 100, 0) }}</div></div></div></div>
     <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Running 2% transaction fees</div><div class="fs-3 fw-bold">₦{{ number_format($current['fees'] / 100, 0) }}</div><div class="small text-secondary">₦{{ number_format($current['accrued'] / 100, 0) }} accrued · ₦{{ number_format($current['collected'] / 100, 0) }} collected</div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Estimated month-end fee</div><div class="fs-3 fw-bold">₦{{ number_format($current['estimated_month_end_fee'] / 100, 0) }}</div><div class="small text-secondary">Estimated invoice: ₦{{ number_format($current['estimated_invoice_balance'] / 100, 0) }} after collected fees</div></div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Estimated organization month-end fee</div><div class="fs-3 fw-bold">₦{{ number_format($current['estimated_month_end_fee'] / 100, 0) }}</div><div class="small text-secondary">Organization-wide invoice: ₦{{ number_format($current['estimated_invoice_balance'] / 100, 0) }} after collected fees</div></div></div></div>
     <div class="col-md-6 col-xl-3"><div class="card metric-card h-100"><div class="card-body"><div class="text-secondary">Current plan</div><div class="fs-5 fw-bold">{{ str_replace('_', ' ', ucfirst($currentOrganization->billing_plan->value)) }}</div><div class="small text-secondary">{{ $subscription?->status ?? 'No separate subscription record' }}</div></div></div></div>
 </div>
 <div class="row g-4"><div class="col-xl-8"><div class="card metric-card">
 <x-filter-bar :action="route('finance.index')" :active="$ledgerFiltered" title="HotFii charge ledger">
     {{-- The invoice list filters through its own form, so carry its value across. --}}
     <input type="hidden" name="invoice_status" value="{{ $filters['invoice_status'] }}">
+    <input type="hidden" name="router" value="{{ $filters['router'] }}">
     <div class="col-md-4"><select class="form-select form-select-sm" name="status"><option value="">Any status</option>@foreach($entryStatuses as $status)<option value="{{ $status }}" @selected($filters['status'] === $status)>{{ ucfirst($status) }}</option>@endforeach</select></div>
     <div class="col-md-4"><div class="input-group input-group-sm"><span class="input-group-text">Period</span><input class="form-control" type="month" name="period" value="{{ $filters['period'] }}"></div></div>
 </x-filter-bar>
-<div class="card-body p-0"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Period</th><th>Source</th><th>Billable sale</th><th>Fee</th><th>Status</th></tr></thead><tbody>@forelse($entries as $entry)<tr><td>{{ $entry->billing_period->format('M Y') }}</td><td>{{ ucfirst($entry->source_type) }} #{{ $entry->source_id }}</td><td>₦{{ number_format($entry->billable_sales_kobo / 100, 0) }}</td><td>₦{{ number_format($entry->fee_amount_kobo / 100, 0) }}</td><td>{{ ucfirst($entry->status) }}</td></tr>@empty<tr><td colspan="5" class="text-center py-5 text-secondary">{{ $ledgerFiltered ? 'No ledger entries match these filters.' : 'Fees appear after paid activations.' }}</td></tr>@endforelse</tbody></table></div></div></div><div class="mt-3">{{ $entries->links() }}</div></div>
+<div class="card-body p-0"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Period</th><th>Router</th><th>Source</th><th>Billable sale</th><th>Fee</th><th>Status</th></tr></thead><tbody>@forelse($entries as $entry)<tr><td>{{ $entry->billing_period->format('M Y') }}</td><td>{{ $entry->networkDevice?->name ?? 'Unattributed' }}</td><td>{{ ucfirst($entry->source_type) }} #{{ $entry->source_id }}</td><td>₦{{ number_format($entry->billable_sales_kobo / 100, 0) }}</td><td>₦{{ number_format($entry->fee_amount_kobo / 100, 0) }}</td><td>{{ ucfirst($entry->status) }}</td></tr>@empty<tr><td colspan="6" class="text-center py-5 text-secondary">{{ $ledgerFiltered ? 'No ledger entries match these filters.' : 'Fees appear after paid activations.' }}</td></tr>@endforelse</tbody></table></div></div></div><div class="mt-3">{{ $entries->links() }}</div></div>
 <div class="col-xl-4"><div class="card metric-card">
 <x-filter-bar :action="route('finance.index')" :active="$invoicesFiltered" title="Invoices">
     {{-- Likewise, keep the ledger's filters when this form submits. --}}
     <input type="hidden" name="status" value="{{ $filters['status'] }}">
     <input type="hidden" name="period" value="{{ $filters['period'] }}">
+    <input type="hidden" name="router" value="{{ $filters['router'] }}">
     <div class="col"><select class="form-select form-select-sm" name="invoice_status"><option value="">Any status</option>@foreach($invoiceStatuses as $status)<option value="{{ $status }}" @selected($filters['invoice_status'] === $status)>{{ ucfirst($status) }}</option>@endforeach</select></div>
 </x-filter-bar>
 <div class="list-group list-group-flush">@forelse($invoices as $invoice)

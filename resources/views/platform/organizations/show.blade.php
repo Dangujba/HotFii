@@ -208,10 +208,11 @@
 <div class="card metric-card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center"><h2 class="h5 mb-0">Recent payments</h2><a class="small" href="{{ route('platform.transactions.index', ['organization' => $organization->id]) }}">All payments</a></div>
     <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
-        <thead><tr><th>Reference</th><th>Plan</th><th>Channel</th><th class="text-end">Amount</th><th class="text-end">Fee</th><th>Status</th><th>Paid</th></tr></thead>
+        <thead><tr><th>Reference</th><th>Router</th><th>Plan</th><th>Channel</th><th class="text-end">Amount</th><th class="text-end">Fee</th><th>Status</th><th>Paid</th></tr></thead>
         <tbody>@forelse($transactions as $transaction)
             <tr>
                 <td><code>{{ $transaction->reference }}</code></td>
+                <td class="small">{{ $transaction->networkDevice?->name ?? 'Unattributed' }}</td>
                 <td class="small">{{ $transaction->accessPlan?->name ?? '—' }}</td>
                 <td class="small">{{ ucfirst($transaction->channel) }}</td>
                 <td class="text-end">{{ \App\Support\Naira::from($transaction->gross_amount_kobo) }}</td>
@@ -219,7 +220,7 @@
                 <td><span class="badge text-bg-{{ $transaction->status->value === 'successful' ? 'success' : ($transaction->status->value === 'failed' ? 'danger' : 'secondary') }}">{{ ucfirst($transaction->status->value) }}</span></td>
                 <td class="small text-secondary">{{ $transaction->paid_at?->format('j M Y, H:i') ?? '—' }}</td>
             </tr>
-        @empty<tr><td colspan="7" class="text-center py-5 text-secondary">No payments yet.</td></tr>@endforelse</tbody>
+        @empty<tr><td colspan="8" class="text-center py-5 text-secondary">No payments yet.</td></tr>@endforelse</tbody>
     </table></div></div>
 </div>
 
@@ -245,16 +246,17 @@
         <div class="card metric-card h-100">
             <div class="card-header"><h2 class="h5 mb-0">Fee ledger</h2></div>
             <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0">
-                <thead><tr><th>Period</th><th>Source</th><th class="text-end">Sales</th><th class="text-end">Fee</th><th>Status</th></tr></thead>
+                <thead><tr><th>Period</th><th>Router</th><th>Source</th><th class="text-end">Sales</th><th class="text-end">Fee</th><th>Status</th></tr></thead>
                 <tbody>@forelse($entries as $entry)
                     <tr>
                         <td class="small">{{ $entry->billing_period->format('M Y') }}</td>
+                        <td class="small">{{ $entry->networkDevice?->name ?? 'Unattributed' }}</td>
                         <td class="small">{{ str_replace('_', ' ', ucfirst($entry->source_type)) }}</td>
                         <td class="text-end">{{ \App\Support\Naira::from($entry->billable_sales_kobo) }}</td>
                         <td class="text-end">{{ \App\Support\Naira::from($entry->fee_amount_kobo) }}</td>
                         <td><span class="badge text-bg-{{ $entry->status === 'collected' ? 'success' : 'secondary' }}">{{ ucfirst($entry->status) }}</span></td>
                     </tr>
-                @empty<tr><td colspan="5" class="text-center py-4 text-secondary">No platform fees recorded yet.</td></tr>@endforelse</tbody>
+                @empty<tr><td colspan="6" class="text-center py-4 text-secondary">No platform fees recorded yet.</td></tr>@endforelse</tbody>
             </table></div></div>
         </div>
     </div>

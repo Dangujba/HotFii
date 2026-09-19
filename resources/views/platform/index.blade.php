@@ -671,17 +671,18 @@
 <div class="card metric-card">
     <div class="card-header d-flex justify-content-between align-items-center"><h2 class="h5 mb-0">Latest payments</h2><a href="{{ route('platform.transactions.index') }}" class="small">All transactions</a></div>
     <div class="card-body p-0"><div class="table-responsive"><table class="table mb-0">
-        <thead><tr><th>Reference</th><th>Organization</th><th class="text-end">Amount</th><th class="text-end">Fee</th><th>Status</th><th>When</th></tr></thead>
+        <thead><tr><th>Reference</th><th>Organization</th><th>Router</th><th class="text-end">Amount</th><th class="text-end">Fee</th><th>Status</th><th>When</th></tr></thead>
         <tbody>@forelse($transactions as $transaction)
             <tr>
                 <td><code>{{ $transaction->reference }}</code></td>
                 <td>@if($transaction->organization)<a class="text-decoration-none" href="{{ route('platform.organizations.show', $transaction->organization) }}">{{ $transaction->organization->name }}</a>@else<span class="text-secondary">—</span>@endif</td>
+                <td>{{ $transaction->networkDevice?->name ?? 'Unattributed' }}</td>
                 <td class="text-end">{{ \App\Support\Naira::from($transaction->gross_amount_kobo) }}</td>
                 <td class="text-end">{{ \App\Support\Naira::from($transaction->platform_fee_kobo) }}</td>
                 <td><span class="badge text-bg-{{ $transaction->status->value === 'successful' ? 'success' : ($transaction->status->value === 'failed' ? 'danger' : 'secondary') }}">{{ ucfirst($transaction->status->value) }}</span></td>
                 <td>{{ $transaction->created_at->diffForHumans() }}</td>
             </tr>
-        @empty<tr><td colspan="6" class="text-center py-5 text-secondary">No transactions yet.</td></tr>@endforelse</tbody>
+        @empty<tr><td colspan="7" class="text-center py-5 text-secondary">No transactions yet.</td></tr>@endforelse</tbody>
     </table></div></div>
 </div>
 @endsection

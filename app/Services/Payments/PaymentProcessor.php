@@ -59,6 +59,7 @@ class PaymentProcessor
                     'source_id' => $transaction->id,
                 ],
                 [
+                    'network_device_id' => $transaction->network_device_id,
                     'billing_period' => now()->startOfMonth()->toDateString(),
                     'billable_sales_kobo' => $transaction->billable_sales_kobo,
                     'fee_amount_kobo' => $transaction->platform_fee_kobo,

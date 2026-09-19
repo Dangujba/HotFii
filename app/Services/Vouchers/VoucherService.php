@@ -359,6 +359,7 @@ class VoucherService
 
             $voucher->update([
                 'customer_id' => $customer?->id,
+                'activated_network_device_id' => $device?->id ?? $boundDeviceId,
                 'status' => VoucherStatus::Active,
                 'activated_at' => $activatedAt,
                 'sold_at' => $voucher->sold_at ?? now(),
@@ -394,7 +395,7 @@ class VoucherService
                 }
 
                 $quote = $this->fees->quote($organization, $voucher->price_snapshot_kobo);
-                $this->sales->record($voucher, $quote->chargeablePercentageFeeKobo());
+                $this->sales->record($voucher, $quote->chargeablePercentageFeeKobo(), $device);
 
                 FeeLedgerEntry::updateOrCreate(
                     [
@@ -403,6 +404,7 @@ class VoucherService
                         'source_id' => $voucher->id,
                     ],
                     [
+                        'network_device_id' => $device?->id ?? $boundDeviceId,
                         'billing_period' => now()->startOfMonth()->toDateString(),
                         'billable_sales_kobo' => $voucher->price_snapshot_kobo,
                         'fee_amount_kobo' => $quote->chargeablePercentageFeeKobo(),

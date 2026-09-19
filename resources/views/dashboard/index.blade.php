@@ -4,7 +4,16 @@
 @section('subheading', 'A live view of '.$currentOrganization->name)
 @section('actions')<a href="{{ route('network.devices.index') }}" class="btn btn-hotfii"><i class="bi bi-plus-lg me-1"></i>Add network device</a>@endsection
 @section('content')
-<livewire:dashboard-pulse :organization-uuid="$currentOrganization->uuid" />
+<div class="card metric-card mb-4"><div class="card-body">
+    <form class="row g-2 align-items-end" method="GET" action="{{ route('dashboard') }}">
+        <div class="col-md-5"><label class="form-label" for="dashboard-router">Router</label><select class="form-select" id="dashboard-router" name="router"><option value="">All routers</option>@foreach($routers as $router)<option value="{{ $router->id }}" @selected($selectedRouterId === $router->id)>{{ $router->name }}@if($router->location) · {{ $router->location->name }}@endif</option>@endforeach</select></div>
+        <div class="col-auto"><button class="btn btn-hotfii" type="submit"><i class="bi bi-funnel me-1"></i>Apply router</button></div>
+        @if($selectedRouter)<div class="col-auto"><a class="btn btn-outline-secondary" href="{{ route('dashboard') }}">All routers</a></div>@endif
+        <div class="col-md ms-md-auto text-md-end text-secondary small pb-2">{{ $selectedRouter ? 'Showing '.$selectedRouter->name : 'Showing the whole organization' }}</div>
+    </form>
+</div></div>
+
+<livewire:dashboard-pulse :organization-uuid="$currentOrganization->uuid" :network-device-id="$selectedRouterId" :key="'dashboard-pulse-'.$currentOrganization->uuid.'-'.($selectedRouterId ?? 'all')" />
 
 @if($currentOrganization->billing_suspended_at)
     {{-- Being held over an unpaid bill used to be silent: sales simply started
@@ -44,7 +53,7 @@
         <div class="card metric-card h-100">
             <div class="card-header border-0 pt-4 px-4 d-flex flex-wrap justify-content-between align-items-start gap-3">
                 <div>
-                    <span class="hf-chart-eyebrow">Last 14 days</span>
+                    <span class="hf-chart-eyebrow">Last 14 days{{ $selectedRouter ? ' · '.$selectedRouter->name : '' }}</span>
                     <h2 class="h5 mb-0">Revenue collected</h2>
                 </div>
                 <div class="text-end">
@@ -82,7 +91,7 @@
             <div class="card-header border-0 pt-4 px-4 d-flex justify-content-between align-items-start gap-2">
                 <div>
                     <span class="hf-chart-eyebrow">Right now</span>
-                    <h2 class="h5 mb-0">Router fleet</h2>
+                    <h2 class="h5 mb-0">{{ $selectedRouter ? 'Router status' : 'Router fleet' }}</h2>
                 </div>
                 <a href="{{ route('network.devices.index') }}" class="small">Manage</a>
             </div>
@@ -161,7 +170,7 @@
                     <span class="hf-chart-eyebrow">Last {{ $plans['days'] }} days</span>
                     <h2 class="h5 mb-0">Top plans by revenue</h2>
                 </div>
-                <a href="{{ route('reports.index') }}" class="small">Full report</a>
+                <a href="{{ route('reports.index', array_filter(['router' => $selectedRouterId])) }}" class="small">Full report</a>
             </div>
             <div class="card-body pt-2 px-3 pb-3">
                 @if($plans['labels'] !== [])
@@ -207,7 +216,7 @@
         <div class="card metric-card h-100">
             <div class="card-header border-0 pt-4 px-4"><h2 class="h5 mb-0">Recent transactions</h2></div>
             <div class="list-group list-group-flush">@forelse($transactions as $transaction)
-                <div class="list-group-item px-4 py-3 d-flex justify-content-between"><div><strong>{{ $transaction->reference }}</strong><div class="small text-secondary">{{ $transaction->created_at->diffForHumans() }}</div></div><div class="text-end"><strong>₦{{ number_format($transaction->gross_amount_kobo / 100, 0) }}</strong><div class="small text-secondary">{{ ucfirst($transaction->status->value) }}</div></div></div>
+                <div class="list-group-item px-4 py-3 d-flex justify-content-between"><div><strong>{{ $transaction->reference }}</strong><div class="small text-secondary">{{ $transaction->networkDevice?->name ?? 'Unattributed router' }} · {{ $transaction->created_at->diffForHumans() }}</div></div><div class="text-end"><strong>₦{{ number_format($transaction->gross_amount_kobo / 100, 0) }}</strong><div class="small text-secondary">{{ ucfirst($transaction->status->value) }}</div></div></div>
             @empty<div class="p-5 text-center text-secondary">Transactions will appear here.</div>@endforelse</div>
         </div>
     </div>
