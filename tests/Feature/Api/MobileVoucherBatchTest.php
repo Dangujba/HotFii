@@ -7,6 +7,7 @@ use App\Models\NetworkDevice;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\VoucherBatch;
+use App\Services\Vouchers\VoucherService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -184,7 +185,7 @@ class MobileVoucherBatchTest extends TestCase
 
     private function batch(): VoucherBatch
     {
-        return app(\App\Services\Vouchers\VoucherService::class)->createBatch(
+        return app(VoucherService::class)->createBatch(
             $this->organization,
             $this->plan,
             2,
