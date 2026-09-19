@@ -1,8 +1,13 @@
 <?php
 
+use App\Http\Middleware\EnsureMobileOrganizationMembership;
+use App\Http\Middleware\EnsureOrganizationContext;
+use App\Http\Middleware\RequireOrganizationRole;
+use App\Http\Middleware\RequirePlatformAdmin;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,9 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: ['webhooks/paystack']);
 
         $middleware->alias([
-            'organization' => \App\Http\Middleware\EnsureOrganizationContext::class,
-            'role' => \App\Http\Middleware\RequireOrganizationRole::class,
-            'platform-admin' => \App\Http\Middleware\RequirePlatformAdmin::class,
+            'organization' => EnsureOrganizationContext::class,
+            'role' => RequireOrganizationRole::class,
+            'platform-admin' => RequirePlatformAdmin::class,
+            'abilities' => CheckAbilities::class,
+            'mobile-organization' => EnsureMobileOrganizationMembership::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

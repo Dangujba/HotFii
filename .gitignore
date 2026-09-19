@@ -45,3 +45,12 @@ Thumbs.db
 /hotfii-sidecars.tgz
 /hotfii-full.tgz
 /*.patch
+
+# Native Android application.
+/android/.gradle
+/android/.idea
+/android/local.properties
+/android/captures
+/android/**/build
+/android/*.jks
+/android/*.keystore

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\IntegrationTestStatusController;
+use App\Http\Controllers\Api\MobileDashboardController;
+use App\Http\Controllers\Api\MobileSessionController;
 use App\Http\Controllers\Api\NetworkDeviceHeartbeatController;
 use App\Http\Controllers\Api\NetworkDeviceWireGuardEnrollController;
 use App\Http\Controllers\Api\PortalConfigurationController;
@@ -8,6 +10,24 @@ use App\Http\Controllers\Api\ProvisioningDownloadController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
+    Route::prefix('mobile')->name('mobile.')->group(function () {
+        Route::post('/auth/login', [MobileSessionController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('auth.login');
+
+        Route::middleware(['auth:sanctum', 'abilities:mobile'])->group(function () {
+            Route::get('/session', [MobileSessionController::class, 'show'])->name('session.show');
+            Route::delete('/auth/logout', [MobileSessionController::class, 'destroy'])->name('auth.logout');
+
+            Route::prefix('/organizations/{organization}')
+                ->middleware('mobile-organization')
+                ->name('organizations.')
+                ->group(function () {
+                    Route::get('/dashboard', MobileDashboardController::class)->name('dashboard');
+                });
+        });
+    });
+
     Route::get('/portal/{device}/configuration', PortalConfigurationController::class)
         ->middleware('throttle:120,1')
         ->name('portal.configuration');
