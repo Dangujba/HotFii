@@ -109,9 +109,13 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
 
     Route::get('/plans', [AccessPlanController::class, 'index'])->name('plans.index');
     Route::post('/plans', [AccessPlanController::class, 'store'])->middleware('role:owner,manager')->name('plans.store');
+    Route::patch('/plans/{plan}', [AccessPlanController::class, 'update'])->middleware('role:owner,manager')->name('plans.update');
+    Route::delete('/plans/{plan}', [AccessPlanController::class, 'destroy'])->middleware('role:owner,manager')->name('plans.destroy');
 
     Route::get('/vouchers', [VoucherBatchController::class, 'index'])->name('vouchers.index');
     Route::post('/vouchers', [VoucherBatchController::class, 'store'])->middleware('role:owner,manager,agent')->name('vouchers.store');
+    Route::patch('/vouchers/{batch}', [VoucherBatchController::class, 'update'])->middleware('role:owner,manager')->name('vouchers.update');
+    Route::delete('/vouchers/{batch}', [VoucherBatchController::class, 'destroy'])->middleware('role:owner,manager')->name('vouchers.destroy');
     Route::get('/vouchers/{batch}/print', [VoucherBatchController::class, 'print'])->name('vouchers.print');
 
     Route::get('/sales', [SalesController::class, 'index'])->name('sales.index');

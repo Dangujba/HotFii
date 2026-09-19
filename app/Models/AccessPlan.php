@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class AccessPlan extends Model
@@ -18,6 +19,26 @@ class AccessPlan extends Model
     protected $attributes = ['validity_mode' => 'midnight'];
     protected function casts(): array { return ['starts_on_first_use'=>'boolean','is_active'=>'boolean','validity_mode'=>PlanValidityMode::class]; }
     public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
+
+    public function voucherBatches(): HasMany
+    {
+        return $this->hasMany(VoucherBatch::class);
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    public function accessCredentials(): HasMany
+    {
+        return $this->hasMany(AccessCredential::class);
+    }
+
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(HotspotSession::class);
+    }
 
     public function expiresAt(DateTimeInterface $activatedAt, string $timezone): ?CarbonImmutable
     {

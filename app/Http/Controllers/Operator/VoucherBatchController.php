@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Operator;
 
 use App\Domain\Enums\VoucherPinFormat;
+use App\Domain\Enums\VoucherStatus;
 use App\Http\Controllers\Controller;
-use App\Models\Organization;
 use App\Models\NetworkDevice;
+use App\Models\Organization;
 use App\Models\VoucherBatch;
 use App\Services\Vouchers\VoucherPinGenerator;
 use App\Services\Vouchers\VoucherService;
@@ -15,6 +16,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -44,6 +46,19 @@ class VoucherBatchController extends Controller
         return view('operator.vouchers', [
             'batches' => $organization->voucherBatches()
                 ->with('accessPlan', 'networkDevice')
+                ->withCount([
+                    'vouchers as locked_vouchers_count' => fn ($query) => $query->where('status', '!=', VoucherStatus::Generated->value),
+                    'vouchers as used_vouchers_count' => fn ($query) => $query->where(function ($query) {
+                        $query->whereNotNull('sold_at')
+                            ->orWhereNotNull('activated_at')
+                            ->orWhereIn('status', [
+                                VoucherStatus::Sold->value,
+                                VoucherStatus::Active->value,
+                                VoucherStatus::Expired->value,
+                                VoucherStatus::Revoked->value,
+                            ]);
+                    }),
+                ])
                 ->when($filters['search'], fn ($query, $term) => $query->where('reference', 'like', "%{$term}%"))
                 ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
                 ->when($filters['plan'], fn ($query, $plan) => $query->where('access_plan_id', $plan))
@@ -53,6 +68,7 @@ class VoucherBatchController extends Controller
                 ->withQueryString(),
             'routers' => $routers,
             'plans' => $organization->accessPlans()->where('is_active', true)->where('access_type', 'paid')->orderBy('name')->get(),
+            'editPlans' => $organization->accessPlans()->where('access_type', 'paid')->orderBy('name')->get(),
             // Batches outlive the plans they were minted from, so the filter
             // list is not the same as the list you can generate against.
             'filterPlans' => $organization->accessPlans()->orderBy('name')->get(['id', 'name']),
@@ -61,39 +77,15 @@ class VoucherBatchController extends Controller
             'statuses' => self::BATCH_STATUSES,
             'filters' => $filters,
             'filtered' => ListFilters::any($filters),
+            'canManageVouchers' => $request->user()->is_platform_admin
+                || in_array($request->user()->roleFor($organization), ['owner', 'manager'], true),
         ]);
     }
 
     public function store(Request $request, Organization $organization, VoucherService $service): RedirectResponse
     {
         $data = $request->validate([
-            'network_device_id' => [
-                'required',
-                function (
-                    string $attribute,
-                    mixed $value,
-                    \Closure $fail
-                ) use ($organization) {
-                    if ($value === 'all') {
-                        return;
-                    }
-
-                    if (
-                        ! ctype_digit((string) $value)
-                        || ! NetworkDevice::query()
-                            ->where(
-                                'organization_id',
-                                $organization->id
-                            )
-                            ->whereKey((int) $value)
-                            ->exists()
-                    ) {
-                        $fail(
-                            'Choose a valid router or All routers.'
-                        );
-                    }
-                },
-            ],
+            'network_device_id' => $this->coverageRules($organization),
             'access_plan_id' => ['required', 'integer'],
             'quantity' => ['required', 'integer', 'min:1', 'max:5000'],
             // Leaving this blank means "sell at the plan price". The service
@@ -104,11 +96,7 @@ class VoucherBatchController extends Controller
             'dashed_pin' => ['nullable', 'boolean'],
         ]);
 
-        $device = $data['network_device_id'] === 'all'
-            ? null
-            : NetworkDevice::query()
-                ->where('organization_id', $organization->id)
-                ->findOrFail((int) $data['network_device_id']);
+        $device = $this->selectedDevice($organization, $data['network_device_id']);
 
         $plan = $organization->accessPlans()->where('access_type', 'paid')->findOrFail($data['access_plan_id']);
         $retailPriceKobo = isset($data['retail_price_naira'])
@@ -141,13 +129,86 @@ class VoucherBatchController extends Controller
             ->with('download_batch', $batch->getRouteKey());
     }
 
+    public function update(Request $request, Organization $organization, VoucherBatch $batch): RedirectResponse
+    {
+        $this->guardBatch($organization, $batch);
+
+        $data = $request->validate([
+            'network_device_id' => $this->coverageRules($organization),
+            'access_plan_id' => ['required', 'integer'],
+            'retail_price_naira' => ['required', 'numeric', 'decimal:0,2', 'min:1'],
+        ]);
+
+        $device = $this->selectedDevice($organization, $data['network_device_id']);
+        $plan = $organization->accessPlans()->where('access_type', 'paid')->findOrFail($data['access_plan_id']);
+        $retailPriceKobo = (int) round($data['retail_price_naira'] * 100);
+        $keepsGrandfatheredPrice = $batch->access_plan_id === $plan->id
+            && $batch->retail_price_kobo === $retailPriceKobo;
+
+        if ($retailPriceKobo < $plan->price_kobo && ! $keepsGrandfatheredPrice) {
+            throw ValidationException::withMessages([
+                'retail_price_naira' => 'The voucher price cannot be below the selected plan price.',
+            ]);
+        }
+
+        DB::transaction(function () use ($organization, $batch, $plan, $device, $retailPriceKobo): void {
+            $batch = $organization->voucherBatches()->whereKey($batch->id)->lockForUpdate()->firstOrFail();
+
+            if ($batch->vouchers()->where('status', '!=', VoucherStatus::Generated->value)->exists()) {
+                throw ValidationException::withMessages([
+                    'batch' => 'This batch has already been printed or used. Its plan, coverage, and price can no longer be edited.',
+                ]);
+            }
+
+            $batch->update([
+                'access_plan_id' => $plan->id,
+                'network_device_id' => $device?->id,
+                'retail_price_kobo' => $retailPriceKobo,
+            ]);
+
+            $batch->vouchers()->update([
+                'network_device_id' => $device?->id,
+                'price_snapshot_kobo' => $retailPriceKobo,
+            ]);
+        });
+
+        return back()->with('success', 'Voucher batch updated. Existing codes and quantity were kept.');
+    }
+
+    public function destroy(Organization $organization, VoucherBatch $batch): RedirectResponse
+    {
+        $this->guardBatch($organization, $batch);
+
+        DB::transaction(function () use ($organization, $batch): void {
+            $batch = $organization->voucherBatches()->whereKey($batch->id)->lockForUpdate()->firstOrFail();
+            $hasUsedVouchers = $batch->vouchers()
+                ->where(function ($query) {
+                    $query->whereNotNull('sold_at')
+                        ->orWhereNotNull('activated_at')
+                        ->orWhereIn('status', [
+                            VoucherStatus::Sold->value,
+                            VoucherStatus::Active->value,
+                            VoucherStatus::Expired->value,
+                            VoucherStatus::Revoked->value,
+                        ]);
+                })
+                ->exists();
+
+            if ($hasUsedVouchers) {
+                throw ValidationException::withMessages([
+                    'batch' => 'This batch contains sold, activated, expired, or revoked vouchers and cannot be deleted because its sales and access history must be preserved.',
+                ]);
+            }
+
+            $batch->delete();
+        });
+
+        return back()->with('success', 'Unused voucher batch deleted. Its codes can no longer be redeemed.');
+    }
+
     public function print(Request $request, VoucherBatch $batch): Response
     {
-        abort_unless(
-            $batch->organization_id ===
-            $request->attributes->get('organization')->id,
-            404
-        );
+        $this->guardBatch($request->attributes->get('organization'), $batch);
 
         $totalParts = max(
             1,
@@ -190,7 +251,7 @@ class VoucherBatchController extends Controller
 
         $filename =
             $totalParts === 1
-                ? $batch->reference . '.pdf'
+                ? $batch->reference.'.pdf'
                 : sprintf(
                     '%s-part-%02d-of-%02d.pdf',
                     $batch->reference,
@@ -245,12 +306,47 @@ class VoucherBatchController extends Controller
         ) {
             $batch->update([
                 'status' => 'printed',
-                'printed_at' =>
-                    $batch->printed_at
+                'printed_at' => $batch->printed_at
                     ?? now(),
             ]);
         }
 
         return $response;
+    }
+
+    private function coverageRules(Organization $organization): array
+    {
+        return [
+            'required',
+            function (string $attribute, mixed $value, \Closure $fail) use ($organization): void {
+                if ($value === 'all') {
+                    return;
+                }
+
+                if (
+                    ! ctype_digit((string) $value)
+                    || ! NetworkDevice::query()
+                        ->where('organization_id', $organization->id)
+                        ->whereKey((int) $value)
+                        ->exists()
+                ) {
+                    $fail('Choose a valid router or All routers.');
+                }
+            },
+        ];
+    }
+
+    private function selectedDevice(Organization $organization, mixed $value): ?NetworkDevice
+    {
+        return $value === 'all'
+            ? null
+            : NetworkDevice::query()
+                ->where('organization_id', $organization->id)
+                ->findOrFail((int) $value);
+    }
+
+    private function guardBatch(Organization $organization, VoucherBatch $batch): void
+    {
+        abort_unless($batch->organization_id === $organization->id, 404);
     }
 }
