@@ -11,6 +11,8 @@ import com.innobytes.hotfii.data.repository.DefaultSessionRepository
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.DefaultDashboardRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
+import com.innobytes.hotfii.data.repository.DefaultVoucherRepository
+import com.innobytes.hotfii.data.repository.VoucherRepository
 import com.innobytes.hotfii.data.security.SecureSessionStore
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -54,4 +56,6 @@ class AppContainer(context: Context) {
         api = api,
         gson = gson,
     )
+
+    val voucherRepository: VoucherRepository = DefaultVoucherRepository(api, gson)
 }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\IntegrationTestStatusController;
 use App\Http\Controllers\Api\MobileDashboardController;
 use App\Http\Controllers\Api\MobileSessionController;
+use App\Http\Controllers\Api\MobileVoucherBatchController;
 use App\Http\Controllers\Api\NetworkDeviceHeartbeatController;
 use App\Http\Controllers\Api\NetworkDeviceWireGuardEnrollController;
 use App\Http\Controllers\Api\PortalConfigurationController;
@@ -24,6 +25,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 ->name('organizations.')
                 ->group(function () {
                     Route::get('/dashboard', MobileDashboardController::class)->name('dashboard');
+                    Route::get('/voucher-batches', [MobileVoucherBatchController::class, 'index'])->name('voucher-batches.index');
+                    Route::post('/voucher-batches', [MobileVoucherBatchController::class, 'store'])->name('voucher-batches.store');
+                    Route::get('/voucher-batches/{batch}', [MobileVoucherBatchController::class, 'show'])->name('voucher-batches.show');
+                    Route::patch('/voucher-batches/{batch}', [MobileVoucherBatchController::class, 'update'])->name('voucher-batches.update');
+                    Route::delete('/voucher-batches/{batch}', [MobileVoucherBatchController::class, 'destroy'])->name('voucher-batches.destroy');
+                    Route::post('/voucher-batches/{batch}/share', [MobileVoucherBatchController::class, 'share'])->name('voucher-batches.share');
                 });
         });
     });

@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.innobytes.hotfii.ui.auth.LoginScreen
-import com.innobytes.hotfii.ui.workspace.WorkspaceScreen
 
 @Composable
 fun HotFiiApp(
@@ -23,19 +22,6 @@ fun HotFiiApp(
             onInputChanged = viewModel::clearLoginError,
             onCloseApp = onCloseApp,
         )
-        else -> WorkspaceScreen(
-            session = session,
-            selectedOrganization = state.selectedOrganization,
-            dashboard = state.dashboard,
-            selectedRouterId = state.selectedRouterId,
-            isRefreshing = state.isSubmitting || state.isDashboardLoading,
-            error = state.error,
-            dashboardError = state.dashboardError,
-            onOrganizationSelected = viewModel::selectOrganization,
-            onRouterSelected = viewModel::selectRouter,
-            onRefresh = viewModel::refresh,
-            onDashboardRefresh = viewModel::refreshDashboard,
-            onSignOut = viewModel::signOut,
-        )
+        else -> AuthenticatedShell(state = state, viewModel = viewModel)
     }
 }

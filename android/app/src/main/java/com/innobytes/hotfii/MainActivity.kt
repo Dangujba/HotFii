@@ -16,6 +16,7 @@ class MainActivity : ComponentActivity() {
         MainViewModel.factory(
             application.container.sessionRepository,
             application.container.dashboardRepository,
+            application.container.voucherRepository,
         )
     }
 
