@@ -1,6 +1,7 @@
 package com.innobytes.hotfii.ui.vouchers
 
 import android.content.Intent
+import android.content.ClipData
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.innobytes.hotfii.domain.*
 import com.innobytes.hotfii.ui.VoucherUiState
 import java.text.NumberFormat
+import java.io.File
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Currency
@@ -49,17 +52,31 @@ fun VoucherScreen(
     LaunchedEffect(organizationId) {
         if (organizationId != null) onLoad(VoucherFilters(), 1)
     }
-    LaunchedEffect(state.pendingShareText) {
-        val text = state.pendingShareText ?: return@LaunchedEffect
-        context.startActivity(
-            Intent.createChooser(
-                Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, text)
-                },
-                "Share voucher codes",
-            ),
-        )
+    LaunchedEffect(state.pendingSharePdfPaths) {
+        val paths = state.pendingSharePdfPaths
+        if (paths.isEmpty()) return@LaunchedEffect
+        val uris = ArrayList(paths.map { path ->
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.files",
+                File(path),
+            )
+        })
+        val intent = Intent(
+            if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE,
+        ).apply {
+            type = "application/pdf"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (uris.size == 1) {
+                putExtra(Intent.EXTRA_STREAM, uris.first())
+            } else {
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+            }
+            clipData = ClipData.newUri(context.contentResolver, "HotFii voucher PDF", uris.first()).apply {
+                uris.drop(1).forEach { addItem(ClipData.Item(it)) }
+            }
+        }
+        context.startActivity(Intent.createChooser(intent, "Share voucher PDF"))
         onShareConsumed()
     }
 
@@ -279,7 +296,7 @@ private fun VoucherDetail(
                 },
                 actions = {
                     IconButton(onClick = { onShare(batch.id) }, enabled = !state.isActionRunning) {
-                        Icon(Icons.Outlined.Share, contentDescription = "Share voucher codes")
+                        Icon(Icons.Outlined.Share, contentDescription = "Share voucher PDF")
                     }
                     if (batch.canEdit) IconButton(onClick = { showEdit = true }) {
                         Icon(Icons.Outlined.Edit, contentDescription = "Edit unused batch")
@@ -321,7 +338,7 @@ private fun VoucherDetail(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Voucher status", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Full codes are revealed only when you share this batch.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Share the same printable PDF layout available on the web.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             items(detail.vouchers, key = { it.id }) { voucher ->

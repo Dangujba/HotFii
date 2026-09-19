@@ -10,6 +10,7 @@ use App\Models\Voucher;
 use App\Models\VoucherBatch;
 use App\Services\Vouchers\VoucherPinGenerator;
 use App\Services\Vouchers\VoucherService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -20,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 class MobileVoucherBatchController extends Controller
 {
     private const BATCH_STATUSES = ['generated', 'printed'];
+
+    private const PDF_CHUNK_SIZE = 100;
 
     public function index(Request $request, Organization $organization): JsonResponse
     {
@@ -192,6 +195,48 @@ class MobileVoucherBatchController extends Controller
         });
 
         return response()->noContent();
+    }
+
+    public function pdf(Request $request, Organization $organization, VoucherBatch $batch): Response
+    {
+        $this->guardBatch($organization, $batch);
+        abort_unless($this->canCreate($request, $organization), 403, 'You cannot export vouchers for this organization.');
+
+        $totalParts = max(1, (int) ceil($batch->quantity / self::PDF_CHUNK_SIZE));
+        $part = max(1, $request->integer('part', 1));
+        abort_if($part > $totalParts, 404);
+
+        $batch->load('organization', 'accessPlan', 'networkDevice');
+        $vouchers = $batch->vouchers()
+            ->orderBy('id')
+            ->forPage($part, self::PDF_CHUNK_SIZE)
+            ->get();
+        abort_if($vouchers->isEmpty(), 404);
+
+        $batch->setRelation('vouchers', $vouchers);
+        $filename = $totalParts === 1
+            ? $batch->reference.'.pdf'
+            : sprintf('%s-part-%02d-of-%02d.pdf', $batch->reference, $part, $totalParts);
+
+        $response = Pdf::loadView('operator.voucher-pdf', [
+            'batch' => $batch,
+            'printPart' => $part,
+            'printParts' => $totalParts,
+        ])->setPaper('a4', 'landscape')->download($filename);
+
+        $batch->vouchers()
+            ->whereIn('id', $vouchers->pluck('id'))
+            ->where('status', VoucherStatus::Generated->value)
+            ->update(['status' => VoucherStatus::Printed->value]);
+
+        if (! $batch->vouchers()->where('status', VoucherStatus::Generated->value)->exists()) {
+            $batch->update([
+                'status' => VoucherStatus::Printed->value,
+                'printed_at' => $batch->printed_at ?? now(),
+            ]);
+        }
+
+        return $response->header('Cache-Control', 'no-store, private');
     }
 
     public function share(Request $request, Organization $organization, VoucherBatch $batch): JsonResponse

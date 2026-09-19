@@ -30,6 +30,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                     Route::get('/voucher-batches/{batch}', [MobileVoucherBatchController::class, 'show'])->name('voucher-batches.show');
                     Route::patch('/voucher-batches/{batch}', [MobileVoucherBatchController::class, 'update'])->name('voucher-batches.update');
                     Route::delete('/voucher-batches/{batch}', [MobileVoucherBatchController::class, 'destroy'])->name('voucher-batches.destroy');
+                    Route::get('/voucher-batches/{batch}/pdf', [MobileVoucherBatchController::class, 'pdf'])->name('voucher-batches.pdf');
                     Route::post('/voucher-batches/{batch}/share', [MobileVoucherBatchController::class, 'share'])->name('voucher-batches.share');
                 });
         });

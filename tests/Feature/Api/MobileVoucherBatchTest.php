@@ -142,6 +142,25 @@ class MobileVoucherBatchTest extends TestCase
         )->assertUnprocessable()->assertJsonValidationErrors('batch');
     }
 
+    public function test_mobile_pdf_uses_printable_output_and_marks_its_vouchers_printed(): void
+    {
+        $batch = $this->batch();
+
+        $response = $this->withToken($this->token($this->owner))->get(
+            route('api.v1.mobile.organizations.voucher-batches.pdf', [
+                'organization' => $this->organization,
+                'batch' => $batch,
+            ])
+        );
+
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+        $this->assertDatabaseHas('voucher_batches', ['id' => $batch->id, 'status' => 'printed']);
+        $this->assertDatabaseMissing('vouchers', ['voucher_batch_id' => $batch->id, 'status' => 'generated']);
+    }
+
     public function test_agent_can_generate_but_cannot_edit_or_delete(): void
     {
         $agent = User::factory()->create();

@@ -98,8 +98,8 @@ fun AuthenticatedShell(
                     onCreate = viewModel::createVoucherBatch,
                     onUpdate = viewModel::updateVoucherBatch,
                     onDelete = viewModel::deleteVoucherBatch,
-                    onShare = viewModel::shareVoucherBatch,
-                    onShareConsumed = viewModel::consumeVoucherShare,
+                    onShare = viewModel::shareVoucherPdf,
+                    onShareConsumed = viewModel::consumeVoucherPdfShare,
                     onFeedbackDismissed = viewModel::clearVoucherFeedback,
                 )
 

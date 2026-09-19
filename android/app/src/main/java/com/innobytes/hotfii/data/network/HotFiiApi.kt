@@ -10,6 +10,8 @@ import com.innobytes.hotfii.data.network.dto.VoucherCatalogDto
 import com.innobytes.hotfii.data.network.dto.VoucherCreateRequestDto
 import com.innobytes.hotfii.data.network.dto.VoucherEditRequestDto
 import com.innobytes.hotfii.data.network.dto.VoucherShareDto
+import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -17,7 +19,7 @@ import retrofit2.http.Path
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Query
-import retrofit2.Response
+import retrofit2.http.Streaming
 
 interface HotFiiApi {
     @POST("auth/login")
@@ -69,6 +71,14 @@ interface HotFiiApi {
         @Path("organization") organizationId: String,
         @Path("batch") batchId: String,
     )
+
+    @Streaming
+    @GET("organizations/{organization}/voucher-batches/{batch}/pdf")
+    suspend fun voucherBatchPdf(
+        @Path("organization") organizationId: String,
+        @Path("batch") batchId: String,
+        @Query("part") part: Int,
+    ): ResponseBody
 
     @POST("organizations/{organization}/voucher-batches/{batch}/share")
     suspend fun shareVoucherBatch(

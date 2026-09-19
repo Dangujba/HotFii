@@ -6,6 +6,7 @@ import com.innobytes.hotfii.data.network.dto.ApiErrorDto
 import com.innobytes.hotfii.data.network.dto.VoucherCreateRequestDto
 import com.innobytes.hotfii.data.network.dto.VoucherEditRequestDto
 import com.innobytes.hotfii.domain.*
+import java.io.File
 import java.io.IOException
 import retrofit2.HttpException
 
@@ -15,10 +16,19 @@ interface VoucherRepository {
     suspend fun create(organizationId: String, input: VoucherCreateInput): VoucherBatchDetail
     suspend fun update(organizationId: String, batchId: String, input: VoucherEditInput): VoucherBatchDetail
     suspend fun delete(organizationId: String, batchId: String)
-    suspend fun share(organizationId: String, batchId: String): VoucherShare
+    suspend fun sharePdf(
+        organizationId: String,
+        batchId: String,
+        reference: String,
+        quantity: Int,
+    ): List<String>
 }
 
-class DefaultVoucherRepository(private val api: HotFiiApi, private val gson: Gson) : VoucherRepository {
+class DefaultVoucherRepository(
+    private val api: HotFiiApi,
+    private val gson: Gson,
+    private val cacheDir: File,
+) : VoucherRepository {
     override suspend fun catalog(organizationId: String, filters: VoucherFilters, page: Int) = request {
         api.voucherBatches(
             organizationId, filters.search.trim().ifEmpty { null }, filters.status,
@@ -33,8 +43,44 @@ class DefaultVoucherRepository(private val api: HotFiiApi, private val gson: Gso
         request { api.updateVoucherBatch(organizationId, batchId, VoucherEditRequestDto.from(input)).data.toDetail() }
     override suspend fun delete(organizationId: String, batchId: String) =
         request { api.deleteVoucherBatch(organizationId, batchId) }
-    override suspend fun share(organizationId: String, batchId: String) =
-        request { api.shareVoucherBatch(organizationId, batchId).data.toDomain() }
+    override suspend fun sharePdf(
+        organizationId: String,
+        batchId: String,
+        reference: String,
+        quantity: Int,
+    ): List<String> {
+        val partCount = maxOf(1, (quantity + 99) / 100)
+        val safeReference = reference.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val directory = File(cacheDir, "shared_vouchers").apply { mkdirs() }
+        directory.listFiles()
+            ?.filter { it.name.startsWith(safeReference) }
+            ?.forEach(File::delete)
+        val files = mutableListOf<File>()
+
+        try {
+            for (part in 1..partCount) {
+                val filename = if (partCount == 1) {
+                    "$safeReference.pdf"
+                } else {
+                    "%s-part-%02d-of-%02d.pdf".format(safeReference, part, partCount)
+                }
+                val file = File(directory, filename)
+                request {
+                    api.voucherBatchPdf(organizationId, batchId, part).use { body ->
+                        body.byteStream().use { input ->
+                            file.outputStream().use { output -> input.copyTo(output) }
+                        }
+                    }
+                }
+                files += file
+            }
+        } catch (error: Throwable) {
+            files.forEach(File::delete)
+            throw error
+        }
+
+        return files.map(File::getAbsolutePath)
+    }
 
     private suspend fun <T> request(block: suspend () -> T): T = try {
         block()

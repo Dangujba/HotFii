@@ -28,7 +28,7 @@ data class VoucherUiState(
     val filters: VoucherFilters = VoucherFilters(),
     val error: String? = null,
     val notice: String? = null,
-    val pendingShareText: String? = null,
+    val pendingSharePdfPaths: List<String> = emptyList(),
 )
 
 data class MainUiState(
@@ -278,14 +278,22 @@ class MainViewModel(
         }
     }
 
-    fun shareVoucherBatch(batchId: String) {
+    fun shareVoucherPdf(batchId: String) {
         val organizationId = _state.value.selectedOrganizationId ?: return
+        val batch = _state.value.vouchers.detail?.summary?.takeIf { it.id == batchId } ?: return
         viewModelScope.launch {
             _state.update {
                 it.copy(vouchers = it.vouchers.copy(isActionRunning = true, error = null, notice = null))
             }
-            runCatching { voucherRepository.share(organizationId, batchId) }
-                .onSuccess { share ->
+            runCatching {
+                voucherRepository.sharePdf(
+                    organizationId,
+                    batchId,
+                    batch.reference,
+                    batch.quantity,
+                )
+            }
+                .onSuccess { paths ->
                     val detail = runCatching { voucherRepository.detail(organizationId, batchId) }.getOrNull()
                     val catalog = runCatching {
                         voucherRepository.catalog(organizationId, _state.value.vouchers.filters, 1)
@@ -295,17 +303,17 @@ class MainViewModel(
                             isActionRunning = false,
                             detail = detail ?: current.vouchers.detail,
                             catalog = catalog ?: current.vouchers.catalog,
-                            pendingShareText = share.asPlainText(),
-                            notice = "Voucher codes are ready to share.",
+                            pendingSharePdfPaths = paths,
+                            notice = "Voucher PDF is ready to share.",
                         ))
                     }
                 }
-                .onFailure { voucherActionFailed(it, "Voucher codes could not be prepared.") }
+                .onFailure { voucherActionFailed(it, "Voucher PDF could not be prepared.") }
         }
     }
 
-    fun consumeVoucherShare() {
-        _state.update { it.copy(vouchers = it.vouchers.copy(pendingShareText = null)) }
+    fun consumeVoucherPdfShare() {
+        _state.update { it.copy(vouchers = it.vouchers.copy(pendingSharePdfPaths = emptyList())) }
     }
 
     fun clearVoucherFeedback() {

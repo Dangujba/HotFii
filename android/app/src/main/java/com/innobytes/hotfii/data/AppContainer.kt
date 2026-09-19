@@ -57,5 +57,5 @@ class AppContainer(context: Context) {
         gson = gson,
     )
 
-    val voucherRepository: VoucherRepository = DefaultVoucherRepository(api, gson)
+    val voucherRepository: VoucherRepository = DefaultVoucherRepository(api, gson, context.cacheDir)
 }
