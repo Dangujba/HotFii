@@ -63,6 +63,10 @@ class MainViewModel(
         }
     }
 
+    fun clearLoginError() {
+        _state.update { it.copy(error = null) }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             _state.update { it.copy(isSubmitting = true, error = null) }

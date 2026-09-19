@@ -56,17 +56,30 @@ fun LoginScreen(
     isSubmitting: Boolean,
     error: String?,
     onSignIn: (String, String) -> Unit,
+    onInputChanged: () -> Unit,
     onCloseApp: () -> Unit,
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var showCloseConfirmation by rememberSaveable { mutableStateOf(false) }
+    var hasAttemptedSubmit by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val submit = {
+        hasAttemptedSubmit = true
         focusManager.clearFocus()
-        onSignIn(email, password)
+        if (!validateLoginInputs(email, password).hasErrors) {
+            onSignIn(email, password)
+        }
     }
+    val inputErrors = if (hasAttemptedSubmit) {
+        validateLoginInputs(email, password)
+    } else {
+        LoginInputErrors()
+    }
+    val credentialsRejected = error?.isCredentialError() == true
+    val passwordMessage = inputErrors.password ?: error?.takeIf { credentialsRejected }
+    val generalError = error?.takeUnless { credentialsRejected }
 
     if (showCloseConfirmation) {
         AlertDialog(
@@ -144,7 +157,7 @@ fun LoginScreen(
                 modifier = Modifier.padding(top = 6.dp, bottom = 24.dp),
             )
 
-            if (error != null) {
+            if (generalError != null) {
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -153,15 +166,22 @@ fun LoginScreen(
                         .fillMaxWidth()
                         .padding(bottom = 16.dp),
                 ) {
-                    Text(error, modifier = Modifier.padding(14.dp))
+                    Text(generalError, modifier = Modifier.padding(14.dp))
                 }
             }
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = {
+                    email = it
+                    if (error != null) onInputChanged()
+                },
                 label = { Text("Email address") },
                 leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null) },
+                isError = inputErrors.email != null || credentialsRejected,
+                supportingText = inputErrors.email?.let { message ->
+                    { Text(message) }
+                },
                 singleLine = true,
                 enabled = !isSubmitting,
                 keyboardOptions = KeyboardOptions(
@@ -173,9 +193,16 @@ fun LoginScreen(
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = {
+                    password = it
+                    if (error != null) onInputChanged()
+                },
                 label = { Text("Password") },
                 leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+                isError = passwordMessage != null || credentialsRejected,
+                supportingText = passwordMessage?.let { message ->
+                    { Text(message) }
+                },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
@@ -218,3 +245,29 @@ fun LoginScreen(
         }
     }
 }
+
+internal data class LoginInputErrors(
+    val email: String? = null,
+    val password: String? = null,
+) {
+    val hasErrors: Boolean
+        get() = email != null || password != null
+}
+
+internal fun validateLoginInputs(email: String, password: String): LoginInputErrors {
+    val emailError = when {
+        email.isBlank() -> "Email address is required."
+        !email.trim().matches(EMAIL_PATTERN) -> "Enter a valid email address."
+        else -> null
+    }
+    val passwordError = if (password.isBlank()) "Password is required." else null
+
+    return LoginInputErrors(email = emailError, password = passwordError)
+}
+
+private fun String.isCredentialError(): Boolean =
+    contains("credential", ignoreCase = true) ||
+        contains("email or password", ignoreCase = true) ||
+        contains("incorrect password", ignoreCase = true)
+
+private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")

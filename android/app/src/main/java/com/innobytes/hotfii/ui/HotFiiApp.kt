@@ -20,6 +20,7 @@ fun HotFiiApp(
             isSubmitting = state.isSubmitting,
             error = state.error,
             onSignIn = viewModel::signIn,
+            onInputChanged = viewModel::clearLoginError,
             onCloseApp = onCloseApp,
         )
         else -> WorkspaceScreen(
