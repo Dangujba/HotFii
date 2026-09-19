@@ -151,7 +151,63 @@ ROS, [
 
  /system script add name="hotfii-heartbeat" policy=ftp,read,test source={
     :local firmwareVersion [/system resource get version]
-    :local heartbeatBody ("{\"firmware_version\":\"" . $firmwareVersion . "\"}")
+
+    # Build a small list of currently active HotSpot clients and their
+    # DHCP host names. HotFii uses this only as display metadata.
+    :local clientsJson ""
+    :local clientCount 0
+
+    :foreach activeId in=[/ip hotspot active find] do={
+
+        :if ($clientCount < 50) do={
+
+            :local clientMac [/ip hotspot active get $activeId mac-address]
+
+            :local clientName ""
+
+            :foreach leaseId in=[
+                /ip dhcp-server lease find where mac-address=$clientMac
+            ] do={
+
+                :if ([:len $clientName] = 0) do={
+                    :set clientName [/ip dhcp-server lease get $leaseId host-name]
+                }
+            }
+
+            # DHCP host names normally contain safe DNS-style characters.
+            # Skip JSON-sensitive values rather than break the heartbeat.
+            :if (
+                ([:len $clientName] > 0)
+                && ([:find $clientName "\""] = nil)
+                && ([:find $clientName "\\"] = nil)
+            ) do={
+
+                :if ([:len $clientsJson] > 0) do={
+                    :set clientsJson ($clientsJson . ",")
+                }
+
+                :set clientsJson (
+                    $clientsJson
+                    . "{\"mac\":\""
+                    . $clientMac
+                    . "\",\"name\":\""
+                    . $clientName
+                    . "\"}"
+                )
+
+                :set clientCount ($clientCount + 1)
+            }
+        }
+    }
+
+    :local heartbeatBody (
+        "{\"firmware_version\":\""
+        . $firmwareVersion
+        . "\",\"clients\":["
+        . $clientsJson
+        . "]}"
+    )
+
     /tool fetch url="{{HEARTBEAT_URL}}" http-method=post http-header-field="Content-Type: application/json,X-HotFii-Secret: {{RADIUS_SECRET}}" http-data=$heartbeatBody check-certificate=yes-without-crl keep-result=no
 }
 

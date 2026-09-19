@@ -72,6 +72,25 @@
                     <li class="nav-header">TENANTS</li>
                     <li class="nav-item"><a href="{{ route('platform.organizations.index') }}" class="nav-link {{ request()->routeIs('platform.organizations.*') ? 'active' : '' }}"><i class="nav-icon bi bi-buildings"></i><p>Organizations</p></a></li>
                     <li class="nav-item"><a href="{{ route('platform.reviews.index') }}" class="nav-link {{ request()->routeIs('platform.reviews.*') ? 'active' : '' }}"><i class="nav-icon bi bi-person-check"></i><p>Payment reviews @if($pendingReviews)<span class="nav-badge badge text-bg-danger">{{ $pendingReviews }}</span>@endif</p></a></li>
+
+                    <li class="nav-header">NETWORK</li>
+
+                    <li class="nav-item">
+                        <a
+                            href="{{ route('platform.routers.index') }}"
+                            class="nav-link {{
+                                request()->routeIs(
+                                    'platform.routers.*'
+                                )
+                                    ? 'active'
+                                    : ''
+                            }}"
+                        >
+                            <i class="nav-icon bi bi-router"></i>
+                            <p>Routers</p>
+                        </a>
+                    </li>
+
                     <li class="nav-header">MONEY</li>
                     <li class="nav-item"><a href="{{ route('platform.billing.index') }}" class="nav-link {{ request()->routeIs('platform.billing.*') ? 'active' : '' }}"><i class="nav-icon bi bi-receipt"></i><p>Billing & Invoices</p></a></li>
                     <li class="nav-item"><a href="{{ route('platform.transactions.index') }}" class="nav-link {{ request()->routeIs('platform.transactions.*') ? 'active' : '' }}"><i class="nav-icon bi bi-cash-stack"></i><p>Transactions</p></a></li>

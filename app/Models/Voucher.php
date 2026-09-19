@@ -13,8 +13,8 @@ class Voucher extends Model
     use HasPublicUuid;
 
     protected $fillable = [
-        'organization_id', 'voucher_batch_id', 'customer_id', 'code_lookup',
-        'code_cipher', 'code_last_four', 'status', 'price_snapshot_kobo',
+        'organization_id', 'network_device_id', 'voucher_batch_id', 'customer_id', 'code_lookup',
+        'code_cipher', 'code_last_four', 'serial_number', 'status', 'price_snapshot_kobo',
         'is_complimentary', 'sold_at', 'activated_at', 'expires_at', 'revoked_at',
     ];
 
@@ -32,6 +32,7 @@ class Voucher extends Model
     }
 
     public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
+    public function networkDevice(): BelongsTo { return $this->belongsTo(NetworkDevice::class); }
     public function batch(): BelongsTo { return $this->belongsTo(VoucherBatch::class, 'voucher_batch_id'); }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function credential(): HasOne { return $this->hasOne(AccessCredential::class); }

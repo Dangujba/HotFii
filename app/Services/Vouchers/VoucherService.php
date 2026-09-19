@@ -10,6 +10,7 @@ use App\Models\AccessPlan;
 use App\Models\Customer;
 use App\Models\FeeLedgerEntry;
 use App\Models\Organization;
+use App\Models\NetworkDevice;
 use App\Models\Voucher;
 use App\Models\VoucherBatch;
 use App\Services\Billing\CommerceFeeCalculator;
@@ -39,7 +40,22 @@ class VoucherService
         VoucherPinFormat $pinFormat = VoucherPinFormat::Numbers,
         bool $dashedPin = true,
         int $pinLength = 12,
+        ?NetworkDevice $device = null,
     ): VoucherBatch {
+        /*
+         * A specific device means router-scoped vouchers.
+         * NULL intentionally means organization-wide / All routers.
+         */
+        if (
+            $device
+            && $device->organization_id !== $organization->id
+        ) {
+            throw ValidationException::withMessages([
+                'network_device_id' =>
+                    'The selected router does not belong to this organization.',
+            ]);
+        }
+
         if ($quantity < 1 || $quantity > 5000) {
             throw new RuntimeException('Voucher quantity must be between 1 and 5,000.');
         }
@@ -60,10 +76,11 @@ class VoucherService
             throw new RuntimeException('A voucher cannot be priced below its access plan. Leave the price blank to use the plan price.');
         }
 
-        return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin, $pinLength) {
+        return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin, $pinLength, $device) {
             $batch = VoucherBatch::create([
                 'organization_id' => $organization->id,
                 'access_plan_id' => $plan->id,
+                'network_device_id' => $device?->id,
                 'reference' => 'VB-'.now()->format('ymd').'-'.Str::upper(Str::random(6)),
                 'quantity' => $quantity,
                 'pin_length' => $pinLength,
@@ -71,7 +88,49 @@ class VoucherService
                 'status' => VoucherStatus::Generated->value,
             ]);
 
+            /*
+             * Reserve today's voucher serial sequence.
+             *
+             * The row lock is held by the surrounding transaction, so
+             * concurrent batches generated on the same day cannot receive
+             * overlapping serial numbers.
+             *
+             * Example:
+             * 20260907-001
+             * 20260907-002
+             *
+             * Another batch today continues the sequence.
+             * A new calendar day starts again from 001.
+             */
+            $serialDate =
+                now(config('hotfii.timezone', 'Africa/Lagos'))
+                    ->format('Ymd');
+
+            DB::table('voucher_serial_counters')
+                ->insertOrIgnore([
+                    'serial_date' => $serialDate,
+                    'last_number' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            $serialCounter =
+                DB::table('voucher_serial_counters')
+                    ->where('serial_date', $serialDate)
+                    ->lockForUpdate()
+                    ->first();
+
+            if (! $serialCounter) {
+                throw new RuntimeException(
+                    'Unable to reserve voucher serial numbers.'
+                );
+            }
+
+            $serialStart =
+                ((int) $serialCounter->last_number) + 1;
+
             $created = 0;
+
             foreach ($this->pins->candidates($pinFormat, $pinLength, $dashedPin, $quantity) as $code) {
                 $lookup = $this->lookup($code);
                 if (Voucher::where('code_lookup', $lookup)->exists()) {
@@ -82,9 +141,17 @@ class VoucherService
                     // A savepoint lets concurrent batch collisions retry on PostgreSQL.
                     DB::transaction(fn () => $batch->vouchers()->create([
                         'organization_id' => $organization->id,
+                        'network_device_id' => $device?->id,
                         'code_lookup' => $lookup,
                         'code_cipher' => $code,
                         'code_last_four' => substr($code, -4),
+
+                        'serial_number' => sprintf(
+                            '%s-%03d',
+                            $serialDate,
+                            $serialStart + $created
+                        ),
+
                         'status' => VoucherStatus::Generated,
                         'price_snapshot_kobo' => $batch->retail_price_kobo,
                     ]));
@@ -97,7 +164,19 @@ class VoucherService
                 }
 
                 if (++$created === $quantity) {
-                    return $batch->load('vouchers', 'accessPlan');
+                    DB::table('voucher_serial_counters')
+                        ->where('serial_date', $serialDate)
+                        ->update([
+                            'last_number' =>
+                                $serialStart + $quantity - 1,
+
+                            'updated_at' => now(),
+                        ]);
+
+                    return $batch->load(
+                        'vouchers',
+                        'accessPlan'
+                    );
                 }
             }
 
@@ -105,14 +184,46 @@ class VoucherService
         });
     }
 
-    public function redeem(Organization $organization, string $code, ?string $phone = null): Voucher
-    {
-        return DB::transaction(function () use ($organization, $code, $phone) {
+    public function redeem(
+        Organization $organization,
+        string $code,
+        ?string $phone = null,
+        ?NetworkDevice $device = null,
+    ): Voucher {
+        if ($device && $device->organization_id !== $organization->id) {
+            throw new RuntimeException(
+                'This voucher is not valid for this hotspot.'
+            );
+        }
+
+        return DB::transaction(function () use ($organization, $code, $phone, $device) {
             $voucher = Voucher::query()
                 ->where('organization_id', $organization->id)
                 ->where('code_lookup', $this->lookup($code))
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            /*
+             * A non-null network_device_id restricts the voucher to one router.
+             * NULL intentionally means All routers in this organization.
+             * Historical vouchers with NULL therefore retain their previous
+             * organization-wide behaviour.
+             */
+            $boundDeviceId =
+                $voucher->network_device_id
+                ?? $voucher->batch?->network_device_id;
+
+            if (
+                $boundDeviceId !== null
+                && (
+                    ! $device
+                    || (int) $boundDeviceId !== (int) $device->id
+                )
+            ) {
+                throw new RuntimeException(
+                    'This voucher is not valid for this hotspot. Please use a voucher issued for this router.'
+                );
+            }
 
             if ($voucher->expires_at?->isPast()) {
                 $voucher->update(['status' => VoucherStatus::Expired]);

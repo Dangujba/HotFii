@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Domain\Enums\VoucherPinFormat;
 use App\Domain\Enums\VoucherStatus;
 use App\Models\AccessPlan;
+use App\Models\NetworkDevice;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\VoucherBatch;
 use App\Services\Vouchers\VoucherPinGenerator;
 use App\Services\Vouchers\VoucherService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -88,9 +90,21 @@ class VoucherPinLengthTest extends TestCase
     {
         $user = User::factory()->create();
         $user->organizations()->attach($this->organization, ['role' => 'owner']);
+        $location = $this->organization->locations()->create(['name' => 'Main site']);
+        $device = NetworkDevice::create([
+            'organization_id' => $this->organization->id,
+            'location_id' => $location->id,
+            'name' => 'Voucher router',
+            'vendor' => 'generic',
+            'adapter' => 'generic-radius',
+            'support_level' => 'compatible',
+            'status' => 'online',
+            'nas_identifier' => 'hf-'.Str::lower(Str::random(12)),
+            'radius_secret' => Str::random(32),
+        ]);
         $this->actingAs($user)->withoutVite();
         $this->get(route('vouchers.index'))->assertOk()->assertSee('PIN length');
-        $data = ['access_plan_id' => $this->plan->id, 'quantity' => 1, 'pin_length' => 6, 'pin_format' => 'numbers', 'dashed_pin' => 0];
+        $data = ['network_device_id' => $device->id, 'access_plan_id' => $this->plan->id, 'quantity' => 1, 'pin_length' => 6, 'pin_format' => 'numbers', 'dashed_pin' => 0];
         $this->post(route('vouchers.store'), $data)->assertSessionHasNoErrors()->assertRedirect(route('vouchers.index'));
         $batch = VoucherBatch::sole();
         $this->assertSame(6, $batch->pin_length);

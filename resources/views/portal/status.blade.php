@@ -440,6 +440,7 @@
     @elseif($portalContext['link_login'] ?? null)
 
         <form
+            id="hotfii-mikrotik-auto-resume"
             method="POST"
             action="{{ $portalContext['link_login'] }}"
         >
@@ -493,6 +494,49 @@
             </button>
 
         </form>
+
+        @if($autoResume ?? false)
+
+            <div
+                class="small text-secondary text-center mt-3"
+                id="hotfii-auto-resume-message"
+            >
+                Device recognized. Reconnecting automatically…
+            </div>
+
+            <script>
+                document.addEventListener(
+                    'DOMContentLoaded',
+                    function () {
+                        var form =
+                            document.getElementById(
+                                'hotfii-mikrotik-auto-resume'
+                            );
+
+                        if (! form) {
+                            return;
+                        }
+
+                        var button =
+                            form.querySelector('button');
+
+                        if (button) {
+                            button.disabled = true;
+                            button.textContent =
+                                'Reconnecting…';
+                        }
+
+                        window.setTimeout(
+                            function () {
+                                form.submit();
+                            },
+                            150
+                        );
+                    }
+                );
+            </script>
+
+        @endif
 
 
     {{-- ============================================================

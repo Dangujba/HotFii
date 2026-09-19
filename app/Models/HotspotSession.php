@@ -12,7 +12,7 @@ class HotspotSession extends Model
 
     protected $fillable = [
         'organization_id', 'network_device_id', 'customer_id', 'access_plan_id',
-        'radius_username', 'acct_session_id', 'mac_address', 'ip_address', 'status',
+        'radius_username', 'acct_session_id', 'mac_address', 'client_name', 'ip_address', 'status',
         'input_bytes', 'output_bytes', 'started_at', 'expires_at', 'stopped_at', 'terminate_cause',
     ];
 

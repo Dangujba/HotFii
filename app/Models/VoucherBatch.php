@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class VoucherBatch extends Model
 {
     use HasPublicUuid;
-    protected $fillable = ['organization_id','access_plan_id','assigned_user_id','reference','quantity','retail_price_kobo','pin_length','status','printed_at'];
+    protected $fillable = ['organization_id','access_plan_id','network_device_id','assigned_user_id','reference','quantity','retail_price_kobo','pin_length','status','printed_at'];
     protected function casts(): array { return ['printed_at'=>'datetime','pin_length'=>'integer']; }
     public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
     public function accessPlan(): BelongsTo { return $this->belongsTo(AccessPlan::class); }
+    public function networkDevice(): BelongsTo { return $this->belongsTo(NetworkDevice::class); }
     public function vouchers(): HasMany { return $this->hasMany(Voucher::class); }
 }

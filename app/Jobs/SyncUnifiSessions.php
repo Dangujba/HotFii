@@ -191,9 +191,31 @@ class SyncUnifiSessions implements ShouldQueue
             'expiresAt'
         );
 
+        /*
+         * UniFi may expose the client hostname/name using different
+         * keys depending on controller/API version.
+         */
+        $clientName = collect([
+            data_get($client, 'name'),
+            data_get($client, 'hostname'),
+            data_get($client, 'hostName'),
+            data_get($client, 'displayName'),
+            data_get($client, 'clientName'),
+            data_get($client, 'client.name'),
+            data_get($client, 'client.hostname'),
+        ])->first(
+            fn ($value) =>
+                is_string($value)
+                && trim($value) !== ''
+        );
+
         $updates = [
             'ip_address' => $client['ipAddress']
                 ?? $session->ip_address,
+
+            'client_name' => $clientName
+                ? mb_substr(trim($clientName), 0, 255)
+                : $session->client_name,
 
             'input_bytes' => $inputBytes,
             'output_bytes' => $outputBytes,

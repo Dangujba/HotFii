@@ -6,11 +6,13 @@ use App\Domain\Enums\RouterVendor;
 use App\Models\HotspotSession;
 use App\Models\NetworkDevice;
 use App\Services\Access\AllowanceService;
+use App\Services\Access\VoucherDeviceBindingService;
 use App\Services\Network\NetworkDeviceManager;
 use App\Services\Vouchers\VoucherService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use RuntimeException;
@@ -20,8 +22,9 @@ class PortalController extends Controller
     public function show(
         Request $request,
         NetworkDevice $device,
-        NetworkDeviceManager $manager
-    ): View {
+        NetworkDeviceManager $manager,
+        VoucherDeviceBindingService $bindings
+    ): View|RedirectResponse {
         $portalContext = $this->portalContext($request, $device);
 
         $portalMac =
@@ -77,6 +80,71 @@ class PortalController extends Controller
             );
         }
 
+        /*
+         * Returning-device recognition.
+         *
+         * This does NOT redeem the voucher again. If HotFii knows this
+         * router/MAC combination and the original voucher/credential is
+         * still valid, continue directly to the existing authentication
+         * flow with the original credential.
+         */
+        if ($portalMac) {
+            $normalizedResumeMac =
+                $bindings->normalizeMac(
+                    $portalMac
+                );
+
+            /*
+             * Prevent an immediate captive-portal loop if the router
+             * rejects an automatic resume attempt. After 20 seconds
+             * HotFii may try automatic recognition again.
+             */
+            $resumeAttemptKey =
+                $normalizedResumeMac
+                    ? 'portal:auto-resume:'.$device->id.':'.$normalizedResumeMac
+                    : null;
+
+            $mayAutoResume =
+                $resumeAttemptKey !== null
+                && Cache::add(
+                    $resumeAttemptKey,
+                    true,
+                    now()->addSeconds(20)
+                );
+
+            $resumeVoucher =
+                $mayAutoResume
+                    ? $bindings->resumableFor(
+                        $device,
+                        $portalMac
+                    )
+                    : null;
+
+            if ($resumeVoucher) {
+                return redirect()->route(
+                    'portal.status',
+                    [
+                        'device' =>
+                            $device,
+
+                        'voucher' =>
+                            $resumeVoucher->uuid,
+
+                        'auto_resume' =>
+                            1,
+
+                        ...collect($portalContext)
+                            ->filter(
+                                fn ($value) =>
+                                    $value !== null
+                                    && $value !== ''
+                            )
+                            ->all(),
+                    ]
+                );
+            }
+        }
+
         return view('portal.show', [
             'device' => $device->load('organization', 'location'),
 
@@ -96,7 +164,8 @@ class PortalController extends Controller
     public function redeem(
         Request $request,
         NetworkDevice $device,
-        VoucherService $service
+        VoucherService $service,
+        VoucherDeviceBindingService $bindings
     ): RedirectResponse {
         /*
          * Normalise vendor-specific aliases first so that the same
@@ -279,7 +348,8 @@ class PortalController extends Controller
             $voucher = $service->redeem(
                 $device->organization,
                 $data['voucher_code'],
-                $data['phone'] ?? null
+                $data['phone'] ?? null,
+                $device,
             );
         } catch (RuntimeException|ModelNotFoundException $exception) {
             return back()
@@ -290,6 +360,26 @@ class PortalController extends Controller
                             : $exception->getMessage(),
                 ])
                 ->withInput();
+        }
+
+        /*
+         * Remember the client that presented this voucher.
+         *
+         * This is an identity binding only; it does not create another
+         * voucher, credential, sale or fee.
+         */
+        $bindingMac =
+            $data['mac']
+            ?? $data['id']
+            ?? $data['clientMac']
+            ?? null;
+
+        if ($bindingMac) {
+            $bindings->bind(
+                $device,
+                $voucher,
+                $bindingMac
+            );
         }
 
         return redirect()->route('portal.status', [
@@ -592,6 +682,9 @@ HTML;
 
             'portalContext' =>
                 $portalContext,
+
+            'autoResume' =>
+                $request->boolean('auto_resume'),
 
             'allowance' =>
                 $allowances->forCredential(

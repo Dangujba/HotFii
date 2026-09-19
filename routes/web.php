@@ -32,6 +32,7 @@ use App\Http\Controllers\Platform\ImpersonationController;
 use App\Http\Controllers\Platform\InvoiceController as PlatformInvoiceController;
 use App\Http\Controllers\Platform\OrganizationController as PlatformOrganizationController;
 use App\Http\Controllers\Platform\PaymentReviewController;
+use App\Http\Controllers\Platform\RouterController as PlatformRouterController;
 use App\Http\Controllers\Platform\SystemController as PlatformSystemController;
 use App\Http\Controllers\Platform\TransactionController as PlatformTransactionController;
 use App\Http\Controllers\Platform\UserController as PlatformUserController;
@@ -141,6 +142,9 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
 // organization. Anything that changes what a customer owes stays out of the UI.
 Route::middleware(['auth', 'verified', 'platform-admin'])->prefix('platform')->name('platform.')->group(function () {
     Route::get('/', PlatformDashboardController::class)->name('index');
+
+    Route::get('/routers', PlatformRouterController::class)
+        ->name('routers.index');
 
     Route::get('/organizations', [PlatformOrganizationController::class, 'index'])->name('organizations.index');
     // withTrashed: a soft-deleted organization still has money and an audit
