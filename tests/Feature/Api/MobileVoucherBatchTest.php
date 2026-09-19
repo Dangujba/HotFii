@@ -16,8 +16,11 @@ class MobileVoucherBatchTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private User $owner;
+
     private AccessPlan $plan;
+
     private NetworkDevice $router;
 
     protected function setUp(): void
