@@ -8,6 +8,7 @@ import com.innobytes.hotfii.data.network.dto.VoucherEditRequestDto
 import com.innobytes.hotfii.domain.*
 import java.io.File
 import java.io.IOException
+import java.net.SocketTimeoutException
 import retrofit2.HttpException
 
 interface VoucherRepository {
@@ -56,6 +57,7 @@ class DefaultVoucherRepository(
             ?.filter { it.name.startsWith(safeReference) }
             ?.forEach(File::delete)
         val files = mutableListOf<File>()
+        val partialFiles = mutableListOf<File>()
 
         try {
             for (part in 1..partCount) {
@@ -65,17 +67,25 @@ class DefaultVoucherRepository(
                     "%s-part-%02d-of-%02d.pdf".format(safeReference, part, partCount)
                 }
                 val file = File(directory, filename)
+                val partialFile = File(directory, "$filename.part").also {
+                    it.delete()
+                    partialFiles += it
+                }
                 request {
                     api.voucherBatchPdf(organizationId, batchId, part).use { body ->
                         body.byteStream().use { input ->
-                            file.outputStream().use { output -> input.copyTo(output) }
+                            partialFile.outputStream().use { output -> input.copyTo(output) }
                         }
                     }
+                }
+                if (!partialFile.renameTo(file)) {
+                    partialFile.copyTo(file, overwrite = true)
+                    partialFile.delete()
                 }
                 files += file
             }
         } catch (error: Throwable) {
-            files.forEach(File::delete)
+            (files + partialFiles).forEach(File::delete)
             throw error
         }
 
@@ -94,6 +104,8 @@ class DefaultVoucherRepository(
                 ?: if (error.code() == 401) "Your session has expired. Sign in again."
                 else "The voucher request could not be completed.",
         )
+    } catch (_: SocketTimeoutException) {
+        throw VoucherException("The voucher PDF took too long to download. Please try again.")
     } catch (_: IOException) {
         throw VoucherException("HotFii could not be reached. Check your connection and try again.")
     }

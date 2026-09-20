@@ -18,6 +18,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 class AppContainer(context: Context) {
     private val gson: Gson = GsonBuilder()
@@ -27,6 +28,9 @@ class AppContainer(context: Context) {
     private val sessionStore = SecureSessionStore(context)
 
     private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(2, TimeUnit.MINUTES)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(BearerTokenInterceptor(sessionStore))
         .addInterceptor(
             HttpLoggingInterceptor().apply {
