@@ -1,5 +1,6 @@
 package com.innobytes.hotfii.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -391,6 +392,7 @@ class MainViewModel(
     }
 
     private fun voucherActionFailed(error: Throwable, fallback: String) {
+        Log.e("HotFiiVoucher", fallback, error)
         _state.update {
             it.copy(vouchers = it.vouchers.copy(
                 isActionRunning = false,

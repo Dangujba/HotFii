@@ -9,6 +9,8 @@ import com.innobytes.hotfii.domain.*
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 
 interface VoucherRepository {
@@ -49,7 +51,7 @@ class DefaultVoucherRepository(
         batchId: String,
         reference: String,
         quantity: Int,
-    ): List<String> {
+    ): List<String> = withContext(Dispatchers.IO) {
         val partCount = maxOf(1, (quantity + 99) / 100)
         val safeReference = reference.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val directory = File(cacheDir, "shared_vouchers").apply { mkdirs() }
@@ -89,7 +91,7 @@ class DefaultVoucherRepository(
             throw error
         }
 
-        return files.map(File::getAbsolutePath)
+        files.map(File::getAbsolutePath)
     }
 
     private suspend fun <T> request(block: suspend () -> T): T = try {
@@ -103,12 +105,13 @@ class DefaultVoucherRepository(
                 ?: body?.message
                 ?: if (error.code() == 401) "Your session has expired. Sign in again."
                 else "The voucher request could not be completed.",
+            error,
         )
-    } catch (_: SocketTimeoutException) {
-        throw VoucherException("The voucher PDF took too long to download. Please try again.")
-    } catch (_: IOException) {
-        throw VoucherException("HotFii could not be reached. Check your connection and try again.")
+    } catch (error: SocketTimeoutException) {
+        throw VoucherException("The voucher PDF took too long to download. Please try again.", error)
+    } catch (error: IOException) {
+        throw VoucherException("HotFii could not be reached. Check your connection and try again.", error)
     }
 }
 
-class VoucherException(message: String) : Exception(message)
+class VoucherException(message: String, cause: Throwable? = null) : Exception(message, cause)
