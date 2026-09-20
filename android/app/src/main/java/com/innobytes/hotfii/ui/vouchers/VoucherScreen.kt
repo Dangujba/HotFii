@@ -10,6 +10,7 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -76,6 +77,10 @@ fun VoucherScreen(
     var thermalError by remember { mutableStateOf<String?>(null) }
     var noPairedPrinter by remember { mutableStateOf(false) }
     var isThermalPrinting by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = state.detail != null) {
+        onClose()
+    }
 
     val enableBluetooth = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),

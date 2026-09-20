@@ -19,7 +19,16 @@ Target Android: API 36
 11. Reports
 12. Notifications and settings
 
-Implemented now: sign in, secure session restore, organization switching, and the real dashboard with router filtering. Later screens must consume server-calculated values and must not reimplement billing, fee, voucher, or expiry rules on the device.
+Implemented now: sign in, secure session restore, organization switching, the real dashboard with router filtering, full access-plan management, and voucher batch management with A4 PDF and 58/88 mm Bluetooth printing. Server-side rules remain authoritative for plan locking, prices, expiry, voucher state, and permissions.
+
+## Current Delivery Status
+
+- Stage 1 (Foundation): complete.
+- Stage 2 (Dashboard): complete.
+- Stage 3 (Plans and Vouchers): implemented and awaiting Muhammad's review/deployment checkpoint.
+- Stages 4-6: not started.
+- Stage 7: theme selection, fingerprint protection, authenticator 2FA, and secure logout are implemented; notifications and the remaining settings are pending.
+- Stage 8: not started.
 
 ## API Endpoint Map
 
@@ -29,8 +38,8 @@ Implemented now: sign in, secure session restore, organization switching, and th
 | GET | `/api/v1/mobile/session` | Restore the authenticated user and organization list | 1 |
 | DELETE | `/api/v1/mobile/auth/logout` | Revoke the current device token | 1 |
 | GET | `/api/v1/mobile/organizations/{organization}/dashboard` | Real dashboard summaries and charts | 2 complete |
-| GET/POST/PATCH/DELETE | `/api/v1/mobile/organizations/{organization}/plans` | Plan management | 3 |
-| GET/POST/PATCH/DELETE | `/api/v1/mobile/organizations/{organization}/voucher-batches` | Voucher batch management | 3 |
+| GET/POST/PATCH/DELETE | `/api/v1/mobile/organizations/{organization}/plans` | Plan management | 3 complete |
+| GET/POST/PATCH/DELETE | `/api/v1/mobile/organizations/{organization}/voucher-batches` | Voucher batch management | 3 complete |
 | GET | `/api/v1/mobile/organizations/{organization}/sales` | Sales summaries and paginated transactions | 4 |
 | POST | `/api/v1/mobile/organizations/{organization}/cash-activations` | Idempotent direct cash activation | 4 |
 | GET | `/api/v1/mobile/organizations/{organization}/customers` | Customer list and details | 4 |

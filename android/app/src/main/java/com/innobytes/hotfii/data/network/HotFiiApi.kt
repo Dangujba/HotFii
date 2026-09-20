@@ -7,6 +7,9 @@ import com.innobytes.hotfii.data.network.dto.LoginResponseDto
 import com.innobytes.hotfii.data.network.dto.LoginSessionDto
 import com.innobytes.hotfii.data.network.dto.SessionDto
 import com.innobytes.hotfii.data.network.dto.PasswordRequestDto
+import com.innobytes.hotfii.data.network.dto.AccessPlanDto
+import com.innobytes.hotfii.data.network.dto.PlanCatalogDto
+import com.innobytes.hotfii.data.network.dto.PlanRequestDto
 import com.innobytes.hotfii.data.network.dto.TwoFactorCodeRequestDto
 import com.innobytes.hotfii.data.network.dto.TwoFactorConfirmationDto
 import com.innobytes.hotfii.data.network.dto.TwoFactorSetupDto
@@ -51,6 +54,34 @@ interface HotFiiApi {
         @Path("organization") organizationId: String,
         @Query("router") routerId: String? = null,
     ): ApiEnvelope<DashboardDto>
+
+    @GET("organizations/{organization}/plans")
+    suspend fun plans(
+        @Path("organization") organizationId: String,
+        @Query("search") search: String? = null,
+        @Query("type") type: String? = null,
+        @Query("state") state: String? = null,
+        @Query("page") page: Int = 1,
+    ): ApiEnvelope<PlanCatalogDto>
+
+    @POST("organizations/{organization}/plans")
+    suspend fun createPlan(
+        @Path("organization") organizationId: String,
+        @Body request: PlanRequestDto,
+    ): ApiEnvelope<AccessPlanDto>
+
+    @PATCH("organizations/{organization}/plans/{plan}")
+    suspend fun updatePlan(
+        @Path("organization") organizationId: String,
+        @Path("plan") planId: String,
+        @Body request: PlanRequestDto,
+    ): ApiEnvelope<AccessPlanDto>
+
+    @DELETE("organizations/{organization}/plans/{plan}")
+    suspend fun deletePlan(
+        @Path("organization") organizationId: String,
+        @Path("plan") planId: String,
+    )
 
     @GET("organizations/{organization}/voucher-batches")
     suspend fun voucherBatches(

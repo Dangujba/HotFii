@@ -1,5 +1,6 @@
 package com.innobytes.hotfii.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,10 +70,12 @@ import com.innobytes.hotfii.domain.OrganizationSummary
 import com.innobytes.hotfii.domain.TwoFactorSetup
 import com.innobytes.hotfii.domain.UserSession
 import com.innobytes.hotfii.ui.vouchers.VoucherScreen
+import com.innobytes.hotfii.ui.plans.PlanScreen
 import com.innobytes.hotfii.ui.workspace.WorkspaceScreen
 
 private enum class MainDestination(val label: String, val icon: ImageVector) {
     Dashboard("Dashboard", Icons.Outlined.Dashboard),
+    Plans("Plans", Icons.Outlined.Tune),
     Vouchers("Vouchers", Icons.Outlined.ConfirmationNumber),
     Account("Account", Icons.Outlined.Person),
 }
@@ -89,6 +93,10 @@ fun AuthenticatedShell(
 ) {
     val session = requireNotNull(state.session)
     var destination by rememberSaveable { mutableStateOf(MainDestination.Dashboard) }
+
+    BackHandler(enabled = destination != MainDestination.Dashboard) {
+        destination = MainDestination.Dashboard
+    }
 
     Scaffold(
         bottomBar = {
@@ -119,6 +127,17 @@ fun AuthenticatedShell(
                     onRefresh = viewModel::refresh,
                     onDashboardRefresh = viewModel::refreshDashboard,
                     onSignOut = viewModel::signOut,
+                )
+
+                MainDestination.Plans -> PlanScreen(
+                    organizationId = state.selectedOrganizationId,
+                    organizationName = state.selectedOrganization?.name,
+                    state = state.plans,
+                    onLoad = viewModel::loadPlans,
+                    onCreate = viewModel::createPlan,
+                    onUpdate = viewModel::updatePlan,
+                    onDelete = viewModel::deletePlan,
+                    onFeedbackDismissed = viewModel::clearPlanFeedback,
                 )
 
                 MainDestination.Vouchers -> VoucherScreen(

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\IntegrationTestStatusController;
+use App\Http\Controllers\Api\MobileAccessPlanController;
 use App\Http\Controllers\Api\MobileDashboardController;
 use App\Http\Controllers\Api\MobileSessionController;
 use App\Http\Controllers\Api\MobileVoucherBatchController;
@@ -31,6 +32,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 ->name('organizations.')
                 ->group(function () {
                     Route::get('/dashboard', MobileDashboardController::class)->name('dashboard');
+                    Route::get('/plans', [MobileAccessPlanController::class, 'index'])->name('plans.index');
+                    Route::post('/plans', [MobileAccessPlanController::class, 'store'])->name('plans.store');
+                    Route::patch('/plans/{plan}', [MobileAccessPlanController::class, 'update'])->name('plans.update');
+                    Route::delete('/plans/{plan}', [MobileAccessPlanController::class, 'destroy'])->name('plans.destroy');
                     Route::get('/voucher-batches', [MobileVoucherBatchController::class, 'index'])->name('voucher-batches.index');
                     Route::post('/voucher-batches', [MobileVoucherBatchController::class, 'store'])->name('voucher-batches.store');
                     Route::get('/voucher-batches/{batch}', [MobileVoucherBatchController::class, 'show'])->name('voucher-batches.show');

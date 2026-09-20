@@ -2,6 +2,7 @@ package com.innobytes.hotfii.ui
 
 import com.innobytes.hotfii.MainDispatcherRule
 import com.innobytes.hotfii.data.repository.DashboardRepository
+import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
 import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
 import com.innobytes.hotfii.data.repository.VoucherRepository
@@ -10,6 +11,13 @@ import com.innobytes.hotfii.domain.DashboardPulse
 import com.innobytes.hotfii.domain.DashboardSnapshot
 import com.innobytes.hotfii.domain.HourlySessions
 import com.innobytes.hotfii.domain.OrganizationSummary
+import com.innobytes.hotfii.domain.AccessPlanSummary
+import com.innobytes.hotfii.domain.PlanCatalog
+import com.innobytes.hotfii.domain.PlanFilters
+import com.innobytes.hotfii.domain.PlanInput
+import com.innobytes.hotfii.domain.PlanOptions
+import com.innobytes.hotfii.domain.PlanPagination
+import com.innobytes.hotfii.domain.PlanPermissions
 import com.innobytes.hotfii.domain.RevenueTrend
 import com.innobytes.hotfii.domain.RouterSummary
 import com.innobytes.hotfii.domain.SessionUser
@@ -47,7 +55,7 @@ class MainViewModelTest {
         )
         val dashboardRepository = FakeDashboardRepository()
 
-        val viewModel = MainViewModel(repository, dashboardRepository, FakeVoucherRepository())
+        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository())
 
         assertFalse(viewModel.state.value.isRestoring)
         assertEquals("org-two", viewModel.state.value.selectedOrganization?.id)
@@ -57,7 +65,7 @@ class MainViewModelTest {
     @Test
     fun `successful sign in opens the server default organization`() = runTest {
         val repository = FakeSessionRepository(signInSession = session())
-        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakeVoucherRepository())
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository())
 
         viewModel.signIn("owner@example.com", "password")
 
@@ -72,7 +80,7 @@ class MainViewModelTest {
             signInSession = session(),
             twoFactorRequired = true,
         )
-        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakeVoucherRepository())
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository())
 
         viewModel.signIn("owner@example.com", "password")
 
@@ -89,7 +97,7 @@ class MainViewModelTest {
     fun `organization selection is limited to the authenticated membership list`() = runTest {
         val repository = FakeSessionRepository(restoredSession = session())
         val dashboardRepository = FakeDashboardRepository()
-        val viewModel = MainViewModel(repository, dashboardRepository, FakeVoucherRepository())
+        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository())
 
         viewModel.selectOrganization("outside-org")
         assertEquals("org-one", viewModel.state.value.selectedOrganization?.id)
@@ -105,6 +113,7 @@ class MainViewModelTest {
         val viewModel = MainViewModel(
             FakeSessionRepository(restoredSession = session()),
             dashboardRepository,
+            FakePlanRepository(),
             FakeVoucherRepository(),
         )
 
@@ -122,6 +131,7 @@ class MainViewModelTest {
         val viewModel = MainViewModel(
             FakeSessionRepository(restoredSession = session()),
             FakeDashboardRepository(),
+            FakePlanRepository(),
             vouchers,
         )
         val filters = VoucherFilters(search = "VB-2609", status = "printed")
@@ -131,6 +141,24 @@ class MainViewModelTest {
         assertEquals(Triple("org-one", filters, 2), vouchers.catalogRequests.single())
         assertEquals(filters, viewModel.state.value.vouchers.filters)
         assertEquals(0, viewModel.state.value.vouchers.catalog?.pagination?.total)
+    }
+
+    @Test
+    fun plan_filters_and_pagination_are_sent_for_the_selected_organization() = runTest {
+        val plans = FakePlanRepository()
+        val viewModel = MainViewModel(
+            FakeSessionRepository(restoredSession = session()),
+            FakeDashboardRepository(),
+            plans,
+            FakeVoucherRepository(),
+        )
+        val filters = PlanFilters(search = "Day", type = "paid", state = "active")
+
+        viewModel.loadPlans(filters, 3)
+
+        assertEquals(Triple("org-one", filters, 3), plans.catalogRequests.single())
+        assertEquals(filters, viewModel.state.value.plans.filters)
+        assertEquals(0, viewModel.state.value.plans.catalog?.pagination?.total)
     }
 
     private fun session() = UserSession(
@@ -160,6 +188,35 @@ class MainViewModelTest {
         timezone = "Africa/Lagos",
         permissions = setOf("manage_plans"),
     )
+}
+
+private class FakePlanRepository : PlanRepository {
+    val catalogRequests = mutableListOf<Triple<String, PlanFilters, Int>>()
+
+    override suspend fun catalog(
+        organizationId: String,
+        filters: PlanFilters,
+        page: Int,
+    ): PlanCatalog {
+        catalogRequests += Triple(organizationId, filters, page)
+        return PlanCatalog(
+            plans = emptyList(),
+            pagination = PlanPagination(page, page, 20, 0),
+            options = PlanOptions(emptyList(), emptyList(), "Africa/Lagos"),
+            permissions = PlanPermissions(canManage = true),
+        )
+    }
+
+    override suspend fun create(organizationId: String, input: PlanInput): AccessPlanSummary =
+        error("Not used in this test")
+
+    override suspend fun update(
+        organizationId: String,
+        planId: String,
+        input: PlanInput,
+    ): AccessPlanSummary = error("Not used in this test")
+
+    override suspend fun delete(organizationId: String, planId: String) = Unit
 }
 
 private class FakeVoucherRepository : VoucherRepository {

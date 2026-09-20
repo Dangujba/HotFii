@@ -5,11 +5,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.innobytes.hotfii.data.repository.DashboardRepository
+import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
 import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
 import com.innobytes.hotfii.data.repository.VoucherRepository
 import com.innobytes.hotfii.domain.DashboardSnapshot
 import com.innobytes.hotfii.domain.OrganizationSummary
+import com.innobytes.hotfii.domain.AccessPlanSummary
+import com.innobytes.hotfii.domain.PlanCatalog
+import com.innobytes.hotfii.domain.PlanFilters
+import com.innobytes.hotfii.domain.PlanInput
 import com.innobytes.hotfii.domain.UserSession
 import com.innobytes.hotfii.domain.TwoFactorSetup
 import com.innobytes.hotfii.domain.VoucherBatchDetail
@@ -23,6 +28,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+data class PlanUiState(
+    val isLoading: Boolean = false,
+    val isActionRunning: Boolean = false,
+    val catalog: PlanCatalog? = null,
+    val filters: PlanFilters = PlanFilters(),
+    val error: String? = null,
+    val notice: String? = null,
+)
 
 data class VoucherUiState(
     val isLoading: Boolean = false,
@@ -52,6 +66,7 @@ data class MainUiState(
     val securityError: String? = null,
     val securityNotice: String? = null,
     val dashboardError: String? = null,
+    val plans: PlanUiState = PlanUiState(),
     val vouchers: VoucherUiState = VoucherUiState(),
 ) {
     val selectedOrganization: OrganizationSummary?
@@ -62,6 +77,7 @@ data class MainUiState(
 class MainViewModel(
     private val sessionRepository: SessionRepository,
     private val dashboardRepository: DashboardRepository,
+    private val planRepository: PlanRepository,
     private val voucherRepository: VoucherRepository,
 ) : ViewModel() {
     private var pendingLoginEmail: String? = null
@@ -184,6 +200,7 @@ class MainViewModel(
                 selectedRouterId = null,
                 dashboard = null,
                 dashboardError = null,
+                plans = PlanUiState(),
                 vouchers = VoucherUiState(),
             )
         }
@@ -300,6 +317,117 @@ class MainViewModel(
         _state.update {
             it.copy(securityError = null, securityNotice = null, recoveryCodes = emptyList())
         }
+    }
+
+    fun loadPlans(
+        filters: PlanFilters = _state.value.plans.filters,
+        page: Int = 1,
+    ) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(plans = it.plans.copy(
+                    isLoading = true,
+                    filters = filters,
+                    error = null,
+                    notice = null,
+                ))
+            }
+            runCatching { planRepository.catalog(organizationId, filters, page) }
+                .onSuccess { catalog ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(plans = current.plans.copy(
+                            isLoading = false,
+                            catalog = catalog,
+                        ))
+                    }
+                }
+                .onFailure { error ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(plans = current.plans.copy(
+                            isLoading = false,
+                            error = error.message ?: "Plans could not be loaded.",
+                        ))
+                    }
+                }
+        }
+    }
+
+    fun createPlan(input: PlanInput) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(plans = it.plans.copy(isActionRunning = true, error = null, notice = null))
+            }
+            runCatching { planRepository.create(organizationId, input) }
+                .onSuccess {
+                    val catalog = runCatching {
+                        planRepository.catalog(organizationId, _state.value.plans.filters, 1)
+                    }.getOrNull()
+                    _state.update { current ->
+                        current.copy(plans = current.plans.copy(
+                            isActionRunning = false,
+                            catalog = catalog ?: current.plans.catalog,
+                            notice = "Access plan created.",
+                        ))
+                    }
+                }
+                .onFailure { planActionFailed(it, "Access plan could not be created.") }
+        }
+    }
+
+    fun updatePlan(plan: AccessPlanSummary, input: PlanInput) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(plans = it.plans.copy(isActionRunning = true, error = null, notice = null))
+            }
+            runCatching { planRepository.update(organizationId, plan.id, input) }
+                .onSuccess {
+                    val page = _state.value.plans.catalog?.pagination?.currentPage ?: 1
+                    val catalog = runCatching {
+                        planRepository.catalog(organizationId, _state.value.plans.filters, page)
+                    }.getOrNull()
+                    _state.update { current ->
+                        current.copy(plans = current.plans.copy(
+                            isActionRunning = false,
+                            catalog = catalog ?: current.plans.catalog,
+                            notice = "Access plan updated.",
+                        ))
+                    }
+                }
+                .onFailure { planActionFailed(it, "Access plan could not be updated.") }
+        }
+    }
+
+    fun deletePlan(plan: AccessPlanSummary) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(plans = it.plans.copy(isActionRunning = true, error = null, notice = null))
+            }
+            runCatching { planRepository.delete(organizationId, plan.id) }
+                .onSuccess {
+                    val page = _state.value.plans.catalog?.pagination?.currentPage ?: 1
+                    val catalog = runCatching {
+                        planRepository.catalog(organizationId, _state.value.plans.filters, page)
+                    }.getOrNull()
+                    _state.update { current ->
+                        current.copy(plans = current.plans.copy(
+                            isActionRunning = false,
+                            catalog = catalog ?: current.plans.catalog,
+                            notice = "Unused access plan deleted.",
+                        ))
+                    }
+                }
+                .onFailure { planActionFailed(it, "Access plan could not be deleted.") }
+        }
+    }
+
+    fun clearPlanFeedback() {
+        _state.update { it.copy(plans = it.plans.copy(error = null, notice = null)) }
     }
 
     fun loadVouchers(
@@ -593,15 +721,26 @@ class MainViewModel(
         }
     }
 
+    private fun planActionFailed(error: Throwable, fallback: String) {
+        Log.e("HotFiiPlan", fallback, error)
+        _state.update {
+            it.copy(plans = it.plans.copy(
+                isActionRunning = false,
+                error = error.message ?: fallback,
+            ))
+        }
+    }
+
     companion object {
         fun factory(
             sessionRepository: SessionRepository,
             dashboardRepository: DashboardRepository,
+            planRepository: PlanRepository,
             voucherRepository: VoucherRepository,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                MainViewModel(sessionRepository, dashboardRepository, voucherRepository) as T
+                MainViewModel(sessionRepository, dashboardRepository, planRepository, voucherRepository) as T
         }
     }
 }

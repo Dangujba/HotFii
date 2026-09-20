@@ -29,6 +29,7 @@ class MainActivity : FragmentActivity() {
         MainViewModel.factory(
             application.container.sessionRepository,
             application.container.dashboardRepository,
+            application.container.planRepository,
             application.container.voucherRepository,
         )
     }

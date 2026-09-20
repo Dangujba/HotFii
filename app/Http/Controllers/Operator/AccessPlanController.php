@@ -6,12 +6,11 @@ use App\Domain\Enums\PlanValidityMode;
 use App\Http\Controllers\Controller;
 use App\Models\AccessPlan;
 use App\Models\Organization;
+use App\Services\Access\AccessPlanManager;
 use App\Support\ListFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AccessPlanController extends Controller
@@ -44,74 +43,40 @@ class AccessPlanController extends Controller
         ]);
     }
 
-    public function store(Request $request, Organization $organization): RedirectResponse
+    public function store(Request $request, Organization $organization, AccessPlanManager $manager): RedirectResponse
     {
         // A paid plan priced at 0 is a contradiction that costs money: every
         // voucher generated from it snapshots 0, and VoucherService then skips
         // the sales counters and the fee ledger entirely. Free and internal
         // plans are the legitimate home for 0, so the floor is conditional.
         $data = $this->validatedPlan($request, $organization);
-        $organization->accessPlans()->create($this->attributes($data));
+        $manager->create($organization, $this->attributes($data));
 
         return back()->with('success', 'Access plan created.');
     }
 
-    public function update(Request $request, Organization $organization, AccessPlan $plan): RedirectResponse
+    public function update(
+        Request $request,
+        Organization $organization,
+        AccessPlan $plan,
+        AccessPlanManager $manager,
+    ): RedirectResponse
     {
-        $this->guardPlan($organization, $plan);
+        abort_unless($plan->organization_id === $organization->id, 404);
         $data = $this->validatedPlan($request, $organization, $plan);
         $attributes = $this->attributes($data) + ['is_active' => $request->boolean('is_active')];
-
-        DB::transaction(function () use ($organization, $plan, $attributes): void {
-            $plan = $organization->accessPlans()->whereKey($plan->id)->lockForUpdate()->firstOrFail();
-
-            if ($this->hasUsage($plan)) {
-                $protected = [
-                    'access_type',
-                    'duration_minutes',
-                    'data_limit_bytes',
-                    'download_kbps',
-                    'upload_kbps',
-                    'simultaneous_use',
-                    'validity_days',
-                    'validity_mode',
-                ];
-
-                foreach ($protected as $field) {
-                    $current = $plan->getRawOriginal($field);
-                    $next = $attributes[$field] instanceof \BackedEnum
-                        ? $attributes[$field]->value
-                        : $attributes[$field];
-
-                    if ((string) ($current ?? '') !== (string) ($next ?? '')) {
-                        throw ValidationException::withMessages([
-                            'plan' => 'This plan has already been issued or sold. Its type and access limits are locked to protect existing customers. You can still change its name, future price, or active status.',
-                        ]);
-                    }
-                }
-            }
-
-            $plan->update($attributes);
-        });
+        $manager->update($organization, $plan, $attributes);
 
         return back()->with('success', 'Access plan updated.');
     }
 
-    public function destroy(Organization $organization, AccessPlan $plan): RedirectResponse
+    public function destroy(
+        Organization $organization,
+        AccessPlan $plan,
+        AccessPlanManager $manager,
+    ): RedirectResponse
     {
-        $this->guardPlan($organization, $plan);
-
-        DB::transaction(function () use ($organization, $plan): void {
-            $plan = $organization->accessPlans()->whereKey($plan->id)->lockForUpdate()->firstOrFail();
-
-            if ($this->hasUsage($plan)) {
-                throw ValidationException::withMessages([
-                    'plan' => 'This plan is already linked to vouchers, sales, or access records and cannot be deleted. Edit it and switch off Active instead.',
-                ]);
-            }
-
-            $plan->delete();
-        });
+        $manager->delete($organization, $plan);
 
         return back()->with('success', 'Unused access plan deleted.');
     }
@@ -156,16 +121,4 @@ class AccessPlanController extends Controller
         ];
     }
 
-    private function hasUsage(AccessPlan $plan): bool
-    {
-        return $plan->voucherBatches()->exists()
-            || $plan->transactions()->exists()
-            || $plan->accessCredentials()->exists()
-            || $plan->sessions()->exists();
-    }
-
-    private function guardPlan(Organization $organization, AccessPlan $plan): void
-    {
-        abort_unless($plan->organization_id === $organization->id, 404);
-    }
 }
