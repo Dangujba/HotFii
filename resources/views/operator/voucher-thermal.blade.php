@@ -112,7 +112,12 @@
 <header class="toolbar">
     <div>
         <strong>Thermal vouchers · 58 mm</strong>
-        <small>{{ $batch->reference }} · {{ $batch->vouchers->count() }} vouchers@if(($printParts ?? 1) > 1) · part {{ $printPart }} of {{ $printParts }}@endif</small>
+        <small>
+            {{ $batch->reference }} · {{ $batch->vouchers->count() }} vouchers
+            @if(($printParts ?? 1) > 1)
+                · part {{ $printPart }} of {{ $printParts }}
+            @endif
+        </small>
     </div>
     <div class="actions">
         <a class="button" href="{{ route('vouchers.print', $pdfRoute) }}">A4 PDF</a>
