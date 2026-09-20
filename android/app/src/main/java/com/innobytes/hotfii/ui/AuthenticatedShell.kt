@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -71,10 +72,12 @@ import com.innobytes.hotfii.domain.TwoFactorSetup
 import com.innobytes.hotfii.domain.UserSession
 import com.innobytes.hotfii.ui.vouchers.VoucherScreen
 import com.innobytes.hotfii.ui.plans.PlanScreen
+import com.innobytes.hotfii.ui.sales.SalesScreen
 import com.innobytes.hotfii.ui.workspace.WorkspaceScreen
 
 private enum class MainDestination(val label: String, val icon: ImageVector) {
     Dashboard("Dashboard", Icons.Outlined.Dashboard),
+    Sales("Sales", Icons.Outlined.Storefront),
     Plans("Plans", Icons.Outlined.Tune),
     Vouchers("Vouchers", Icons.Outlined.ConfirmationNumber),
     Account("Account", Icons.Outlined.Person),
@@ -127,6 +130,19 @@ fun AuthenticatedShell(
                     onRefresh = viewModel::refresh,
                     onDashboardRefresh = viewModel::refreshDashboard,
                     onSignOut = viewModel::signOut,
+                )
+
+                MainDestination.Sales -> SalesScreen(
+                    organizationId = state.selectedOrganizationId,
+                    organizationName = state.selectedOrganization?.name,
+                    state = state.sales,
+                    onLoad = viewModel::loadSales,
+                    onLoadCustomers = viewModel::loadCustomers,
+                    onOpenCustomer = viewModel::openCustomer,
+                    onCloseCustomer = viewModel::closeCustomer,
+                    onRecordCash = viewModel::recordCashSale,
+                    onFeedbackDismissed = viewModel::clearSalesFeedback,
+                    onCredentialConsumed = viewModel::consumeIssuedCredential,
                 )
 
                 MainDestination.Plans -> PlanScreen(

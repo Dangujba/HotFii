@@ -18,6 +18,11 @@ import com.innobytes.hotfii.data.network.dto.VoucherCatalogDto
 import com.innobytes.hotfii.data.network.dto.VoucherCreateRequestDto
 import com.innobytes.hotfii.data.network.dto.VoucherEditRequestDto
 import com.innobytes.hotfii.data.network.dto.VoucherShareDto
+import com.innobytes.hotfii.data.network.dto.CashSaleRequestDto
+import com.innobytes.hotfii.data.network.dto.CashSaleResultDto
+import com.innobytes.hotfii.data.network.dto.CustomerCatalogDto
+import com.innobytes.hotfii.data.network.dto.CustomerDetailDto
+import com.innobytes.hotfii.data.network.dto.SalesCatalogDto
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -82,6 +87,40 @@ interface HotFiiApi {
         @Path("organization") organizationId: String,
         @Path("plan") planId: String,
     )
+
+    @GET("organizations/{organization}/sales")
+    suspend fun sales(
+        @Path("organization") organizationId: String,
+        @Query("search") search: String? = null,
+        @Query("status") status: String? = null,
+        @Query("channel") channel: String? = null,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+        @Query("router") routerId: String? = null,
+        @Query("transactions_page") transactionsPage: Int = 1,
+        @Query("vouchers_page") vouchersPage: Int = 1,
+    ): ApiEnvelope<SalesCatalogDto>
+
+    @POST("organizations/{organization}/sales/cash")
+    suspend fun recordCashSale(
+        @Path("organization") organizationId: String,
+        @Body request: CashSaleRequestDto,
+    ): ApiEnvelope<CashSaleResultDto>
+
+    @GET("organizations/{organization}/customers")
+    suspend fun customers(
+        @Path("organization") organizationId: String,
+        @Query("search") search: String? = null,
+        @Query("type") type: String? = null,
+        @Query("status") status: String? = null,
+        @Query("page") page: Int = 1,
+    ): ApiEnvelope<CustomerCatalogDto>
+
+    @GET("organizations/{organization}/customers/{customer}")
+    suspend fun customer(
+        @Path("organization") organizationId: String,
+        @Path("customer") customerId: String,
+    ): ApiEnvelope<CustomerDetailDto>
 
     @GET("organizations/{organization}/voucher-batches")
     suspend fun voucherBatches(

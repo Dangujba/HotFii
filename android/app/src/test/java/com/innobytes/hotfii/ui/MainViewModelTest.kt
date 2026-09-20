@@ -4,12 +4,14 @@ import com.innobytes.hotfii.MainDispatcherRule
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
+import com.innobytes.hotfii.data.repository.SalesRepository
 import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
 import com.innobytes.hotfii.data.repository.VoucherRepository
 import com.innobytes.hotfii.domain.DashboardAlerts
 import com.innobytes.hotfii.domain.DashboardPulse
 import com.innobytes.hotfii.domain.DashboardSnapshot
 import com.innobytes.hotfii.domain.HourlySessions
+import com.innobytes.hotfii.domain.IssuedCredential
 import com.innobytes.hotfii.domain.OrganizationSummary
 import com.innobytes.hotfii.domain.AccessPlanSummary
 import com.innobytes.hotfii.domain.PlanCatalog
@@ -18,6 +20,19 @@ import com.innobytes.hotfii.domain.PlanInput
 import com.innobytes.hotfii.domain.PlanOptions
 import com.innobytes.hotfii.domain.PlanPagination
 import com.innobytes.hotfii.domain.PlanPermissions
+import com.innobytes.hotfii.domain.CashSaleInput
+import com.innobytes.hotfii.domain.CashSaleResult
+import com.innobytes.hotfii.domain.CustomerCatalog
+import com.innobytes.hotfii.domain.CustomerDetail
+import com.innobytes.hotfii.domain.CustomerFilters
+import com.innobytes.hotfii.domain.CustomerOptions
+import com.innobytes.hotfii.domain.SalesCatalog
+import com.innobytes.hotfii.domain.SalesFilters
+import com.innobytes.hotfii.domain.SalesOptions
+import com.innobytes.hotfii.domain.SalesPagination
+import com.innobytes.hotfii.domain.SalesPermissions
+import com.innobytes.hotfii.domain.SalesSummary
+import com.innobytes.hotfii.domain.SalesTransaction
 import com.innobytes.hotfii.domain.RevenueTrend
 import com.innobytes.hotfii.domain.RouterSummary
 import com.innobytes.hotfii.domain.SessionUser
@@ -33,7 +48,9 @@ import com.innobytes.hotfii.domain.VoucherOptions
 import com.innobytes.hotfii.domain.VoucherPagination
 import com.innobytes.hotfii.domain.VoucherPermissions
 import com.innobytes.hotfii.domain.VoucherShare
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -55,7 +72,7 @@ class MainViewModelTest {
         )
         val dashboardRepository = FakeDashboardRepository()
 
-        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository())
+        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository())
 
         assertFalse(viewModel.state.value.isRestoring)
         assertEquals("org-two", viewModel.state.value.selectedOrganization?.id)
@@ -65,7 +82,7 @@ class MainViewModelTest {
     @Test
     fun `successful sign in opens the server default organization`() = runTest {
         val repository = FakeSessionRepository(signInSession = session())
-        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository())
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository())
 
         viewModel.signIn("owner@example.com", "password")
 
@@ -80,7 +97,7 @@ class MainViewModelTest {
             signInSession = session(),
             twoFactorRequired = true,
         )
-        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository())
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository())
 
         viewModel.signIn("owner@example.com", "password")
 
@@ -97,7 +114,7 @@ class MainViewModelTest {
     fun `organization selection is limited to the authenticated membership list`() = runTest {
         val repository = FakeSessionRepository(restoredSession = session())
         val dashboardRepository = FakeDashboardRepository()
-        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository())
+        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository())
 
         viewModel.selectOrganization("outside-org")
         assertEquals("org-one", viewModel.state.value.selectedOrganization?.id)
@@ -115,6 +132,7 @@ class MainViewModelTest {
             dashboardRepository,
             FakePlanRepository(),
             FakeVoucherRepository(),
+            FakeSalesRepository(),
         )
 
         viewModel.selectRouter("outside-router")
@@ -133,6 +151,7 @@ class MainViewModelTest {
             FakeDashboardRepository(),
             FakePlanRepository(),
             vouchers,
+            FakeSalesRepository(),
         )
         val filters = VoucherFilters(search = "VB-2609", status = "printed")
 
@@ -151,6 +170,7 @@ class MainViewModelTest {
             FakeDashboardRepository(),
             plans,
             FakeVoucherRepository(),
+            FakeSalesRepository(),
         )
         val filters = PlanFilters(search = "Day", type = "paid", state = "active")
 
@@ -159,6 +179,47 @@ class MainViewModelTest {
         assertEquals(Triple("org-one", filters, 3), plans.catalogRequests.single())
         assertEquals(filters, viewModel.state.value.plans.filters)
         assertEquals(0, viewModel.state.value.plans.catalog?.pagination?.total)
+    }
+
+    @Test
+    fun sales_filters_and_both_pages_are_sent_for_the_selected_organization() = runTest {
+        val sales = FakeSalesRepository()
+        val viewModel = MainViewModel(
+            FakeSessionRepository(restoredSession = session()),
+            FakeDashboardRepository(),
+            FakePlanRepository(),
+            FakeVoucherRepository(),
+            sales,
+        )
+        val filters = SalesFilters(channel = "voucher", routerId = "router-one")
+
+        viewModel.loadSales(filters, transactionsPage = 2, vouchersPage = 3)
+
+        assertEquals(SalesRequest("org-one", filters, 2, 3), sales.catalogRequests.single())
+        assertEquals(filters, viewModel.state.value.sales.filters)
+        assertEquals(0, viewModel.state.value.sales.catalog?.transactionsPagination?.total)
+    }
+
+    @Test
+    fun `cash response from the previous organization is ignored after switching`() = runTest {
+        val pending = CompletableDeferred<CashSaleResult>()
+        val sales = FakeSalesRepository(pending)
+        val viewModel = MainViewModel(
+            FakeSessionRepository(restoredSession = session()),
+            FakeDashboardRepository(),
+            FakePlanRepository(),
+            FakeVoucherRepository(),
+            sales,
+        )
+
+        viewModel.recordCashSale(CashSaleInput("plan-one", "router-one", "Aisha", "08030000000"))
+        viewModel.selectOrganization("org-two")
+        pending.complete(cashSaleResult())
+        advanceUntilIdle()
+
+        assertEquals("org-two", viewModel.state.value.selectedOrganizationId)
+        assertNull(viewModel.state.value.sales.issuedCredential)
+        assertNull(viewModel.state.value.sales.notice)
     }
 
     private fun session() = UserSession(
@@ -188,6 +249,71 @@ class MainViewModelTest {
         timezone = "Africa/Lagos",
         permissions = setOf("manage_plans"),
     )
+
+    private fun cashSaleResult() = CashSaleResult(
+        transaction = SalesTransaction(
+            id = "sale-one",
+            reference = "HF-CASH-ONE",
+            saleType = "cash",
+            status = "successful",
+            grossAmountKobo = 500_00,
+            platformFeeKobo = 1000,
+            routerName = "Main router",
+            customerName = "Aisha",
+            customerContact = "08030000000",
+            planName = "One Day",
+            paidAt = "2026-09-20T12:00:00+01:00",
+            createdAt = "2026-09-20T12:00:00+01:00",
+        ),
+        credential = IssuedCredential("hf-aisha", "secret"),
+    )
+}
+
+private data class SalesRequest(
+    val organizationId: String,
+    val filters: SalesFilters,
+    val transactionsPage: Int,
+    val vouchersPage: Int,
+)
+
+private class FakeSalesRepository(
+    private val pendingCashResult: CompletableDeferred<CashSaleResult>? = null,
+) : SalesRepository {
+    val catalogRequests = mutableListOf<SalesRequest>()
+
+    override suspend fun catalog(
+        organizationId: String,
+        filters: SalesFilters,
+        transactionsPage: Int,
+        vouchersPage: Int,
+    ): SalesCatalog {
+        catalogRequests += SalesRequest(organizationId, filters, transactionsPage, vouchersPage)
+        return SalesCatalog(
+            summary = SalesSummary(0, 0, 0, 0, 0),
+            transactions = emptyList(),
+            transactionsPagination = SalesPagination(transactionsPage, transactionsPage, 20, 0),
+            voucherActivations = emptyList(),
+            vouchersPagination = SalesPagination(vouchersPage, vouchersPage, 20, 0),
+            options = SalesOptions(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()),
+            permissions = SalesPermissions(canRecordCash = true, cashUnavailableReason = null),
+        )
+    }
+
+    override suspend fun recordCash(organizationId: String, input: CashSaleInput): CashSaleResult =
+        pendingCashResult?.await() ?: error("Not used in this test")
+
+    override suspend fun customers(
+        organizationId: String,
+        filters: CustomerFilters,
+        page: Int,
+    ): CustomerCatalog = CustomerCatalog(
+        customers = emptyList(),
+        pagination = SalesPagination(page, page, 20, 0),
+        options = CustomerOptions(emptyList(), emptyList()),
+    )
+
+    override suspend fun customer(organizationId: String, customerId: String): CustomerDetail =
+        error("Not used in this test")
 }
 
 private class FakePlanRepository : PlanRepository {

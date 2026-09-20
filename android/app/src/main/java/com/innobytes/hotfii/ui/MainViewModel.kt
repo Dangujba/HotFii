@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
+import com.innobytes.hotfii.data.repository.SalesRepository
 import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
 import com.innobytes.hotfii.data.repository.VoucherRepository
 import com.innobytes.hotfii.domain.DashboardSnapshot
@@ -15,6 +16,13 @@ import com.innobytes.hotfii.domain.AccessPlanSummary
 import com.innobytes.hotfii.domain.PlanCatalog
 import com.innobytes.hotfii.domain.PlanFilters
 import com.innobytes.hotfii.domain.PlanInput
+import com.innobytes.hotfii.domain.CashSaleInput
+import com.innobytes.hotfii.domain.CustomerCatalog
+import com.innobytes.hotfii.domain.CustomerDetail
+import com.innobytes.hotfii.domain.CustomerFilters
+import com.innobytes.hotfii.domain.IssuedCredential
+import com.innobytes.hotfii.domain.SalesCatalog
+import com.innobytes.hotfii.domain.SalesFilters
 import com.innobytes.hotfii.domain.UserSession
 import com.innobytes.hotfii.domain.TwoFactorSetup
 import com.innobytes.hotfii.domain.VoucherBatchDetail
@@ -50,6 +58,19 @@ data class VoucherUiState(
     val pendingThermalPrint: VoucherShare? = null,
 )
 
+data class SalesUiState(
+    val isLoading: Boolean = false,
+    val isActionRunning: Boolean = false,
+    val catalog: SalesCatalog? = null,
+    val filters: SalesFilters = SalesFilters(),
+    val customerCatalog: CustomerCatalog? = null,
+    val customerFilters: CustomerFilters = CustomerFilters(),
+    val customerDetail: CustomerDetail? = null,
+    val error: String? = null,
+    val notice: String? = null,
+    val issuedCredential: IssuedCredential? = null,
+)
+
 data class MainUiState(
     val isRestoring: Boolean = true,
     val isSubmitting: Boolean = false,
@@ -68,6 +89,7 @@ data class MainUiState(
     val dashboardError: String? = null,
     val plans: PlanUiState = PlanUiState(),
     val vouchers: VoucherUiState = VoucherUiState(),
+    val sales: SalesUiState = SalesUiState(),
 ) {
     val selectedOrganization: OrganizationSummary?
         get() = session?.organizations?.firstOrNull { it.id == selectedOrganizationId }
@@ -79,6 +101,7 @@ class MainViewModel(
     private val dashboardRepository: DashboardRepository,
     private val planRepository: PlanRepository,
     private val voucherRepository: VoucherRepository,
+    private val salesRepository: SalesRepository,
 ) : ViewModel() {
     private var pendingLoginEmail: String? = null
     private var pendingLoginPassword: String? = null
@@ -202,6 +225,7 @@ class MainViewModel(
                 dashboardError = null,
                 plans = PlanUiState(),
                 vouchers = VoucherUiState(),
+                sales = SalesUiState(),
             )
         }
         loadDashboard(id, null)
@@ -641,6 +665,167 @@ class MainViewModel(
         _state.update { it.copy(vouchers = it.vouchers.copy(error = null, notice = null)) }
     }
 
+    fun loadSales(
+        filters: SalesFilters = _state.value.sales.filters,
+        transactionsPage: Int = 1,
+        vouchersPage: Int = 1,
+    ) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(sales = it.sales.copy(
+                    isLoading = true,
+                    filters = filters,
+                    error = null,
+                    notice = null,
+                ))
+            }
+            runCatching {
+                salesRepository.catalog(organizationId, filters, transactionsPage, vouchersPage)
+            }
+                .onSuccess { catalog ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(sales = current.sales.copy(
+                            isLoading = false,
+                            catalog = catalog,
+                            error = null,
+                        ))
+                    }
+                }
+                .onFailure { error ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(sales = current.sales.copy(
+                            isLoading = false,
+                            error = error.message ?: "Sales could not be loaded.",
+                        ))
+                    }
+                }
+        }
+    }
+
+    fun recordCashSale(input: CashSaleInput) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(sales = it.sales.copy(
+                    isActionRunning = true,
+                    error = null,
+                    notice = null,
+                    issuedCredential = null,
+                ))
+            }
+            runCatching { salesRepository.recordCash(organizationId, input) }
+                .onSuccess { result ->
+                    if (_state.value.selectedOrganizationId != organizationId) return@onSuccess
+                    val current = _state.value.sales
+                    val catalog = runCatching {
+                        salesRepository.catalog(
+                            organizationId,
+                            current.filters,
+                            current.catalog?.transactionsPagination?.currentPage ?: 1,
+                            current.catalog?.vouchersPagination?.currentPage ?: 1,
+                        )
+                    }.getOrNull()
+                    _state.update { state ->
+                        if (state.selectedOrganizationId != organizationId) state
+                        else state.copy(sales = state.sales.copy(
+                                isActionRunning = false,
+                                catalog = catalog ?: state.sales.catalog,
+                                customerCatalog = null,
+                                issuedCredential = result.credential,
+                                notice = "Direct cash sale recorded and access activated.",
+                            ))
+                    }
+                }
+                .onFailure { error ->
+                    Log.e("HotFiiSales", "Direct cash sale could not be recorded.", error)
+                    _state.update { state ->
+                        if (state.selectedOrganizationId != organizationId) state
+                        else state.copy(sales = state.sales.copy(
+                                isActionRunning = false,
+                                error = error.message ?: "Direct cash sale could not be recorded.",
+                            ))
+                    }
+                }
+        }
+    }
+
+    fun loadCustomers(
+        filters: CustomerFilters = _state.value.sales.customerFilters,
+        page: Int = 1,
+    ) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(sales = it.sales.copy(
+                    isLoading = true,
+                    customerFilters = filters,
+                    customerDetail = null,
+                    error = null,
+                ))
+            }
+            runCatching { salesRepository.customers(organizationId, filters, page) }
+                .onSuccess { catalog ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(sales = current.sales.copy(
+                            isLoading = false,
+                            customerCatalog = catalog,
+                        ))
+                    }
+                }
+                .onFailure { error ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(sales = current.sales.copy(
+                            isLoading = false,
+                            error = error.message ?: "Customers could not be loaded.",
+                        ))
+                    }
+                }
+        }
+    }
+
+    fun openCustomer(customerId: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(sales = it.sales.copy(isLoading = true, error = null)) }
+            runCatching { salesRepository.customer(organizationId, customerId) }
+                .onSuccess { detail ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(sales = current.sales.copy(
+                            isLoading = false,
+                            customerDetail = detail,
+                        ))
+                    }
+                }
+                .onFailure { error ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(sales = current.sales.copy(
+                                isLoading = false,
+                                error = error.message ?: "Customer details could not be loaded.",
+                            ))
+                    }
+                }
+        }
+    }
+
+    fun closeCustomer() {
+        _state.update { it.copy(sales = it.sales.copy(customerDetail = null, error = null)) }
+    }
+
+    fun clearSalesFeedback() {
+        _state.update { it.copy(sales = it.sales.copy(error = null, notice = null)) }
+    }
+
+    fun consumeIssuedCredential() {
+        _state.update { it.copy(sales = it.sales.copy(issuedCredential = null, notice = null)) }
+    }
+
     private fun restoreSession() {
         viewModelScope.launch {
             runCatching { sessionRepository.restore() }
@@ -737,10 +922,17 @@ class MainViewModel(
             dashboardRepository: DashboardRepository,
             planRepository: PlanRepository,
             voucherRepository: VoucherRepository,
+            salesRepository: SalesRepository,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                MainViewModel(sessionRepository, dashboardRepository, planRepository, voucherRepository) as T
+                MainViewModel(
+                    sessionRepository,
+                    dashboardRepository,
+                    planRepository,
+                    voucherRepository,
+                    salesRepository,
+                ) as T
         }
     }
 }

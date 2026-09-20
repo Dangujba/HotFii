@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\Api\IntegrationTestStatusController;
 use App\Http\Controllers\Api\MobileAccessPlanController;
+use App\Http\Controllers\Api\MobileCustomerController;
 use App\Http\Controllers\Api\MobileDashboardController;
+use App\Http\Controllers\Api\MobileSalesController;
 use App\Http\Controllers\Api\MobileSessionController;
-use App\Http\Controllers\Api\MobileVoucherBatchController;
 use App\Http\Controllers\Api\MobileTwoFactorController;
+use App\Http\Controllers\Api\MobileVoucherBatchController;
 use App\Http\Controllers\Api\NetworkDeviceHeartbeatController;
 use App\Http\Controllers\Api\NetworkDeviceWireGuardEnrollController;
 use App\Http\Controllers\Api\PortalConfigurationController;
@@ -36,6 +38,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                     Route::post('/plans', [MobileAccessPlanController::class, 'store'])->name('plans.store');
                     Route::patch('/plans/{plan}', [MobileAccessPlanController::class, 'update'])->name('plans.update');
                     Route::delete('/plans/{plan}', [MobileAccessPlanController::class, 'destroy'])->name('plans.destroy');
+                    Route::get('/sales', [MobileSalesController::class, 'index'])->name('sales.index');
+                    Route::post('/sales/cash', [MobileSalesController::class, 'store'])->name('sales.cash.store');
+                    Route::get('/customers', [MobileCustomerController::class, 'index'])->name('customers.index');
+                    Route::get('/customers/{customer}', [MobileCustomerController::class, 'show'])->name('customers.show');
                     Route::get('/voucher-batches', [MobileVoucherBatchController::class, 'index'])->name('voucher-batches.index');
                     Route::post('/voucher-batches', [MobileVoucherBatchController::class, 'store'])->name('voucher-batches.store');
                     Route::get('/voucher-batches/{batch}', [MobileVoucherBatchController::class, 'show'])->name('voucher-batches.show');
