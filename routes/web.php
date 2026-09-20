@@ -117,6 +117,7 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
     Route::patch('/vouchers/{batch}', [VoucherBatchController::class, 'update'])->middleware('role:owner,manager')->name('vouchers.update');
     Route::delete('/vouchers/{batch}', [VoucherBatchController::class, 'destroy'])->middleware('role:owner,manager')->name('vouchers.destroy');
     Route::get('/vouchers/{batch}/print', [VoucherBatchController::class, 'print'])->name('vouchers.print');
+    Route::get('/vouchers/{batch}/thermal', [VoucherBatchController::class, 'thermal'])->name('vouchers.thermal');
 
     Route::get('/sales', [SalesController::class, 'index'])->name('sales.index');
     Route::post('/sales/cash', [SalesController::class, 'store'])->middleware('role:owner,manager,agent')->name('sales.cash.store');

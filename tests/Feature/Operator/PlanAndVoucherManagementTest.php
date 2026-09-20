@@ -159,6 +159,24 @@ class PlanAndVoucherManagementTest extends TestCase
         $this->assertDatabaseCount('vouchers', 0);
     }
 
+    public function test_thermal_output_renders_full_vouchers_and_marks_them_printed(): void
+    {
+        $plan = $this->plan('Thermal plan');
+        $batch = app(VoucherService::class)->createBatch($this->organization, $plan, 2);
+        $voucher = $batch->vouchers()->orderBy('id')->firstOrFail();
+
+        $this->get(route('vouchers.thermal', $batch))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertSee('Thermal vouchers')
+            ->assertSee($batch->reference)
+            ->assertSee($voucher->code_cipher)
+            ->assertSee($voucher->serial_number);
+
+        $this->assertDatabaseHas('voucher_batches', ['id' => $batch->id, 'status' => 'printed']);
+        $this->assertDatabaseMissing('vouchers', ['voucher_batch_id' => $batch->id, 'status' => 'generated']);
+    }
+
     public function test_activated_batch_and_cross_organization_records_cannot_be_changed_or_deleted(): void
     {
         $plan = $this->plan('Sold plan');

@@ -18,47 +18,41 @@
     $pdfParts = max(1, (int) ceil($batch->quantity / 100));
 @endphp
 
-@if($pdfParts === 1)
-    <a
-        class="btn btn-sm btn-hotfii"
-        href="{{ route('vouchers.print', $batch) }}"
+<div class="dropdown">
+    <button
+        class="btn btn-sm btn-hotfii dropdown-toggle"
+        type="button"
+        data-bs-toggle="dropdown"
+        aria-expanded="false"
     >
-        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-    </a>
-@else
-    <div class="dropdown">
-        <button
-            class="btn btn-sm btn-hotfii dropdown-toggle"
-            type="button"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
-        >
-            <i class="bi bi-file-earmark-pdf me-1"></i>
-            PDFs ({{ $pdfParts }})
-        </button>
+        <i class="bi bi-printer me-1"></i>Print{{ $pdfParts > 1 ? ' ('.$pdfParts.' parts)' : '' }}
+    </button>
 
-        <ul class="dropdown-menu dropdown-menu-end">
+    <ul class="dropdown-menu dropdown-menu-end">
+        @if($pdfParts === 1)
+            <li><a class="dropdown-item" href="{{ route('vouchers.print', $batch) }}"><i class="bi bi-file-earmark-pdf me-2"></i>A4 PDF</a></li>
+            <li><a class="dropdown-item" href="{{ route('vouchers.thermal', $batch) }}"><i class="bi bi-receipt me-2"></i>Thermal · 58 mm</a></li>
+        @else
+            <li><h6 class="dropdown-header"><i class="bi bi-file-earmark-pdf me-1"></i>A4 PDF</h6></li>
             @for($part = 1; $part <= $pdfParts; $part++)
                 @php
                     $from = (($part - 1) * 100) + 1;
                     $to = min($part * 100, $batch->quantity);
                 @endphp
-
-                <li>
-                    <a
-                        class="dropdown-item"
-                        href="{{ route('vouchers.print', ['batch' => $batch, 'part' => $part]) }}"
-                    >
-                        Part {{ $part }}
-                        <span class="text-secondary">
-                            · vouchers {{ $from }}–{{ $to }}
-                        </span>
-                    </a>
-                </li>
+                <li><a class="dropdown-item" href="{{ route('vouchers.print', ['batch' => $batch, 'part' => $part]) }}">Part {{ $part }} <span class="text-secondary">· {{ $from }}–{{ $to }}</span></a></li>
             @endfor
-        </ul>
-    </div>
-@endif
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header"><i class="bi bi-receipt me-1"></i>Thermal · 58 mm</h6></li>
+            @for($part = 1; $part <= $pdfParts; $part++)
+                @php
+                    $from = (($part - 1) * 100) + 1;
+                    $to = min($part * 100, $batch->quantity);
+                @endphp
+                <li><a class="dropdown-item" href="{{ route('vouchers.thermal', ['batch' => $batch, 'part' => $part]) }}">Part {{ $part }} <span class="text-secondary">· {{ $from }}–{{ $to }}</span></a></li>
+            @endfor
+        @endif
+    </ul>
+</div>
 @if($canManageVouchers)
     <button
         class="btn btn-sm btn-outline-primary"

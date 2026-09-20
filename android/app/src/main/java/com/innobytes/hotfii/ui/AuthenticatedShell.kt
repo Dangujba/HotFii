@@ -100,6 +100,8 @@ fun AuthenticatedShell(
                     onDelete = viewModel::deleteVoucherBatch,
                     onShare = viewModel::shareVoucherPdf,
                     onShareConsumed = viewModel::consumeVoucherPdfShare,
+                    onThermalPrint = viewModel::prepareVoucherThermalPrint,
+                    onThermalPrintConsumed = viewModel::consumeVoucherThermalPrint,
                     onFeedbackDismissed = viewModel::clearVoucherFeedback,
                 )
 

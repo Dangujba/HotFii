@@ -124,6 +124,11 @@ class MobileVoucherBatchTest extends TestCase
 
         $share->assertOk()
             ->assertJsonPath('data.reference', $batch->reference)
+            ->assertJsonPath('data.organization_name', 'BALA STARLINK')
+            ->assertJsonPath('data.plan_name', 'One Day')
+            ->assertJsonPath('data.validity', '1 calendar day, expires at midnight')
+            ->assertJsonPath('data.coverage', 'Main router')
+            ->assertJsonPath('data.price_kobo', 500_00)
             ->assertJsonCount(2, 'data.codes')
             ->assertJsonStructure(['data' => ['codes' => [['id', 'serial_number', 'code']]]]);
         $this->assertDatabaseHas('voucher_batches', ['id' => $batch->id, 'status' => 'printed']);

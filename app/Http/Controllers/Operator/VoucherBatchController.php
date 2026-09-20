@@ -314,6 +314,43 @@ class VoucherBatchController extends Controller
         return $response;
     }
 
+    public function thermal(Request $request, VoucherBatch $batch): Response
+    {
+        $this->guardBatch($request->attributes->get('organization'), $batch);
+
+        $totalParts = max(1, (int) ceil($batch->quantity / self::PDF_CHUNK_SIZE));
+        $part = max(1, $request->integer('part', 1));
+        abort_if($part > $totalParts, 404);
+
+        $batch->load('organization', 'accessPlan', 'networkDevice');
+        $vouchers = $batch->vouchers()
+            ->orderBy('id')
+            ->forPage($part, self::PDF_CHUNK_SIZE)
+            ->get();
+        abort_if($vouchers->isEmpty(), 404);
+
+        $batch->setRelation('vouchers', $vouchers);
+        $response = response()->view('operator.voucher-thermal', [
+            'batch' => $batch,
+            'printPart' => $part,
+            'printParts' => $totalParts,
+        ])->header('Cache-Control', 'no-store, private');
+
+        $batch->vouchers()
+            ->whereIn('id', $vouchers->pluck('id'))
+            ->where('status', VoucherStatus::Generated->value)
+            ->update(['status' => VoucherStatus::Printed->value]);
+
+        if (! $batch->vouchers()->where('status', VoucherStatus::Generated->value)->exists()) {
+            $batch->update([
+                'status' => VoucherStatus::Printed->value,
+                'printed_at' => $batch->printed_at ?? now(),
+            ]);
+        }
+
+        return $response;
+    }
+
     private function coverageRules(Organization $organization): array
     {
         return [

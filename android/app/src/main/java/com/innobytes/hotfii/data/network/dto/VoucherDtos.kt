@@ -107,8 +107,20 @@ data class VoucherEditRequestDto(val networkDeviceId: String, val accessPlanId: 
             VoucherEditRequestDto(input.routerId, input.planId, input.retailPriceKobo)
     }
 }
-data class VoucherShareDto(val reference: String, val codes: List<VoucherShareCodeDto>) {
-    fun toDomain() = VoucherShare(reference, codes.map(VoucherShareCodeDto::toDomain))
+data class VoucherShareDto(
+    val reference: String,
+    val organizationName: String,
+    val planName: String,
+    val access: String,
+    val validity: String,
+    val coverage: String,
+    val priceKobo: Long,
+    val codes: List<VoucherShareCodeDto>,
+) {
+    fun toDomain() = VoucherShare(
+        reference, organizationName, planName, access, validity,
+        coverage, priceKobo, codes.map(VoucherShareCodeDto::toDomain),
+    )
 }
 data class VoucherShareCodeDto(val id: String, val serialNumber: String, val code: String) {
     fun toDomain() = VoucherShareCode(id, serialNumber, code)

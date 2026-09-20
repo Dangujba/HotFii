@@ -243,6 +243,7 @@ class MobileVoucherBatchController extends Controller
     {
         $this->guardBatch($organization, $batch);
         abort_unless($this->canCreate($request, $organization), 403, 'You cannot share vouchers for this organization.');
+        $batch->load('organization', 'accessPlan', 'networkDevice');
         $codes = DB::transaction(function () use ($organization, $batch) {
             $locked = $organization->voucherBatches()->whereKey($batch->id)->lockForUpdate()->firstOrFail();
             $vouchers = $locked->vouchers()->orderBy('id')->get();
@@ -260,7 +261,22 @@ class MobileVoucherBatchController extends Controller
         });
 
         return response()->json([
-            'data' => ['reference' => $batch->reference, 'codes' => $codes],
+            'data' => [
+                'reference' => $batch->reference,
+                'organization_name' => $batch->organization->branding['portal_name']
+                    ?? $batch->organization->name,
+                'plan_name' => $batch->accessPlan->name,
+                'access' => collect([
+                    $batch->accessPlan->duration_minutes
+                        ? number_format($batch->accessPlan->duration_minutes).' min'
+                        : null,
+                    $batch->accessPlan->dataAllowance(),
+                ])->filter()->implode(' · ') ?: 'Unlimited',
+                'validity' => $batch->accessPlan->validityLabel(),
+                'coverage' => $batch->networkDevice?->name ?? 'All routers',
+                'price_kobo' => (int) $batch->retail_price_kobo,
+                'codes' => $codes,
+            ],
         ])->header('Cache-Control', 'no-store, private');
     }
 

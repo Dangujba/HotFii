@@ -21,6 +21,7 @@ import com.innobytes.hotfii.domain.VoucherFilters
 import com.innobytes.hotfii.domain.VoucherOptions
 import com.innobytes.hotfii.domain.VoucherPagination
 import com.innobytes.hotfii.domain.VoucherPermissions
+import com.innobytes.hotfii.domain.VoucherShare
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -167,6 +168,9 @@ private class FakeVoucherRepository : VoucherRepository {
     ): VoucherBatchDetail = error("Not used in this test")
 
     override suspend fun delete(organizationId: String, batchId: String) = Unit
+
+    override suspend fun thermal(organizationId: String, batchId: String): VoucherShare =
+        error("Not used in this test")
 
     override suspend fun sharePdf(
         organizationId: String,

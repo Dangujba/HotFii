@@ -78,7 +78,16 @@ data class VoucherCreateInput(
 
 data class VoucherEditInput(val routerId: String, val planId: String, val retailPriceKobo: Long)
 
-data class VoucherShare(val reference: String, val codes: List<VoucherShareCode>) {
+data class VoucherShare(
+    val reference: String,
+    val organizationName: String,
+    val planName: String,
+    val access: String,
+    val validity: String,
+    val coverage: String,
+    val priceKobo: Long,
+    val codes: List<VoucherShareCode>,
+) {
     fun asPlainText(): String = buildString {
         appendLine("HotFii vouchers - $reference")
         codes.forEach { code -> appendLine("${code.serialNumber}: ${code.code}") }

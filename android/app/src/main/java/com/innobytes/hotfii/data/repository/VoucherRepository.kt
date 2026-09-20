@@ -19,6 +19,7 @@ interface VoucherRepository {
     suspend fun create(organizationId: String, input: VoucherCreateInput): VoucherBatchDetail
     suspend fun update(organizationId: String, batchId: String, input: VoucherEditInput): VoucherBatchDetail
     suspend fun delete(organizationId: String, batchId: String)
+    suspend fun thermal(organizationId: String, batchId: String): VoucherShare
     suspend fun sharePdf(
         organizationId: String,
         batchId: String,
@@ -46,6 +47,8 @@ class DefaultVoucherRepository(
         request { api.updateVoucherBatch(organizationId, batchId, VoucherEditRequestDto.from(input)).data.toDetail() }
     override suspend fun delete(organizationId: String, batchId: String) =
         request { api.deleteVoucherBatch(organizationId, batchId) }
+    override suspend fun thermal(organizationId: String, batchId: String) =
+        request { api.shareVoucherBatch(organizationId, batchId).data.toDomain() }
     override suspend fun sharePdf(
         organizationId: String,
         batchId: String,

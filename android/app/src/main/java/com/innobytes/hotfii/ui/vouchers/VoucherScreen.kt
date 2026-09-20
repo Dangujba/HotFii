@@ -1,12 +1,23 @@
 package com.innobytes.hotfii.ui.vouchers
 
-import android.content.Intent
+import android.Manifest
+import android.app.Activity
+import android.bluetooth.BluetoothAdapter
 import android.content.ClipData
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -18,12 +29,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.FileProvider
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.innobytes.hotfii.domain.*
+import com.innobytes.hotfii.printing.BluetoothThermalPrinter
+import com.innobytes.hotfii.printing.ThermalPrinterDevice
 import com.innobytes.hotfii.ui.VoucherUiState
 import java.text.NumberFormat
 import java.io.File
@@ -31,6 +45,7 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Currency
 import java.util.Locale
+import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
 
 @Composable
@@ -46,9 +61,54 @@ fun VoucherScreen(
     onDelete: (String) -> Unit,
     onShare: (String) -> Unit,
     onShareConsumed: () -> Unit,
+    onThermalPrint: (String) -> Unit,
+    onThermalPrintConsumed: () -> Unit,
     onFeedbackDismissed: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val printer = remember(context) { BluetoothThermalPrinter(context) }
+    var requestedThermalBatchId by remember { mutableStateOf<String?>(null) }
+    var thermalBatch by remember { mutableStateOf<VoucherShare?>(null) }
+    var pairedPrinters by remember { mutableStateOf<List<ThermalPrinterDevice>>(emptyList()) }
+    var thermalError by remember { mutableStateOf<String?>(null) }
+    var noPairedPrinter by remember { mutableStateOf(false) }
+    var isThermalPrinting by remember { mutableStateOf(false) }
+
+    val enableBluetooth = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && printer.isEnabled()) {
+            requestedThermalBatchId?.let(onThermalPrint)
+        } else {
+            thermalError = "Bluetooth must be on before HotFii can print."
+        }
+    }
+    val requestBluetoothPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) {
+            thermalError = "Allow Nearby devices so HotFii can connect to your paired printer."
+        } else if (printer.isEnabled()) {
+            requestedThermalBatchId?.let(onThermalPrint)
+        } else {
+            enableBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+        }
+    }
+    val requestThermalPrint: (String) -> Unit = { batchId ->
+        requestedThermalBatchId = batchId
+        when {
+            !printer.isAvailable() -> thermalError = "Bluetooth is not available on this device."
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                ) != PackageManager.PERMISSION_GRANTED ->
+                requestBluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+            !printer.isEnabled() -> enableBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            else -> onThermalPrint(batchId)
+        }
+    }
     LaunchedEffect(organizationId) {
         if (organizationId != null) onLoad(VoucherFilters(), 1)
     }
@@ -79,6 +139,97 @@ fun VoucherScreen(
         context.startActivity(Intent.createChooser(intent, "Share voucher PDF"))
         onShareConsumed()
     }
+    LaunchedEffect(state.pendingThermalPrint) {
+        val batch = state.pendingThermalPrint ?: return@LaunchedEffect
+        val devices = runCatching { printer.pairedPrinters() }
+            .getOrElse {
+                thermalError = it.message ?: "HotFii could not read paired Bluetooth printers."
+                onThermalPrintConsumed()
+                return@LaunchedEffect
+            }
+        if (devices.isEmpty()) {
+            noPairedPrinter = true
+            thermalError = "No paired Bluetooth printer was found. Pair the printer in Bluetooth settings first."
+            onThermalPrintConsumed()
+        } else {
+            thermalBatch = batch
+            pairedPrinters = devices
+        }
+    }
+
+    if (thermalBatch != null && pairedPrinters.isNotEmpty()) {
+        BluetoothPrinterDialog(
+            devices = pairedPrinters,
+            onDismiss = {
+                thermalBatch = null
+                pairedPrinters = emptyList()
+                onThermalPrintConsumed()
+            },
+            onSelected = { device ->
+                val batch = requireNotNull(thermalBatch)
+                thermalBatch = null
+                pairedPrinters = emptyList()
+                isThermalPrinting = true
+                scope.launch {
+                    runCatching { printer.print(device.address, batch) }
+                        .onSuccess {
+                            Toast.makeText(
+                                context,
+                                "Vouchers sent to ${device.name}.",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                        .onFailure {
+                            thermalError = it.message ?: "HotFii could not print the vouchers."
+                        }
+                    isThermalPrinting = false
+                    onThermalPrintConsumed()
+                }
+            },
+        )
+    }
+    if (thermalError != null) {
+        AlertDialog(
+            onDismissRequest = {
+                thermalError = null
+                noPairedPrinter = false
+            },
+            title = { Text(if (noPairedPrinter) "Pair a thermal printer" else "Thermal printing") },
+            text = { Text(requireNotNull(thermalError)) },
+            confirmButton = {
+                if (noPairedPrinter) {
+                    TextButton(onClick = {
+                        context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                        thermalError = null
+                        noPairedPrinter = false
+                    }) { Text("Open Bluetooth settings") }
+                } else {
+                    TextButton(onClick = { thermalError = null }) { Text("OK") }
+                }
+            },
+            dismissButton = if (noPairedPrinter) {
+                {
+                    TextButton(onClick = {
+                        thermalError = null
+                        noPairedPrinter = false
+                    }) { Text("Cancel") }
+                }
+            } else null,
+        )
+    }
+    if (isThermalPrinting) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Printing vouchers") },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    Text("Sending the batch to the printer...", Modifier.padding(start = 14.dp))
+                }
+            },
+            confirmButton = {},
+        )
+    }
 
     if (state.detail == null) {
         VoucherList(
@@ -87,7 +238,7 @@ fun VoucherScreen(
     } else {
         VoucherDetail(
             state.detail, state.catalog?.options, state, onClose, onUpdate,
-            onDelete, onShare, onFeedbackDismissed,
+            onDelete, onShare, requestThermalPrint, onFeedbackDismissed,
         )
     }
 }
@@ -215,8 +366,15 @@ private fun VoucherList(
                 if (catalog.batches.isEmpty()) {
                     item { EmptyPanel("No voucher batches match these filters.") }
                 } else {
-                    items(catalog.batches, key = { it.id }) { batch ->
-                        BatchRow(batch) { onOpen(batch.id) }
+                    item {
+                        Column {
+                            catalog.batches.forEachIndexed { index, batch ->
+                                BatchRow(batch) { onOpen(batch.id) }
+                                if (index < catalog.batches.lastIndex) {
+                                    HorizontalDivider(Modifier.padding(start = 56.dp))
+                                }
+                            }
+                        }
                     }
                 }
                 if (catalog.pagination.lastPage > 1) {
@@ -253,11 +411,13 @@ private fun VoucherDetail(
     onUpdate: (String, VoucherEditInput) -> Unit,
     onDelete: (String) -> Unit,
     onShare: (String) -> Unit,
+    onThermalPrint: (String) -> Unit,
     onFeedbackDismissed: () -> Unit,
 ) {
     val batch = detail.summary
     var showEdit by rememberSaveable(batch.id) { mutableStateOf(false) }
     var showDelete by rememberSaveable(batch.id) { mutableStateOf(false) }
+    var showPrintOptions by rememberSaveable(batch.id) { mutableStateOf(false) }
     if (showEdit && options != null) {
         EditVoucherDialog(batch, options, state.isActionRunning, { showEdit = false }) {
             showEdit = false
@@ -281,6 +441,19 @@ private fun VoucherDetail(
             dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Cancel") } },
         )
     }
+    if (showPrintOptions) {
+        PrintFormatDialog(
+            onDismiss = { showPrintOptions = false },
+            onPdf = {
+                showPrintOptions = false
+                onShare(batch.id)
+            },
+            onThermal = {
+                showPrintOptions = false
+                onThermalPrint(batch.id)
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -295,8 +468,8 @@ private fun VoucherDetail(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back") }
                 },
                 actions = {
-                    IconButton(onClick = { onShare(batch.id) }, enabled = !state.isActionRunning) {
-                        Icon(Icons.Outlined.Share, contentDescription = "Share voucher PDF")
+                    IconButton(onClick = { showPrintOptions = true }, enabled = !state.isActionRunning) {
+                        Icon(Icons.Outlined.Print, contentDescription = "Print vouchers")
                     }
                     if (batch.canEdit) IconButton(onClick = { showEdit = true }) {
                         Icon(Icons.Outlined.Edit, contentDescription = "Edit unused batch")
@@ -338,7 +511,7 @@ private fun VoucherDetail(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Voucher status", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Share the same printable PDF layout available on the web.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Choose A4 PDF sharing or direct Bluetooth thermal printing.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             items(detail.vouchers, key = { it.id }) { voucher ->
@@ -364,36 +537,112 @@ private fun VoucherDetail(
 private fun BatchRow(batch: VoucherBatchSummary, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surface,
     ) {
-        Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             ) {
-                Text(batch.reference, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                StatusPill(batch.status)
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.ConfirmationNumber, contentDescription = null, Modifier.size(22.dp))
+                }
             }
-            Text(
-                "${batch.plan.name} - ${batch.router?.name ?: "All routers"}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${batch.quantity} vouchers")
+            Column(
+                Modifier.weight(1f).padding(start = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text(
+                    batch.reference,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${batch.plan.name} - ${batch.quantity} vouchers",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${batch.router?.name ?: "All routers"} - ${batch.counts.available} available - ${batch.counts.active} active",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
                 Text(money(batch.retailValueKobo), fontWeight = FontWeight.SemiBold)
+                Text(
+                    batch.status.displayLabel(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
-            Text(
-                "${batch.counts.available} available - ${batch.counts.active} active - ${batch.counts.expired} expired",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
+}
+
+@Composable
+private fun PrintFormatDialog(
+    onDismiss: () -> Unit,
+    onPdf: () -> Unit,
+    onThermal: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose print format") },
+        text = {
+            Column {
+                ListItem(
+                    headlineContent = { Text("A4 PDF") },
+                    supportingContent = { Text("Create the full web-style voucher sheets to share or print.") },
+                    leadingContent = { Icon(Icons.Outlined.PictureAsPdf, contentDescription = null) },
+                    modifier = Modifier.clickable(onClick = onPdf),
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text("Bluetooth thermal") },
+                    supportingContent = { Text("Print compact QR vouchers on a paired ESC/POS printer.") },
+                    leadingContent = { Icon(Icons.Outlined.Print, contentDescription = null) },
+                    modifier = Modifier.clickable(onClick = onThermal),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun BluetoothPrinterDialog(
+    devices: List<ThermalPrinterDevice>,
+    onDismiss: () -> Unit,
+    onSelected: (ThermalPrinterDevice) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose printer") },
+        text = {
+            Column {
+                devices.forEachIndexed { index, device ->
+                    ListItem(
+                        headlineContent = { Text(device.name) },
+                        supportingContent = { Text(device.address) },
+                        leadingContent = { Icon(Icons.Outlined.Print, contentDescription = null) },
+                        modifier = Modifier.clickable { onSelected(device) },
+                    )
+                    if (index < devices.lastIndex) HorizontalDivider()
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

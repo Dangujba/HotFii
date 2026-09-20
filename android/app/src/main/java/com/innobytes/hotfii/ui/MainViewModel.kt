@@ -15,6 +15,7 @@ import com.innobytes.hotfii.domain.VoucherCatalog
 import com.innobytes.hotfii.domain.VoucherCreateInput
 import com.innobytes.hotfii.domain.VoucherEditInput
 import com.innobytes.hotfii.domain.VoucherFilters
+import com.innobytes.hotfii.domain.VoucherShare
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,7 @@ data class VoucherUiState(
     val error: String? = null,
     val notice: String? = null,
     val pendingSharePdfPaths: List<String> = emptyList(),
+    val pendingThermalPrint: VoucherShare? = null,
 )
 
 data class MainUiState(
@@ -315,6 +317,35 @@ class MainViewModel(
 
     fun consumeVoucherPdfShare() {
         _state.update { it.copy(vouchers = it.vouchers.copy(pendingSharePdfPaths = emptyList())) }
+    }
+
+    fun prepareVoucherThermalPrint(batchId: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(vouchers = it.vouchers.copy(isActionRunning = true, error = null, notice = null))
+            }
+            runCatching { voucherRepository.thermal(organizationId, batchId) }
+                .onSuccess { printData ->
+                    val detail = runCatching { voucherRepository.detail(organizationId, batchId) }.getOrNull()
+                    val catalog = runCatching {
+                        voucherRepository.catalog(organizationId, _state.value.vouchers.filters, 1)
+                    }.getOrNull()
+                    _state.update { current ->
+                        current.copy(vouchers = current.vouchers.copy(
+                            isActionRunning = false,
+                            detail = detail ?: current.vouchers.detail,
+                            catalog = catalog ?: current.vouchers.catalog,
+                            pendingThermalPrint = printData,
+                        ))
+                    }
+                }
+                .onFailure { voucherActionFailed(it, "Thermal vouchers could not be prepared.") }
+        }
+    }
+
+    fun consumeVoucherThermalPrint() {
+        _state.update { it.copy(vouchers = it.vouchers.copy(pendingThermalPrint = null)) }
     }
 
     fun clearVoucherFeedback() {
