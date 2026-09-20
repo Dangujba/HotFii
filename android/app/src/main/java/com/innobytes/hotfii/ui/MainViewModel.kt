@@ -1262,6 +1262,7 @@ class MainViewModel(
     }
 
     private fun reportFailed(organizationId: String, error: Throwable, fallback: String) {
+        Log.e("HotFiiReport", fallback, error)
         _state.update { current ->
             if (current.selectedOrganizationId != organizationId) current
             else current.copy(reports = current.reports.copy(
