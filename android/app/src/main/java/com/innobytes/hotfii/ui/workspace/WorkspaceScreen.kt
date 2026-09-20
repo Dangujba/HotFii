@@ -305,32 +305,36 @@ fun WorkspaceScreen(
                         )
                     }
                     if (data.networkHealth.isEmpty()) {
-                        item { EmptyState("No routers have been added yet.") }
+                        item {
+                            SectionCard {
+                                EmptyState("No routers have been added yet.")
+                            }
+                        }
                     } else {
                         item {
-                            Column {
+                            SectionCard {
                                 data.networkHealth.forEachIndexed { index, device ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.Router,
-                                        contentDescription = null,
-                                        tint = statusColor(device.status),
-                                        modifier = Modifier.size(24.dp),
-                                    )
-                                    Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
-                                        Text(device.name, fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "${device.location} - ${device.vendor}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.Router,
+                                            contentDescription = null,
+                                            tint = statusColor(device.status),
+                                            modifier = Modifier.size(24.dp),
                                         )
+                                        Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
+                                            Text(device.name, fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                "${device.location} - ${device.vendor}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        StatusText(device.status)
                                     }
-                                    StatusText(device.status)
-                                }
                                     if (index < data.networkHealth.lastIndex) {
                                         HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                                     }
@@ -490,8 +494,23 @@ private fun Section(
             }
             trailing?.let { Text(it, fontWeight = FontWeight.Bold) }
         }
+        SectionCard {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SectionCard(content: @Composable () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant,
+        ),
+    ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             content()
