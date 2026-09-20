@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.dp
 import com.innobytes.hotfii.domain.*
 import com.innobytes.hotfii.ui.SalesUiState
 import java.text.NumberFormat
+import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Currency
 import java.util.Locale
@@ -436,8 +439,18 @@ private fun SalesFilterDialog(
                 item { ChoiceField("Channel", channel, listOf(null to "All channels") + catalog?.options?.channels.orEmpty().map { it.value to it.label }, { channel = it }, true) }
                 item { ChoiceField("Status", status, listOf(null to "Any status") + catalog?.options?.statuses.orEmpty().map { it to it.replaceFirstChar(Char::uppercase) }, { status = it }, true) }
                 item { ChoiceField("Router", router, listOf(null to "All routers") + catalog?.options?.routers.orEmpty().map { it.id to it.name }, { router = it }, true) }
-                item { OutlinedTextField(from, { from = it }, label = { Text("From (YYYY-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-                item { OutlinedTextField(to, { to = it }, label = { Text("To (YYYY-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                item {
+                    DateFilterField("From", from) { selected ->
+                        from = selected
+                        if (selected.isNotEmpty() && to.isNotEmpty() && selected > to) to = selected
+                    }
+                }
+                item {
+                    DateFilterField("To", to) { selected ->
+                        to = selected
+                        if (selected.isNotEmpty() && from.isNotEmpty() && selected < from) from = selected
+                    }
+                }
             }
         },
         confirmButton = { TextButton(onClick = { onApply(SalesFilters(search.trim(), status, channel, from.trim().ifEmpty { null }, to.trim().ifEmpty { null }, router)) }) { Text("Apply") } },
@@ -448,6 +461,66 @@ private fun SalesFilterDialog(
             }
         },
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateFilterField(label: String, value: String, onValueChange: (String) -> Unit) {
+    var showPicker by rememberSaveable { mutableStateOf(false) }
+
+    Box {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            placeholder = { Text("Select date") },
+            trailingIcon = { Icon(Icons.Outlined.CalendarMonth, null) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(Modifier.matchParentSize().clickable { showPicker = true })
+    }
+
+    if (showPicker) {
+        val initialSelection = remember(value) {
+            runCatching {
+                LocalDate.parse(value).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            }.getOrNull()
+        }
+        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialSelection)
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(
+                    enabled = pickerState.selectedDateMillis != null,
+                    onClick = {
+                        pickerState.selectedDateMillis?.let { millis ->
+                            onValueChange(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString())
+                        }
+                        showPicker = false
+                    },
+                ) { Text("Apply") }
+            },
+            dismissButton = {
+                Row {
+                    if (value.isNotEmpty()) {
+                        TextButton(onClick = {
+                            onValueChange("")
+                            showPicker = false
+                        }) { Text("Clear") }
+                    }
+                    TextButton(onClick = { showPicker = false }) { Text("Cancel") }
+                }
+            },
+        ) {
+            DatePicker(
+                state = pickerState,
+                title = { Text("Select ${label.lowercase()} date", Modifier.padding(start = 24.dp, top = 16.dp)) },
+                showModeToggle = false,
+            )
+        }
+    }
 }
 
 @Composable
