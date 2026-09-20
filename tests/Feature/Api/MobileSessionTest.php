@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Auth\TwoFactorAuthentication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -105,6 +106,57 @@ class MobileSessionTest extends TestCase
         $this->withToken($token)
             ->getJson(route('api.v1.mobile.session.show'))
             ->assertUnauthorized();
+    }
+
+    public function test_operator_can_enable_two_factor_and_must_supply_a_valid_code_at_login(): void
+    {
+        $user = User::factory()->create(['email' => 'secure@example.com']);
+        $user->organizations()->attach($this->organization(), ['role' => 'owner', 'joined_at' => now()]);
+        $token = $user->createToken('android:setup', ['mobile'])->plainTextToken;
+        $twoFactor = app(TwoFactorAuthentication::class);
+
+        $setup = $this->withToken($token)
+            ->postJson(route('api.v1.mobile.auth.two-factor.setup'))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $secret = $setup->json('data.secret');
+
+        $confirmation = $this->withToken($token)
+            ->postJson(route('api.v1.mobile.auth.two-factor.confirm'), [
+                'code' => $twoFactor->currentCode($secret),
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.enabled', true)
+            ->assertJsonCount(8, 'data.recovery_codes');
+
+        $payload = [
+            'email' => 'secure@example.com',
+            'password' => 'password',
+            'device_name' => 'Muhammad Pixel',
+            'device_id' => 'secure-device',
+        ];
+
+        $this->postJson(route('api.v1.mobile.auth.login'), $payload)
+            ->assertAccepted()
+            ->assertJsonPath('two_factor_required', true);
+
+        $this->postJson(route('api.v1.mobile.auth.login'), [
+            ...$payload,
+            'two_factor_code' => '000000',
+        ])->assertUnprocessable()->assertJsonValidationErrors('two_factor_code');
+
+        $this->postJson(route('api.v1.mobile.auth.login'), [
+            ...$payload,
+            'two_factor_code' => $twoFactor->currentCode($secret),
+        ])->assertCreated()->assertJsonPath('data.user.two_factor_enabled', true);
+
+        $recoveryCode = $confirmation->json('data.recovery_codes.0');
+        $this->postJson(route('api.v1.mobile.auth.login'), [
+            ...$payload,
+            'two_factor_code' => $recoveryCode,
+        ])->assertCreated();
+
+        $this->assertCount(7, $user->fresh()->two_factor_recovery_codes);
     }
 
     private function organization(): Organization

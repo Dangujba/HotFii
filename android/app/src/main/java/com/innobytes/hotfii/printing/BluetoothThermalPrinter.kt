@@ -12,6 +12,11 @@ import kotlinx.coroutines.withContext
 
 data class ThermalPrinterDevice(val name: String, val address: String)
 
+enum class ThermalPaperWidth(val label: String, val columns: Int) {
+    Mm58("58 mm", 32),
+    Mm88("88 mm", 48),
+}
+
 class BluetoothThermalPrinter(context: Context) {
     private val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
 
@@ -28,7 +33,11 @@ class BluetoothThermalPrinter(context: Context) {
         .orEmpty()
 
     @SuppressLint("MissingPermission")
-    suspend fun print(address: String, batch: VoucherShare) = withContext(Dispatchers.IO) {
+    suspend fun print(
+        address: String,
+        batch: VoucherShare,
+        paperWidth: ThermalPaperWidth,
+    ) = withContext(Dispatchers.IO) {
         val bluetoothAdapter = adapter ?: throw ThermalPrinterException("Bluetooth is not available on this device.")
         if (!bluetoothAdapter.isEnabled) {
             throw ThermalPrinterException("Turn on Bluetooth before printing.")
@@ -41,7 +50,7 @@ class BluetoothThermalPrinter(context: Context) {
         try {
             socket.connect()
             socket.outputStream.use { output ->
-                output.write(EscPosVoucherFormatter.format(batch))
+                output.write(EscPosVoucherFormatter.format(batch, paperWidth))
                 output.flush()
             }
         } catch (error: Exception) {
@@ -62,40 +71,41 @@ class BluetoothThermalPrinter(context: Context) {
 class ThermalPrinterException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 object EscPosVoucherFormatter {
-    private const val LINE_WIDTH = 32
-
-    fun format(batch: VoucherShare): ByteArray = ByteArrayOutputStream().use { output ->
+    fun format(
+        batch: VoucherShare,
+        paperWidth: ThermalPaperWidth = ThermalPaperWidth.Mm58,
+    ): ByteArray = ByteArrayOutputStream().use { output ->
         output.command(0x1B, 0x40)
         batch.codes.forEach { voucher ->
             output.align(1)
             output.bold(true)
-            output.text(center(batch.organizationName))
+            output.text(center(batch.organizationName, paperWidth.columns))
             output.bold(false)
-            output.text(center("Wi-Fi access | HotFii"))
-            output.text(divider())
+            output.text(center("Wi-Fi access | HotFii", paperWidth.columns))
+            output.text(divider(paperWidth.columns))
             output.bold(true)
-            output.text(center(batch.planName))
+            output.text(center(batch.planName, paperWidth.columns))
             output.bold(false)
-            output.text(center("VOUCHER PIN"))
+            output.text(center("VOUCHER PIN", paperWidth.columns))
             output.size(1, 1)
             output.bold(true)
-            output.text(center(voucher.code))
+            output.text(center(voucher.code, paperWidth.columns))
             output.bold(false)
             output.size(0, 0)
-            output.text(center(voucher.serialNumber))
+            output.text(center(voucher.serialNumber, paperWidth.columns))
             output.feed(1)
             output.qr(voucher.code)
             output.feed(1)
             output.align(0)
-            output.text(detail("Access", batch.access))
-            output.text(detail("Validity", batch.validity))
-            output.text(detail("Value", price(batch.priceKobo)))
-            output.text(detail("Valid on", batch.coverage))
-            output.text(divider())
+            output.text(detail("Access", batch.access, paperWidth.columns))
+            output.text(detail("Validity", batch.validity, paperWidth.columns))
+            output.text(detail("Value", price(batch.priceKobo), paperWidth.columns))
+            output.text(detail("Valid on", batch.coverage, paperWidth.columns))
+            output.text(divider(paperWidth.columns))
             output.align(1)
-            output.text(center("Scan QR or enter the PIN"))
-            output.text(center("Validity starts on first use"))
-            output.text(center(batch.reference))
+            output.text(center("Scan QR or enter the PIN", paperWidth.columns))
+            output.text(center("Validity starts on first use", paperWidth.columns))
+            output.text(center(batch.reference, paperWidth.columns))
             output.feed(4)
             output.command(0x1D, 0x56, 0x42, 0x00)
         }
@@ -127,19 +137,19 @@ object EscPosVoucherFormatter {
         command(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30)
     }
 
-    private fun center(value: String): String {
-        val clean = ascii(value).take(LINE_WIDTH)
-        return clean.padStart(clean.length + ((LINE_WIDTH - clean.length) / 2))
+    private fun center(value: String, columns: Int): String {
+        val clean = ascii(value).take(columns)
+        return clean.padStart(clean.length + ((columns - clean.length) / 2))
     }
 
-    private fun detail(label: String, value: String): String {
+    private fun detail(label: String, value: String, columns: Int): String {
         val cleanLabel = ascii(label).take(10)
         val cleanValue = ascii(value)
-        val available = (LINE_WIDTH - cleanLabel.length - 1).coerceAtLeast(1)
+        val available = (columns - cleanLabel.length - 1).coerceAtLeast(1)
         return "$cleanLabel ${cleanValue.take(available)}"
     }
 
-    private fun divider(): String = "-".repeat(LINE_WIDTH)
+    private fun divider(columns: Int): String = "-".repeat(columns)
 
     private fun price(kobo: Long): String = if (kobo % 100 == 0L) {
         "NGN ${kobo / 100}"

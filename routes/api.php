@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\IntegrationTestStatusController;
 use App\Http\Controllers\Api\MobileDashboardController;
 use App\Http\Controllers\Api\MobileSessionController;
 use App\Http\Controllers\Api\MobileVoucherBatchController;
+use App\Http\Controllers\Api\MobileTwoFactorController;
 use App\Http\Controllers\Api\NetworkDeviceHeartbeatController;
 use App\Http\Controllers\Api\NetworkDeviceWireGuardEnrollController;
 use App\Http\Controllers\Api\PortalConfigurationController;
@@ -19,6 +20,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::middleware(['auth:sanctum', 'abilities:mobile'])->group(function () {
             Route::get('/session', [MobileSessionController::class, 'show'])->name('session.show');
             Route::delete('/auth/logout', [MobileSessionController::class, 'destroy'])->name('auth.logout');
+            Route::post('/auth/two-factor/setup', [MobileTwoFactorController::class, 'store'])->name('auth.two-factor.setup');
+            Route::post('/auth/two-factor/confirm', [MobileTwoFactorController::class, 'confirm'])
+                ->middleware('throttle:10,1')
+                ->name('auth.two-factor.confirm');
+            Route::delete('/auth/two-factor', [MobileTwoFactorController::class, 'destroy'])->name('auth.two-factor.destroy');
 
             Route::prefix('/organizations/{organization}')
                 ->middleware('mobile-organization')

@@ -6,10 +6,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
+import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
 import com.innobytes.hotfii.data.repository.VoucherRepository
 import com.innobytes.hotfii.domain.DashboardSnapshot
 import com.innobytes.hotfii.domain.OrganizationSummary
 import com.innobytes.hotfii.domain.UserSession
+import com.innobytes.hotfii.domain.TwoFactorSetup
 import com.innobytes.hotfii.domain.VoucherBatchDetail
 import com.innobytes.hotfii.domain.VoucherCatalog
 import com.innobytes.hotfii.domain.VoucherCreateInput
@@ -43,6 +45,12 @@ data class MainUiState(
     val selectedRouterId: String? = null,
     val dashboard: DashboardSnapshot? = null,
     val error: String? = null,
+    val requiresTwoFactor: Boolean = false,
+    val securityActionRunning: Boolean = false,
+    val twoFactorSetup: TwoFactorSetup? = null,
+    val recoveryCodes: List<String> = emptyList(),
+    val securityError: String? = null,
+    val securityNotice: String? = null,
     val dashboardError: String? = null,
     val vouchers: VoucherUiState = VoucherUiState(),
 ) {
@@ -56,6 +64,8 @@ class MainViewModel(
     private val dashboardRepository: DashboardRepository,
     private val voucherRepository: VoucherRepository,
 ) : ViewModel() {
+    private var pendingLoginEmail: String? = null
+    private var pendingLoginPassword: String? = null
     private val _state = MutableStateFlow(MainUiState())
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
@@ -70,19 +80,72 @@ class MainViewModel(
         }
 
         viewModelScope.launch {
-            _state.update { it.copy(isSubmitting = true, error = null) }
+            pendingLoginEmail = email
+            pendingLoginPassword = password
+            _state.update { it.copy(isSubmitting = true, error = null, requiresTwoFactor = false) }
             runCatching { sessionRepository.signIn(email, password) }
-                .onSuccess(::openSession)
+                .onSuccess {
+                    pendingLoginEmail = null
+                    pendingLoginPassword = null
+                    openSession(it)
+                }
+                .onFailure { error ->
+                    if (error is TwoFactorRequiredException) {
+                        _state.update {
+                            it.copy(
+                                isRestoring = false,
+                                isSubmitting = false,
+                                requiresTwoFactor = true,
+                                error = null,
+                            )
+                        }
+                    } else {
+                        pendingLoginEmail = null
+                        pendingLoginPassword = null
+                        _state.update {
+                            it.copy(
+                                isRestoring = false,
+                                isSubmitting = false,
+                                error = error.message ?: "Sign in failed.",
+                            )
+                        }
+                    }
+                }
+        }
+    }
+
+    fun verifyTwoFactor(code: String) {
+        val email = pendingLoginEmail ?: return
+        val password = pendingLoginPassword ?: return
+        if (code.isBlank()) {
+            _state.update { it.copy(error = "Enter your authenticator or recovery code.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _state.update { it.copy(isSubmitting = true, error = null) }
+            runCatching { sessionRepository.signIn(email, password, code.trim()) }
+                .onSuccess {
+                    pendingLoginEmail = null
+                    pendingLoginPassword = null
+                    openSession(it)
+                }
                 .onFailure { error ->
                     _state.update {
                         it.copy(
-                            isRestoring = false,
                             isSubmitting = false,
-                            error = error.message ?: "Sign in failed.",
+                            requiresTwoFactor = true,
+                            error = error.message ?: "The verification code is invalid.",
                         )
                     }
                 }
         }
+    }
+
+    fun cancelTwoFactor() {
+        pendingLoginEmail = null
+        pendingLoginPassword = null
+        _state.update { it.copy(requiresTwoFactor = false, error = null, isSubmitting = false) }
     }
 
     fun clearLoginError() {
@@ -138,6 +201,104 @@ class MainViewModel(
             _state.update { it.copy(isSubmitting = true, error = null) }
             sessionRepository.signOut()
             _state.value = MainUiState(isRestoring = false)
+        }
+    }
+
+    fun beginTwoFactorSetup() {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    securityActionRunning = true,
+                    securityError = null,
+                    securityNotice = null,
+                    recoveryCodes = emptyList(),
+                )
+            }
+            runCatching { sessionRepository.setupTwoFactor() }
+                .onSuccess { setup ->
+                    _state.update { it.copy(securityActionRunning = false, twoFactorSetup = setup) }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            securityActionRunning = false,
+                            securityError = error.message ?: "Two-factor setup could not be started.",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun confirmTwoFactor(code: String) {
+        if (code.isBlank()) {
+            _state.update { it.copy(securityError = "Enter the six-digit authenticator code.") }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(securityActionRunning = true, securityError = null) }
+            runCatching { sessionRepository.confirmTwoFactor(code.trim()) }
+                .onSuccess { confirmation ->
+                    _state.update { current ->
+                        current.copy(
+                            securityActionRunning = false,
+                            session = current.session?.copy(
+                                user = current.session.user.copy(twoFactorEnabled = true),
+                            ),
+                            twoFactorSetup = null,
+                            recoveryCodes = confirmation.recoveryCodes,
+                            securityNotice = "Two-factor authentication is enabled.",
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            securityActionRunning = false,
+                            securityError = error.message ?: "The authenticator code could not be confirmed.",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun cancelTwoFactorSetup() {
+        _state.update { it.copy(twoFactorSetup = null, securityError = null) }
+    }
+
+    fun disableTwoFactor(password: String) {
+        if (password.isBlank()) {
+            _state.update { it.copy(securityError = "Enter your password to disable two-factor authentication.") }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(securityActionRunning = true, securityError = null) }
+            runCatching { sessionRepository.disableTwoFactor(password) }
+                .onSuccess {
+                    _state.update { current ->
+                        current.copy(
+                            securityActionRunning = false,
+                            session = current.session?.copy(
+                                user = current.session.user.copy(twoFactorEnabled = false),
+                            ),
+                            recoveryCodes = emptyList(),
+                            securityNotice = "Two-factor authentication disabled.",
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            securityActionRunning = false,
+                            securityError = error.message ?: "Two-factor authentication could not be disabled.",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun clearSecurityFeedback() {
+        _state.update {
+            it.copy(securityError = null, securityNotice = null, recoveryCodes = emptyList())
         }
     }
 

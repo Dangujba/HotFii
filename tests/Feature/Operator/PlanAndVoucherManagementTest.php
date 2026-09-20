@@ -165,16 +165,19 @@ class PlanAndVoucherManagementTest extends TestCase
         $batch = app(VoucherService::class)->createBatch($this->organization, $plan, 2);
         $voucher = $batch->vouchers()->orderBy('id')->firstOrFail();
 
-        $this->get(route('vouchers.thermal', $batch))
+        $this->get(route('vouchers.thermal', ['batch' => $batch, 'width' => 88]))
             ->assertOk()
             ->assertHeader('Cache-Control', 'no-store, private')
             ->assertSee('Thermal vouchers')
+            ->assertSee('88 mm')
             ->assertSee($batch->reference)
             ->assertSee($voucher->code_cipher)
             ->assertSee($voucher->serial_number);
 
         $this->assertDatabaseHas('voucher_batches', ['id' => $batch->id, 'status' => 'printed']);
         $this->assertDatabaseMissing('vouchers', ['voucher_batch_id' => $batch->id, 'status' => 'generated']);
+
+        $this->get(route('vouchers.thermal', ['batch' => $batch, 'width' => 70]))->assertNotFound();
     }
 
     public function test_activated_batch_and_cross_organization_records_cannot_be_changed_or_deleted(): void

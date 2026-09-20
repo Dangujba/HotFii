@@ -44,9 +44,9 @@
             cursor: pointer;
         }
         .button.primary { background: #f4610a; border-color: #f4610a; color: #fff; }
-        .roll { width: 58mm; margin: 18px auto; }
+        .roll { width: {{ $paperWidth }}mm; margin: 18px auto; }
         .voucher {
-            width: 58mm;
+            width: {{ $paperWidth }}mm;
             min-height: 72mm;
             margin: 0 0 10px;
             padding: 3.2mm 3mm 3.8mm;
@@ -81,10 +81,10 @@
         .reference { margin-top: 2mm; text-align: center; color: #66736c; font-size: 7.5px; }
 
         @media print {
-            @page { size: 58mm 76mm; margin: 0; }
-            body { width: 58mm; background: #fff; }
+            @page { size: {{ $paperWidth }}mm 76mm; margin: 0; }
+            body { width: {{ $paperWidth }}mm; background: #fff; }
             .toolbar { display: none !important; }
-            .roll { width: 58mm; margin: 0; }
+            .roll { width: {{ $paperWidth }}mm; margin: 0; }
             .voucher {
                 margin: 0;
                 border: 0;
@@ -111,7 +111,7 @@
 
 <header class="toolbar">
     <div>
-        <strong>Thermal vouchers · 58 mm</strong>
+        <strong>Thermal vouchers · {{ $paperWidth }} mm</strong>
         <small>
             {{ $batch->reference }} · {{ $batch->vouchers->count() }} vouchers
             @if(($printParts ?? 1) > 1)

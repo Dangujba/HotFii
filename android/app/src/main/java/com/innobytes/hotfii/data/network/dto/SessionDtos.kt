@@ -13,6 +13,13 @@ data class LoginRequestDto(
     val password: String,
     val deviceName: String,
     val deviceId: String,
+    val twoFactorCode: String? = null,
+)
+
+data class LoginResponseDto(
+    val data: LoginSessionDto?,
+    val twoFactorRequired: Boolean = false,
+    val message: String? = null,
 )
 
 data class LoginSessionDto(
@@ -48,6 +55,7 @@ data class SessionUserDto(
     val email: String,
     val phone: String?,
     val timezone: String,
+    val twoFactorEnabled: Boolean,
 ) {
     fun toDomain() = SessionUser(
         id = id,
@@ -55,8 +63,14 @@ data class SessionUserDto(
         email = email,
         phone = phone,
         timezone = timezone,
+        twoFactorEnabled = twoFactorEnabled,
     )
 }
+
+data class TwoFactorCodeRequestDto(val code: String)
+data class PasswordRequestDto(val password: String)
+data class TwoFactorSetupDto(val secret: String, val provisioningUri: String)
+data class TwoFactorConfirmationDto(val enabled: Boolean, val recoveryCodes: List<String>)
 
 data class OrganizationDto(
     val id: String,

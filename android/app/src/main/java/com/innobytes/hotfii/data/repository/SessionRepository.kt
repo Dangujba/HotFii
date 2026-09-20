@@ -5,8 +5,12 @@ import com.google.gson.Gson
 import com.innobytes.hotfii.data.network.HotFiiApi
 import com.innobytes.hotfii.data.network.dto.ApiErrorDto
 import com.innobytes.hotfii.data.network.dto.LoginRequestDto
+import com.innobytes.hotfii.data.network.dto.PasswordRequestDto
+import com.innobytes.hotfii.data.network.dto.TwoFactorCodeRequestDto
 import com.innobytes.hotfii.data.security.SecureSessionStore
 import com.innobytes.hotfii.domain.UserSession
+import com.innobytes.hotfii.domain.TwoFactorConfirmation
+import com.innobytes.hotfii.domain.TwoFactorSetup
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -16,9 +20,12 @@ import retrofit2.HttpException
 import retrofit2.Response
 
 interface SessionRepository {
-    suspend fun signIn(email: String, password: String): UserSession
+    suspend fun signIn(email: String, password: String, twoFactorCode: String? = null): UserSession
     suspend fun restore(): UserSession?
     suspend fun signOut()
+    suspend fun setupTwoFactor(): TwoFactorSetup
+    suspend fun confirmTwoFactor(code: String): TwoFactorConfirmation
+    suspend fun disableTwoFactor(password: String)
     fun selectedOrganizationId(): String?
     fun selectOrganization(id: String)
 }
@@ -28,7 +35,11 @@ class DefaultSessionRepository(
     private val sessionStore: SecureSessionStore,
     private val gson: Gson,
 ) : SessionRepository {
-    override suspend fun signIn(email: String, password: String): UserSession = try {
+    override suspend fun signIn(
+        email: String,
+        password: String,
+        twoFactorCode: String?,
+    ): UserSession = try {
         val response = api.login(
             LoginRequestDto(
                 email = email.trim(),
@@ -38,8 +49,15 @@ class DefaultSessionRepository(
                     .joinToString(" ")
                     .ifBlank { "Android" },
                 deviceId = sessionStore.deviceId(),
+                twoFactorCode = twoFactorCode,
             ),
         )
+
+        if (response.code() == 202 && response.body()?.twoFactorRequired == true) {
+            throw TwoFactorRequiredException(
+                response.body()?.message ?: "Enter your authenticator code to continue.",
+            )
+        }
 
         if (!response.isSuccessful) {
             throw response.toSessionException(
@@ -78,6 +96,34 @@ class DefaultSessionRepository(
     override suspend fun signOut() {
         runCatching { api.logout() }
         sessionStore.clearToken()
+    }
+
+    override suspend fun setupTwoFactor(): TwoFactorSetup = try {
+        api.setupTwoFactor().data.let { TwoFactorSetup(it.secret, it.provisioningUri) }
+    } catch (error: HttpException) {
+        throw error.toSessionException("Two-factor setup could not be started.")
+    } catch (error: IOException) {
+        throw error.toSessionException()
+    }
+
+    override suspend fun confirmTwoFactor(code: String): TwoFactorConfirmation = try {
+        api.confirmTwoFactor(TwoFactorCodeRequestDto(code)).data.let {
+            TwoFactorConfirmation(it.recoveryCodes)
+        }
+    } catch (error: HttpException) {
+        throw error.toSessionException("The authenticator code could not be confirmed.")
+    } catch (error: IOException) {
+        throw error.toSessionException()
+    }
+
+    override suspend fun disableTwoFactor(password: String) {
+        try {
+            api.disableTwoFactor(PasswordRequestDto(password))
+        } catch (error: HttpException) {
+            throw error.toSessionException("Two-factor authentication could not be disabled.")
+        } catch (error: IOException) {
+            throw error.toSessionException()
+        }
     }
 
     override fun selectedOrganizationId(): String? = sessionStore.selectedOrganizationId()
@@ -133,3 +179,4 @@ private fun IOException.toSessionException(): SessionException = SessionExceptio
 )
 
 class SessionException(message: String) : Exception(message)
+class TwoFactorRequiredException(message: String) : Exception(message)

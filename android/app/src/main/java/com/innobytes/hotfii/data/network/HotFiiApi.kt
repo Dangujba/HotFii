@@ -3,8 +3,13 @@ package com.innobytes.hotfii.data.network
 import com.innobytes.hotfii.data.network.dto.ApiEnvelope
 import com.innobytes.hotfii.data.network.dto.DashboardDto
 import com.innobytes.hotfii.data.network.dto.LoginRequestDto
+import com.innobytes.hotfii.data.network.dto.LoginResponseDto
 import com.innobytes.hotfii.data.network.dto.LoginSessionDto
 import com.innobytes.hotfii.data.network.dto.SessionDto
+import com.innobytes.hotfii.data.network.dto.PasswordRequestDto
+import com.innobytes.hotfii.data.network.dto.TwoFactorCodeRequestDto
+import com.innobytes.hotfii.data.network.dto.TwoFactorConfirmationDto
+import com.innobytes.hotfii.data.network.dto.TwoFactorSetupDto
 import com.innobytes.hotfii.data.network.dto.VoucherBatchDto
 import com.innobytes.hotfii.data.network.dto.VoucherCatalogDto
 import com.innobytes.hotfii.data.network.dto.VoucherCreateRequestDto
@@ -15,6 +20,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Path
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -23,13 +29,22 @@ import retrofit2.http.Streaming
 
 interface HotFiiApi {
     @POST("auth/login")
-    suspend fun login(@Body request: LoginRequestDto): Response<ApiEnvelope<LoginSessionDto>>
+    suspend fun login(@Body request: LoginRequestDto): Response<LoginResponseDto>
 
     @GET("session")
     suspend fun session(): ApiEnvelope<SessionDto>
 
     @DELETE("auth/logout")
     suspend fun logout()
+
+    @POST("auth/two-factor/setup")
+    suspend fun setupTwoFactor(): ApiEnvelope<TwoFactorSetupDto>
+
+    @POST("auth/two-factor/confirm")
+    suspend fun confirmTwoFactor(@Body request: TwoFactorCodeRequestDto): ApiEnvelope<TwoFactorConfirmationDto>
+
+    @HTTP(method = "DELETE", path = "auth/two-factor", hasBody = true)
+    suspend fun disableTwoFactor(@Body request: PasswordRequestDto)
 
     @GET("organizations/{organization}/dashboard")
     suspend fun dashboard(

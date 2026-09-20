@@ -3,6 +3,7 @@ package com.innobytes.hotfii.ui
 import com.innobytes.hotfii.MainDispatcherRule
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
+import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
 import com.innobytes.hotfii.data.repository.VoucherRepository
 import com.innobytes.hotfii.domain.DashboardAlerts
 import com.innobytes.hotfii.domain.DashboardPulse
@@ -12,6 +13,8 @@ import com.innobytes.hotfii.domain.OrganizationSummary
 import com.innobytes.hotfii.domain.RevenueTrend
 import com.innobytes.hotfii.domain.RouterSummary
 import com.innobytes.hotfii.domain.SessionUser
+import com.innobytes.hotfii.domain.TwoFactorConfirmation
+import com.innobytes.hotfii.domain.TwoFactorSetup
 import com.innobytes.hotfii.domain.UserSession
 import com.innobytes.hotfii.domain.VoucherBatchDetail
 import com.innobytes.hotfii.domain.VoucherCatalog
@@ -27,6 +30,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -60,6 +64,25 @@ class MainViewModelTest {
         assertEquals("org-one", viewModel.state.value.selectedOrganization?.id)
         assertEquals("org-one", repository.selectedId)
         assertNull(viewModel.state.value.error)
+    }
+
+    @Test
+    fun `two factor login waits for and submits the verification code`() = runTest {
+        val repository = FakeSessionRepository(
+            signInSession = session(),
+            twoFactorRequired = true,
+        )
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakeVoucherRepository())
+
+        viewModel.signIn("owner@example.com", "password")
+
+        assertTrue(viewModel.state.value.requiresTwoFactor)
+        assertNull(viewModel.state.value.session)
+
+        viewModel.verifyTwoFactor("123456")
+
+        assertEquals(listOf(null, "123456"), repository.submittedCodes)
+        assertEquals("org-one", viewModel.state.value.selectedOrganization?.id)
     }
 
     @Test
@@ -117,6 +140,7 @@ class MainViewModelTest {
             email = "owner@example.com",
             phone = null,
             timezone = "Africa/Lagos",
+            twoFactorEnabled = false,
         ),
         organizations = listOf(
             organization("org-one", "BALA STARLINK"),
@@ -225,14 +249,29 @@ private class FakeDashboardRepository : DashboardRepository {
 private class FakeSessionRepository(
     private val restoredSession: UserSession? = null,
     private val signInSession: UserSession? = null,
+    private val twoFactorRequired: Boolean = false,
     var selectedId: String? = null,
 ) : SessionRepository {
-    override suspend fun signIn(email: String, password: String): UserSession =
-        requireNotNull(signInSession)
+    val submittedCodes = mutableListOf<String?>()
+
+    override suspend fun signIn(email: String, password: String, twoFactorCode: String?): UserSession {
+        submittedCodes += twoFactorCode
+        if (twoFactorRequired && twoFactorCode == null) {
+            throw TwoFactorRequiredException("Enter your authenticator code.")
+        }
+        return requireNotNull(signInSession)
+    }
 
     override suspend fun restore(): UserSession? = restoredSession
 
     override suspend fun signOut() = Unit
+
+    override suspend fun setupTwoFactor(): TwoFactorSetup = error("Not used in this test")
+
+    override suspend fun confirmTwoFactor(code: String): TwoFactorConfirmation =
+        error("Not used in this test")
+
+    override suspend fun disableTwoFactor(password: String) = Unit
 
     override fun selectedOrganizationId(): String? = selectedId
 

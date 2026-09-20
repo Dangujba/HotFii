@@ -6,6 +6,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.FieldNamingPolicy
 import com.innobytes.hotfii.BuildConfig
 import com.innobytes.hotfii.data.network.BearerTokenInterceptor
+import com.innobytes.hotfii.data.preferences.AppPreferences
 import com.innobytes.hotfii.data.network.HotFiiApi
 import com.innobytes.hotfii.data.repository.DefaultSessionRepository
 import com.innobytes.hotfii.data.repository.DashboardRepository
@@ -21,6 +22,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 class AppContainer(context: Context) {
+    val appPreferences = AppPreferences(context)
     private val gson: Gson = GsonBuilder()
         .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
         .create()

@@ -4,11 +4,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.innobytes.hotfii.ui.auth.LoginScreen
+import com.innobytes.hotfii.data.preferences.AppThemeMode
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun HotFiiApp(
     viewModel: MainViewModel,
     onCloseApp: () -> Unit,
+    themeMode: AppThemeMode,
+    onThemeModeChanged: (AppThemeMode) -> Unit,
+    biometricEnabled: Boolean,
+    biometricUnlocked: Boolean,
+    biometricMessage: String?,
+    onRequestBiometricUnlock: () -> Unit,
+    onBiometricChanged: (Boolean) -> Unit,
+    onBiometricMessageDismissed: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val session = state.session
@@ -18,10 +28,31 @@ fun HotFiiApp(
         session == null -> LoginScreen(
             isSubmitting = state.isSubmitting,
             error = state.error,
+            requiresTwoFactor = state.requiresTwoFactor,
             onSignIn = viewModel::signIn,
+            onVerifyTwoFactor = viewModel::verifyTwoFactor,
+            onCancelTwoFactor = viewModel::cancelTwoFactor,
             onInputChanged = viewModel::clearLoginError,
             onCloseApp = onCloseApp,
         )
-        else -> AuthenticatedShell(state = state, viewModel = viewModel)
+        biometricEnabled && !biometricUnlocked -> {
+            LaunchedEffect(Unit) { onRequestBiometricUnlock() }
+            BiometricLockScreen(
+                message = biometricMessage,
+                onUnlock = onRequestBiometricUnlock,
+                onSignOut = viewModel::signOut,
+                onMessageDismissed = onBiometricMessageDismissed,
+            )
+        }
+        else -> AuthenticatedShell(
+            state = state,
+            viewModel = viewModel,
+            themeMode = themeMode,
+            onThemeModeChanged = onThemeModeChanged,
+            biometricEnabled = biometricEnabled,
+            biometricMessage = biometricMessage,
+            onBiometricChanged = onBiometricChanged,
+            onBiometricMessageDismissed = onBiometricMessageDismissed,
+        )
     }
 }

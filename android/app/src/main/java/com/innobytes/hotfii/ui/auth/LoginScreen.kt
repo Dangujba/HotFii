@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -55,20 +56,26 @@ import com.innobytes.hotfii.R
 fun LoginScreen(
     isSubmitting: Boolean,
     error: String?,
+    requiresTwoFactor: Boolean,
     onSignIn: (String, String) -> Unit,
+    onVerifyTwoFactor: (String) -> Unit,
+    onCancelTwoFactor: () -> Unit,
     onInputChanged: () -> Unit,
     onCloseApp: () -> Unit,
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var twoFactorCode by rememberSaveable { mutableStateOf("") }
     var showCloseConfirmation by rememberSaveable { mutableStateOf(false) }
     var hasAttemptedSubmit by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-    val submit = {
+    val submit: () -> Unit = {
         hasAttemptedSubmit = true
         focusManager.clearFocus()
-        if (!validateLoginInputs(email, password).hasErrors) {
+        if (requiresTwoFactor) {
+            onVerifyTwoFactor(twoFactorCode)
+        } else if (!validateLoginInputs(email, password).hasErrors) {
             onSignIn(email, password)
         }
     }
@@ -146,12 +153,16 @@ fun LoginScreen(
 
             Spacer(Modifier.height(40.dp))
             Text(
-                text = "Sign in",
+                text = if (requiresTwoFactor) "Two-factor verification" else "Sign in",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Use your HotFii operator account",
+                text = if (requiresTwoFactor) {
+                    "Enter the code from your authenticator app or a recovery code"
+                } else {
+                    "Use your HotFii operator account"
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp, bottom = 24.dp),
@@ -170,6 +181,27 @@ fun LoginScreen(
                 }
             }
 
+            if (requiresTwoFactor) {
+                OutlinedTextField(
+                    value = twoFactorCode,
+                    onValueChange = {
+                        twoFactorCode = it
+                        if (error != null) onInputChanged()
+                    },
+                    label = { Text("Verification code") },
+                    leadingIcon = { Icon(Icons.Outlined.Security, contentDescription = null) },
+                    isError = error != null,
+                    supportingText = error?.let { message -> { Text(message) } },
+                    singleLine = true,
+                    enabled = !isSubmitting,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
             OutlinedTextField(
                 value = email,
                 onValueChange = {
@@ -223,6 +255,7 @@ fun LoginScreen(
                     .fillMaxWidth()
                     .padding(top = 14.dp),
             )
+            }
 
             Button(
                 onClick = submit,
@@ -239,7 +272,19 @@ fun LoginScreen(
                         color = Color.White,
                     )
                 } else {
-                    Text("Sign in")
+                    Text(if (requiresTwoFactor) "Verify" else "Sign in")
+                }
+            }
+            if (requiresTwoFactor) {
+                TextButton(
+                    onClick = {
+                        twoFactorCode = ""
+                        onCancelTwoFactor()
+                    },
+                    enabled = !isSubmitting,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    Text("Use another account")
                 }
             }
         }

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Business
@@ -308,14 +307,21 @@ fun WorkspaceScreen(
                     if (data.networkHealth.isEmpty()) {
                         item { EmptyState("No routers have been added yet.") }
                     } else {
-                        items(data.networkHealth, key = { it.id }) { device ->
-                            ListSurface {
+                        item {
+                            Column {
+                                data.networkHealth.forEachIndexed { index, device ->
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Icon(
+                                        Icons.Outlined.Router,
+                                        contentDescription = null,
+                                        tint = statusColor(device.status),
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                    Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
                                         Text(device.name, fontWeight = FontWeight.SemiBold)
                                         Text(
                                             "${device.location} - ${device.vendor}",
@@ -324,6 +330,10 @@ fun WorkspaceScreen(
                                         )
                                     }
                                     StatusText(device.status)
+                                }
+                                    if (index < data.networkHealth.lastIndex) {
+                                        HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
+                                    }
                                 }
                             }
                         }
@@ -339,14 +349,21 @@ fun WorkspaceScreen(
                     if (data.recentTransactions.isEmpty()) {
                         item { EmptyState("Transactions will appear here.") }
                     } else {
-                        items(data.recentTransactions, key = { it.id }) { transaction ->
-                            ListSurface {
+                        item {
+                            Column {
+                                data.recentTransactions.forEachIndexed { index, transaction ->
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Icon(
+                                        Icons.Outlined.Payments,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                    Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
                                         Text(transaction.reference, fontWeight = FontWeight.SemiBold)
                                         Text(
                                             transaction.routerName ?: "Unattributed router",
@@ -364,6 +381,10 @@ fun WorkspaceScreen(
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
+                                    }
+                                }
+                                    if (index < data.recentTransactions.lastIndex) {
+                                        HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                                     }
                                 }
                             }
@@ -469,18 +490,11 @@ private fun Section(
             }
             trailing?.let { Text(it, fontWeight = FontWeight.Bold) }
         }
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                content()
-            }
+            content()
         }
     }
 }
@@ -618,16 +632,6 @@ private fun FleetList(states: List<FleetState>) {
             Text(state.value.toString(), fontWeight = FontWeight.Bold)
         }
         if (index < states.lastIndex) HorizontalDivider()
-    }
-}
-
-@Composable
-private fun ListSurface(content: @Composable () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Box(Modifier.padding(14.dp)) { content() }
     }
 }
 

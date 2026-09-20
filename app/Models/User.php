@@ -15,11 +15,18 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasApiTokens, HasFactory, HasPublicUuid, Notifiable;
 
     protected $fillable = ['name', 'email', 'phone', 'password', 'timezone', 'is_platform_admin'];
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'is_platform_admin' => 'boolean'];
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'is_platform_admin' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_recovery_codes' => 'encrypted:array',
+        ];
     }
 
     public function organizations(): BelongsToMany

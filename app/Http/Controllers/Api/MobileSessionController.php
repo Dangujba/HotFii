@@ -10,17 +10,19 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use App\Services\Auth\TwoFactorAuthentication;
 use Symfony\Component\HttpFoundation\Response;
 
 class MobileSessionController extends Controller
 {
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, TwoFactorAuthentication $twoFactor): JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
             'device_name' => ['required', 'string', 'max:80'],
             'device_id' => ['required', 'string', 'max:128'],
+            'two_factor_code' => ['nullable', 'string', 'max:32'],
         ]);
 
         $user = User::query()->where('email', $data['email'])->first();
@@ -37,6 +39,20 @@ class MobileSessionController extends Controller
             throw ValidationException::withMessages([
                 'email' => 'This account does not belong to a HotFii organization.',
             ]);
+        }
+
+        if ($user->two_factor_confirmed_at) {
+            if (empty($data['two_factor_code'])) {
+                return response()->json([
+                    'two_factor_required' => true,
+                    'message' => 'Enter the code from your authenticator app or a recovery code.',
+                ], Response::HTTP_ACCEPTED)->header('Cache-Control', 'no-store, private');
+            }
+            if (! $twoFactor->verifyOrConsumeRecoveryCode($user, $data['two_factor_code'])) {
+                throw ValidationException::withMessages([
+                    'two_factor_code' => 'The authenticator or recovery code is invalid.',
+                ]);
+            }
         }
 
         $tokenName = $this->tokenName($data['device_name'], $data['device_id']);
@@ -79,6 +95,7 @@ class MobileSessionController extends Controller
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'timezone' => $user->timezone,
+                'two_factor_enabled' => (bool) $user->two_factor_confirmed_at,
             ],
             'organizations' => $organizations->map(fn (Organization $organization) => [
                 'id' => $organization->uuid,

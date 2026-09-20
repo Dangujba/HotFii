@@ -317,6 +317,8 @@ class VoucherBatchController extends Controller
     public function thermal(Request $request, VoucherBatch $batch): Response
     {
         $this->guardBatch($request->attributes->get('organization'), $batch);
+        $paperWidth = $request->integer('width', 58);
+        abort_unless(in_array($paperWidth, [58, 88], true), 404);
 
         $totalParts = max(1, (int) ceil($batch->quantity / self::PDF_CHUNK_SIZE));
         $part = max(1, $request->integer('part', 1));
@@ -334,6 +336,7 @@ class VoucherBatchController extends Controller
             'batch' => $batch,
             'printPart' => $part,
             'printParts' => $totalParts,
+            'paperWidth' => $paperWidth,
         ])->header('Cache-Control', 'no-store, private');
 
         $batch->vouchers()

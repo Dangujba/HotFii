@@ -30,6 +30,12 @@ class EscPosVoucherFormatterTest {
         assertTrue(printable.contains("HF-000001"))
         assertTrue(bytes.containsSequence(byteArrayOf(0x1D, 0x28, 0x6B)))
         assertTrue(bytes.containsSequence(byteArrayOf(0x1D, 0x56, 0x42, 0x00)))
+
+        val wide = String(
+            EscPosVoucherFormatter.format(batch, ThermalPaperWidth.Mm88),
+            StandardCharsets.ISO_8859_1,
+        )
+        assertTrue(wide.contains("-".repeat(48)))
     }
 
     private fun ByteArray.containsSequence(sequence: ByteArray): Boolean =

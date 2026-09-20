@@ -37,6 +37,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.innobytes.hotfii.domain.*
 import com.innobytes.hotfii.printing.BluetoothThermalPrinter
+import com.innobytes.hotfii.printing.ThermalPaperWidth
 import com.innobytes.hotfii.printing.ThermalPrinterDevice
 import com.innobytes.hotfii.ui.VoucherUiState
 import java.text.NumberFormat
@@ -69,6 +70,7 @@ fun VoucherScreen(
     val scope = rememberCoroutineScope()
     val printer = remember(context) { BluetoothThermalPrinter(context) }
     var requestedThermalBatchId by remember { mutableStateOf<String?>(null) }
+    var requestedThermalWidth by remember { mutableStateOf(ThermalPaperWidth.Mm58) }
     var thermalBatch by remember { mutableStateOf<VoucherShare?>(null) }
     var pairedPrinters by remember { mutableStateOf<List<ThermalPrinterDevice>>(emptyList()) }
     var thermalError by remember { mutableStateOf<String?>(null) }
@@ -95,8 +97,9 @@ fun VoucherScreen(
             enableBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
         }
     }
-    val requestThermalPrint: (String) -> Unit = { batchId ->
+    val requestThermalPrint: (String, ThermalPaperWidth) -> Unit = { batchId, paperWidth ->
         requestedThermalBatchId = batchId
+        requestedThermalWidth = paperWidth
         when {
             !printer.isAvailable() -> thermalError = "Bluetooth is not available on this device."
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
@@ -171,7 +174,7 @@ fun VoucherScreen(
                 pairedPrinters = emptyList()
                 isThermalPrinting = true
                 scope.launch {
-                    runCatching { printer.print(device.address, batch) }
+                    runCatching { printer.print(device.address, batch, requestedThermalWidth) }
                         .onSuccess {
                             Toast.makeText(
                                 context,
@@ -411,7 +414,7 @@ private fun VoucherDetail(
     onUpdate: (String, VoucherEditInput) -> Unit,
     onDelete: (String) -> Unit,
     onShare: (String) -> Unit,
-    onThermalPrint: (String) -> Unit,
+    onThermalPrint: (String, ThermalPaperWidth) -> Unit,
     onFeedbackDismissed: () -> Unit,
 ) {
     val batch = detail.summary
@@ -448,9 +451,9 @@ private fun VoucherDetail(
                 showPrintOptions = false
                 onShare(batch.id)
             },
-            onThermal = {
+            onThermal = { paperWidth ->
                 showPrintOptions = false
-                onThermalPrint(batch.id)
+                onThermalPrint(batch.id, paperWidth)
             },
         )
     }
@@ -514,18 +517,42 @@ private fun VoucherDetail(
                     Text("Choose A4 PDF sharing or direct Bluetooth thermal printing.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            items(detail.vouchers, key = { it.id }) { voucher ->
-                Surface(shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+            item {
+                Column {
+                    detail.vouchers.forEachIndexed { index, voucher ->
                     Row(
-                        Modifier.fillMaxWidth().padding(14.dp),
+                        Modifier.fillMaxWidth().padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Surface(
+                            modifier = Modifier.size(42.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.ConfirmationNumber, contentDescription = null, Modifier.size(22.dp))
+                            }
+                        }
                         Column(Modifier.weight(1f)) {
-                            Text("Voucher ending ${voucher.codeLastFour}", fontWeight = FontWeight.SemiBold)
-                            Text(voucher.serialNumber, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "Voucher ending ${voucher.codeLastFour}",
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(start = 12.dp),
+                            )
+                            Text(
+                                voucher.serialNumber,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 12.dp),
+                            )
                         }
                         StatusPill(voucher.status)
+                    }
+                        if (index < detail.vouchers.lastIndex) {
+                            HorizontalDivider(modifier = Modifier.padding(start = 54.dp))
+                        }
                     }
                 }
             }
@@ -593,7 +620,7 @@ private fun BatchRow(batch: VoucherBatchSummary, onClick: () -> Unit) {
 private fun PrintFormatDialog(
     onDismiss: () -> Unit,
     onPdf: () -> Unit,
-    onThermal: () -> Unit,
+    onThermal: (ThermalPaperWidth) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -608,10 +635,17 @@ private fun PrintFormatDialog(
                 )
                 HorizontalDivider()
                 ListItem(
-                    headlineContent = { Text("Bluetooth thermal") },
-                    supportingContent = { Text("Print compact QR vouchers on a paired ESC/POS printer.") },
+                    headlineContent = { Text("Bluetooth thermal - 58 mm") },
+                    supportingContent = { Text("For compact handheld ESC/POS printers.") },
                     leadingContent = { Icon(Icons.Outlined.Print, contentDescription = null) },
-                    modifier = Modifier.clickable(onClick = onThermal),
+                    modifier = Modifier.clickable { onThermal(ThermalPaperWidth.Mm58) },
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text("Bluetooth thermal - 88 mm") },
+                    supportingContent = { Text("For wider counter-style ESC/POS printers.") },
+                    leadingContent = { Icon(Icons.Outlined.Print, contentDescription = null) },
+                    modifier = Modifier.clickable { onThermal(ThermalPaperWidth.Mm88) },
                 )
             }
         },

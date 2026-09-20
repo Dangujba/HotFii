@@ -6,7 +6,15 @@ data class SessionUser(
     val email: String,
     val phone: String?,
     val timezone: String,
+    val twoFactorEnabled: Boolean,
 )
+
+data class TwoFactorSetup(
+    val secret: String,
+    val provisioningUri: String,
+)
+
+data class TwoFactorConfirmation(val recoveryCodes: List<String>)
 
 data class OrganizationSummary(
     val id: String,
