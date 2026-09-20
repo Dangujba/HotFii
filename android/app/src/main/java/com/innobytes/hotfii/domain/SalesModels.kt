@@ -1,5 +1,7 @@
 package com.innobytes.hotfii.domain
 
+import java.util.UUID
+
 data class SalesCatalog(
     val summary: SalesSummary,
     val transactions: List<SalesTransaction>,
@@ -87,6 +89,7 @@ data class CashSaleInput(
     val networkDeviceId: String,
     val customerName: String?,
     val phone: String?,
+    val requestId: String = UUID.randomUUID().toString(),
 )
 
 data class CashSaleResult(

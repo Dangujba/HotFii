@@ -23,6 +23,12 @@ import com.innobytes.hotfii.data.network.dto.CashSaleResultDto
 import com.innobytes.hotfii.data.network.dto.CustomerCatalogDto
 import com.innobytes.hotfii.data.network.dto.CustomerDetailDto
 import com.innobytes.hotfii.data.network.dto.SalesCatalogDto
+import com.innobytes.hotfii.data.network.dto.ApiMessageEnvelope
+import com.innobytes.hotfii.data.network.dto.HotspotSessionCatalogDto
+import com.innobytes.hotfii.data.network.dto.HotspotSessionRecordDto
+import com.innobytes.hotfii.data.network.dto.MessageDto
+import com.innobytes.hotfii.data.network.dto.NetworkCatalogDto
+import com.innobytes.hotfii.data.network.dto.NetworkRouterDetailDto
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -121,6 +127,46 @@ interface HotFiiApi {
         @Path("organization") organizationId: String,
         @Path("customer") customerId: String,
     ): ApiEnvelope<CustomerDetailDto>
+
+    @GET("organizations/{organization}/routers")
+    suspend fun routers(
+        @Path("organization") organizationId: String,
+        @Query("search") search: String? = null,
+        @Query("status") status: String? = null,
+        @Query("vendor") vendor: String? = null,
+        @Query("location") locationId: String? = null,
+        @Query("page") page: Int = 1,
+    ): ApiEnvelope<NetworkCatalogDto>
+
+    @GET("organizations/{organization}/routers/{router}")
+    suspend fun router(
+        @Path("organization") organizationId: String,
+        @Path("router") routerId: String,
+    ): ApiEnvelope<NetworkRouterDetailDto>
+
+    @POST("organizations/{organization}/routers/{router}/test")
+    suspend fun runRouterTests(
+        @Path("organization") organizationId: String,
+        @Path("router") routerId: String,
+    ): MessageDto
+
+    @GET("organizations/{organization}/sessions")
+    suspend fun hotspotSessions(
+        @Path("organization") organizationId: String,
+        @Query("view") view: String,
+        @Query("search") search: String? = null,
+        @Query("status") status: String? = null,
+        @Query("router") routerId: String? = null,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+        @Query("page") page: Int = 1,
+    ): ApiEnvelope<HotspotSessionCatalogDto>
+
+    @POST("organizations/{organization}/sessions/{session}/disconnect")
+    suspend fun disconnectSession(
+        @Path("organization") organizationId: String,
+        @Path("session") sessionId: String,
+    ): ApiMessageEnvelope<HotspotSessionRecordDto>
 
     @GET("organizations/{organization}/voucher-batches")
     suspend fun voucherBatches(

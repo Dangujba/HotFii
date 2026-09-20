@@ -25,11 +25,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.innobytes.hotfii.domain.*
 import com.innobytes.hotfii.ui.SalesUiState
+import com.innobytes.hotfii.ui.components.DateFilterField
 import java.text.NumberFormat
-import java.time.Instant
-import java.time.LocalDate
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Currency
 import java.util.Locale
@@ -48,6 +46,7 @@ fun SalesScreen(
     onOpenCustomer: (String) -> Unit,
     onCloseCustomer: () -> Unit,
     onRecordCash: (CashSaleInput) -> Unit,
+    onRetryCash: () -> Unit,
     onFeedbackDismissed: () -> Unit,
     onCredentialConsumed: () -> Unit,
 ) {
@@ -128,7 +127,15 @@ fun SalesScreen(
                 Tab(section == SalesSection.Customers, { section = SalesSection.Customers }, text = { Text("Customers") })
             }
             if (state.isLoading || state.isActionRunning) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { FeedbackPanel(it, true, onFeedbackDismissed) }
+            state.error?.let {
+                FeedbackPanel(
+                    it,
+                    true,
+                    onFeedbackDismissed,
+                    if (state.failedCashSale != null) "Retry" else null,
+                    onRetryCash,
+                )
+            }
             state.notice?.takeIf { state.issuedCredential == null }?.let { FeedbackPanel(it, false, onFeedbackDismissed) }
             if (section == SalesSection.Activity) {
                 ActivityContent(state, list, { list = it }, onLoad) { cashForm = true }
@@ -463,66 +470,6 @@ private fun SalesFilterDialog(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DateFilterField(label: String, value: String, onValueChange: (String) -> Unit) {
-    var showPicker by rememberSaveable { mutableStateOf(false) }
-
-    Box {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            placeholder = { Text("Select date") },
-            trailingIcon = { Icon(Icons.Outlined.CalendarMonth, null) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Box(Modifier.matchParentSize().clickable { showPicker = true })
-    }
-
-    if (showPicker) {
-        val initialSelection = remember(value) {
-            runCatching {
-                LocalDate.parse(value).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-            }.getOrNull()
-        }
-        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialSelection)
-        DatePickerDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(
-                    enabled = pickerState.selectedDateMillis != null,
-                    onClick = {
-                        pickerState.selectedDateMillis?.let { millis ->
-                            onValueChange(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString())
-                        }
-                        showPicker = false
-                    },
-                ) { Text("Apply") }
-            },
-            dismissButton = {
-                Row {
-                    if (value.isNotEmpty()) {
-                        TextButton(onClick = {
-                            onValueChange("")
-                            showPicker = false
-                        }) { Text("Clear") }
-                    }
-                    TextButton(onClick = { showPicker = false }) { Text("Cancel") }
-                }
-            },
-        ) {
-            DatePicker(
-                state = pickerState,
-                title = { Text("Select ${label.lowercase()} date", Modifier.padding(start = 24.dp, top = 16.dp)) },
-                showModeToggle = false,
-            )
-        }
-    }
-}
-
 @Composable
 private fun CustomerFilterDialog(
     filters: CustomerFilters,
@@ -611,10 +558,17 @@ private fun CircleIcon(icon: ImageVector) {
 }
 
 @Composable
-private fun FeedbackPanel(message: String, isError: Boolean, onDismiss: () -> Unit) {
+private fun FeedbackPanel(
+    message: String,
+    isError: Boolean,
+    onDismiss: () -> Unit,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+) {
     Surface(color = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(message, Modifier.weight(1f))
+            actionLabel?.let { TextButton(onClick = onAction) { Text(it) } }
             IconButton(onClick = onDismiss) { Icon(Icons.Outlined.Close, "Dismiss") }
         }
     }

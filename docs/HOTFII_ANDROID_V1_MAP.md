@@ -19,15 +19,16 @@ Target Android: API 36
 11. Reports
 12. Notifications and settings
 
-Implemented now: sign in, secure session restore, organization switching, the real dashboard with router filtering, full access-plan management, voucher batch management with A4 PDF and 58/88 mm Bluetooth printing, sales activity, direct cash activation, and customer history. Server-side rules remain authoritative for plan locking, prices, expiry, voucher state, sales classification, fees, and permissions.
+Implemented now: sign in, secure session restore, organization switching, the real dashboard with router filtering, full access-plan management, voucher batch management with A4 PDF and 58/88 mm Bluetooth printing, idempotent sales activity, direct cash activation, customer history, router readiness, and live/recent session operations. Server-side rules remain authoritative for plan locking, prices, expiry, voucher state, sales classification, fees, router state, disconnect confirmation, and permissions.
 
 ## Current Delivery Status
 
 - Stage 1 (Foundation): complete.
 - Stage 2 (Dashboard): complete.
 - Stage 3 (Plans and Vouchers): complete.
-- Stage 4 (Sales and Customers): implemented and awaiting Muhammad's review/deployment checkpoint.
-- Stages 5-6: not started.
+- Stage 4 (Sales and Customers): complete.
+- Stage 5 (Network and Sessions): implemented and awaiting Muhammad's review/deployment checkpoint.
+- Stage 6: not started.
 - Stage 7: theme selection, fingerprint protection, authenticator 2FA, and secure logout are implemented; notifications and the remaining settings are pending.
 - Stage 8: not started.
 
@@ -45,9 +46,11 @@ Implemented now: sign in, secure session restore, organization switching, the re
 | POST | `/api/v1/mobile/organizations/{organization}/sales/cash` | Record a direct cash activation and return one-time credentials | 4 complete |
 | GET | `/api/v1/mobile/organizations/{organization}/customers` | Filtered and paginated customer list | 4 complete |
 | GET | `/api/v1/mobile/organizations/{organization}/customers/{customer}` | Customer profile, recent sessions, and recent sales | 4 complete |
-| GET | `/api/v1/mobile/organizations/{organization}/routers` | Router status and test results | 5 |
-| GET | `/api/v1/mobile/organizations/{organization}/sessions` | Paginated live and recent sessions | 5 |
-| POST | `/api/v1/mobile/organizations/{organization}/sessions/{session}/disconnect` | Authorized disconnect | 5 |
+| GET | `/api/v1/mobile/organizations/{organization}/routers` | Filtered and paginated router status | 5 complete |
+| GET | `/api/v1/mobile/organizations/{organization}/routers/{router}` | Router health, setup state, and readiness results | 5 complete |
+| POST | `/api/v1/mobile/organizations/{organization}/routers/{router}/test` | Queue authorized readiness testing | 5 complete |
+| GET | `/api/v1/mobile/organizations/{organization}/sessions` | Filtered and paginated live/recent sessions | 5 complete |
+| POST | `/api/v1/mobile/organizations/{organization}/sessions/{session}/disconnect` | Confirmed, authorized session disconnect | 5 complete |
 | GET | `/api/v1/mobile/organizations/{organization}/finance` | Fees, charge ledger, and invoices | 6 |
 | GET | `/api/v1/mobile/organizations/{organization}/reports` | Filtered report datasets | 6 |
 

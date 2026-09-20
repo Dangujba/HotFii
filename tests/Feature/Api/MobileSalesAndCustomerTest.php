@@ -128,13 +128,16 @@ class MobileSalesAndCustomerTest extends TestCase
 
     public function test_owner_can_record_cash_and_receives_one_time_credentials_and_one_accrued_fee(): void
     {
-        $response = $this->withToken($this->token($this->owner))
-            ->postJson(route('api.v1.mobile.organizations.sales.cash.store', $this->organization), [
-                'access_plan_id' => $this->plan->uuid,
-                'network_device_id' => $this->router->uuid,
-                'customer_name' => 'Aisha',
-                'phone' => '08035550123',
-            ]);
+        $token = $this->token($this->owner);
+        $payload = [
+            'request_id' => (string) Str::uuid(),
+            'access_plan_id' => $this->plan->uuid,
+            'network_device_id' => $this->router->uuid,
+            'customer_name' => 'Aisha',
+            'phone' => '08035550123',
+        ];
+        $response = $this->withToken($token)
+            ->postJson(route('api.v1.mobile.organizations.sales.cash.store', $this->organization), $payload);
 
         $response->assertCreated()
             ->assertHeader('Cache-Control', 'no-store, private')
@@ -157,6 +160,14 @@ class MobileSalesAndCustomerTest extends TestCase
             'fee_amount_kobo' => 1000,
             'status' => 'accrued',
         ]);
+        $this->assertSame(1, FeeLedgerEntry::where('organization_id', $this->organization->id)->count());
+
+        $this->withToken($token)
+            ->postJson(route('api.v1.mobile.organizations.sales.cash.store', $this->organization), $payload)
+            ->assertOk()
+            ->assertJsonPath('data.transaction.id', $response->json('data.transaction.id'))
+            ->assertJsonPath('data.credential.username', $response->json('data.credential.username'));
+        $this->assertSame(1, Transaction::where('organization_id', $this->organization->id)->count());
         $this->assertSame(1, FeeLedgerEntry::where('organization_id', $this->organization->id)->count());
     }
 
@@ -228,6 +239,7 @@ class MobileSalesAndCustomerTest extends TestCase
             ->assertJsonPath('data.permissions.can_record_cash', false);
         $this->withToken($this->token($viewer))
             ->postJson(route('api.v1.mobile.organizations.sales.cash.store', $this->organization), [
+                'request_id' => (string) Str::uuid(),
                 'access_plan_id' => $this->plan->uuid,
                 'network_device_id' => $this->router->uuid,
             ])

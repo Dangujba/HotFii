@@ -125,6 +125,7 @@ class MobileSalesController extends Controller
         [$canRecordCash, $reason] = $this->cashPermission($request, $organization);
         abort_unless($canRecordCash, 403, $reason ?? 'You cannot record cash sales for this organization.');
         $data = $request->validate([
+            'request_id' => ['required', 'uuid'],
             'access_plan_id' => ['required', 'uuid'],
             'network_device_id' => ['required', 'uuid'],
             'customer_name' => ['nullable', 'string', 'max:255'],
@@ -138,6 +139,7 @@ class MobileSalesController extends Controller
             $device,
             $data['customer_name'] ?? null,
             $data['phone'] ?? null,
+            $data['request_id'],
         );
 
         return response()->json([
@@ -146,7 +148,7 @@ class MobileSalesController extends Controller
                 'credential' => ['username' => $result['username'], 'password' => $result['password']],
             ],
             'message' => 'Direct cash sale recorded and access activated.',
-        ], 201)->header('Cache-Control', 'no-store, private');
+        ], $result['created'] ? 201 : 200)->header('Cache-Control', 'no-store, private');
     }
 
     private function transactions(Organization $organization, array $data, ?NetworkDevice $router): Builder

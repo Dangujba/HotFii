@@ -134,6 +134,7 @@ data class SalesPermissionsDto(val canRecordCash: Boolean, val cashUnavailableRe
 }
 
 data class CashSaleRequestDto(
+    val requestId: String,
     val accessPlanId: String,
     val networkDeviceId: String,
     val customerName: String?,
@@ -141,6 +142,7 @@ data class CashSaleRequestDto(
 ) {
     companion object {
         fun from(input: CashSaleInput) = CashSaleRequestDto(
+            input.requestId,
             input.accessPlanId,
             input.networkDeviceId,
             input.customerName,

@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Auth\TwoFactorAuthentication;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use App\Services\Auth\TwoFactorAuthentication;
 use Symfony\Component\HttpFoundation\Response;
 
 class MobileSessionController extends Controller
@@ -131,9 +131,9 @@ class MobileSessionController extends Controller
     private function permissions(string $role): array
     {
         return match ($role) {
-            'owner', 'manager' => ['manage_plans', 'manage_vouchers', 'create_vouchers', 'record_cash', 'disconnect_sessions'],
+            'owner', 'manager' => ['manage_plans', 'manage_vouchers', 'create_vouchers', 'record_cash', 'manage_network', 'disconnect_sessions'],
             'agent' => ['create_vouchers', 'record_cash'],
-            'technician' => ['disconnect_sessions'],
+            'technician' => ['manage_network', 'disconnect_sessions'],
             default => [],
         };
     }

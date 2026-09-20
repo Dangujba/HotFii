@@ -32,6 +32,7 @@ class MainActivity : FragmentActivity() {
             application.container.planRepository,
             application.container.voucherRepository,
             application.container.salesRepository,
+            application.container.networkRepository,
         )
     }
 

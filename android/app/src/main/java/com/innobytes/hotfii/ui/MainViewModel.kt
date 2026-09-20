@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
+import com.innobytes.hotfii.data.repository.NetworkRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
 import com.innobytes.hotfii.data.repository.SalesRepository
 import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
@@ -21,6 +22,12 @@ import com.innobytes.hotfii.domain.CustomerCatalog
 import com.innobytes.hotfii.domain.CustomerDetail
 import com.innobytes.hotfii.domain.CustomerFilters
 import com.innobytes.hotfii.domain.IssuedCredential
+import com.innobytes.hotfii.domain.HotspotSessionCatalog
+import com.innobytes.hotfii.domain.HotspotSessionFilters
+import com.innobytes.hotfii.domain.HotspotSessionRecord
+import com.innobytes.hotfii.domain.NetworkCatalog
+import com.innobytes.hotfii.domain.NetworkFilters
+import com.innobytes.hotfii.domain.NetworkRouterDetail
 import com.innobytes.hotfii.domain.SalesCatalog
 import com.innobytes.hotfii.domain.SalesFilters
 import com.innobytes.hotfii.domain.UserSession
@@ -69,6 +76,20 @@ data class SalesUiState(
     val error: String? = null,
     val notice: String? = null,
     val issuedCredential: IssuedCredential? = null,
+    val failedCashSale: CashSaleInput? = null,
+)
+
+data class NetworkUiState(
+    val isLoading: Boolean = false,
+    val isActionRunning: Boolean = false,
+    val catalog: NetworkCatalog? = null,
+    val filters: NetworkFilters = NetworkFilters(),
+    val routerDetail: NetworkRouterDetail? = null,
+    val sessionCatalog: HotspotSessionCatalog? = null,
+    val sessionFilters: HotspotSessionFilters = HotspotSessionFilters(),
+    val selectedSession: HotspotSessionRecord? = null,
+    val error: String? = null,
+    val notice: String? = null,
 )
 
 data class MainUiState(
@@ -90,6 +111,7 @@ data class MainUiState(
     val plans: PlanUiState = PlanUiState(),
     val vouchers: VoucherUiState = VoucherUiState(),
     val sales: SalesUiState = SalesUiState(),
+    val network: NetworkUiState = NetworkUiState(),
 ) {
     val selectedOrganization: OrganizationSummary?
         get() = session?.organizations?.firstOrNull { it.id == selectedOrganizationId }
@@ -102,6 +124,7 @@ class MainViewModel(
     private val planRepository: PlanRepository,
     private val voucherRepository: VoucherRepository,
     private val salesRepository: SalesRepository,
+    private val networkRepository: NetworkRepository,
 ) : ViewModel() {
     private var pendingLoginEmail: String? = null
     private var pendingLoginPassword: String? = null
@@ -226,6 +249,7 @@ class MainViewModel(
                 plans = PlanUiState(),
                 vouchers = VoucherUiState(),
                 sales = SalesUiState(),
+                network = NetworkUiState(),
             )
         }
         loadDashboard(id, null)
@@ -714,6 +738,7 @@ class MainViewModel(
                     error = null,
                     notice = null,
                     issuedCredential = null,
+                    failedCashSale = null,
                 ))
             }
             runCatching { salesRepository.recordCash(organizationId, input) }
@@ -735,6 +760,7 @@ class MainViewModel(
                                 catalog = catalog ?: state.sales.catalog,
                                 customerCatalog = null,
                                 issuedCredential = result.credential,
+                                failedCashSale = null,
                                 notice = "Direct cash sale recorded and access activated.",
                             ))
                     }
@@ -746,6 +772,7 @@ class MainViewModel(
                         else state.copy(sales = state.sales.copy(
                                 isActionRunning = false,
                                 error = error.message ?: "Direct cash sale could not be recorded.",
+                                failedCashSale = input,
                             ))
                     }
                 }
@@ -819,11 +846,133 @@ class MainViewModel(
     }
 
     fun clearSalesFeedback() {
-        _state.update { it.copy(sales = it.sales.copy(error = null, notice = null)) }
+        _state.update { it.copy(sales = it.sales.copy(error = null, notice = null, failedCashSale = null)) }
+    }
+
+    fun retryCashSale() {
+        _state.value.sales.failedCashSale?.let(::recordCashSale)
     }
 
     fun consumeIssuedCredential() {
         _state.update { it.copy(sales = it.sales.copy(issuedCredential = null, notice = null)) }
+    }
+
+    fun loadRouters(filters: NetworkFilters = _state.value.network.filters, page: Int = 1) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(network = it.network.copy(isLoading = true, filters = filters, error = null, notice = null)) }
+            runCatching { networkRepository.routers(organizationId, filters, page) }
+                .onSuccess { catalog ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(network = current.network.copy(isLoading = false, catalog = catalog))
+                    }
+                }
+                .onFailure { error -> networkLoadFailed(organizationId, error, "Routers could not be loaded.") }
+        }
+    }
+
+    fun openRouter(routerId: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(network = it.network.copy(isLoading = true, error = null, notice = null)) }
+            runCatching { networkRepository.router(organizationId, routerId) }
+                .onSuccess { detail ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(network = current.network.copy(isLoading = false, routerDetail = detail))
+                    }
+                }
+                .onFailure { error -> networkLoadFailed(organizationId, error, "Router details could not be loaded.") }
+        }
+    }
+
+    fun closeRouter() {
+        _state.update { it.copy(network = it.network.copy(routerDetail = null, error = null, notice = null)) }
+    }
+
+    fun runRouterTests(routerId: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(network = it.network.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching {
+                val message = networkRepository.runTests(organizationId, routerId)
+                val detail = networkRepository.router(organizationId, routerId)
+                message to detail
+            }.onSuccess { (message, detail) ->
+                _state.update { current ->
+                    if (current.selectedOrganizationId != organizationId) current
+                    else current.copy(network = current.network.copy(
+                        isActionRunning = false,
+                        routerDetail = detail,
+                        notice = message,
+                    ))
+                }
+            }.onFailure { error -> networkActionFailed(organizationId, error, "Readiness tests could not be started.") }
+        }
+    }
+
+    fun loadHotspotSessions(
+        filters: HotspotSessionFilters = _state.value.network.sessionFilters,
+        page: Int = 1,
+    ) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(network = it.network.copy(
+                isLoading = true,
+                sessionFilters = filters,
+                selectedSession = null,
+                error = null,
+                notice = null,
+            )) }
+            runCatching { networkRepository.sessions(organizationId, filters, page) }
+                .onSuccess { catalog ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(network = current.network.copy(isLoading = false, sessionCatalog = catalog))
+                    }
+                }
+                .onFailure { error -> networkLoadFailed(organizationId, error, "Sessions could not be loaded.") }
+        }
+    }
+
+    fun openHotspotSession(session: HotspotSessionRecord) {
+        _state.update { it.copy(network = it.network.copy(selectedSession = session, error = null, notice = null)) }
+    }
+
+    fun closeHotspotSession() {
+        _state.update { it.copy(network = it.network.copy(selectedSession = null, error = null, notice = null)) }
+    }
+
+    fun disconnectHotspotSession(sessionId: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(network = it.network.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching {
+                val result = networkRepository.disconnect(organizationId, sessionId)
+                val current = _state.value.network
+                val catalog = networkRepository.sessions(
+                    organizationId,
+                    current.sessionFilters,
+                    current.sessionCatalog?.pagination?.currentPage ?: 1,
+                )
+                result to catalog
+            }.onSuccess { (result, catalog) ->
+                _state.update { current ->
+                    if (current.selectedOrganizationId != organizationId) current
+                    else current.copy(network = current.network.copy(
+                        isActionRunning = false,
+                        sessionCatalog = catalog,
+                        selectedSession = result.session,
+                        notice = result.message,
+                    ))
+                }
+            }.onFailure { error -> networkActionFailed(organizationId, error, "The session could not be disconnected.") }
+        }
+    }
+
+    fun clearNetworkFeedback() {
+        _state.update { it.copy(network = it.network.copy(error = null, notice = null)) }
     }
 
     private fun restoreSession() {
@@ -916,6 +1065,27 @@ class MainViewModel(
         }
     }
 
+    private fun networkLoadFailed(organizationId: String, error: Throwable, fallback: String) {
+        _state.update { current ->
+            if (current.selectedOrganizationId != organizationId) current
+            else current.copy(network = current.network.copy(
+                isLoading = false,
+                error = error.message ?: fallback,
+            ))
+        }
+    }
+
+    private fun networkActionFailed(organizationId: String, error: Throwable, fallback: String) {
+        Log.e("HotFiiNetwork", fallback, error)
+        _state.update { current ->
+            if (current.selectedOrganizationId != organizationId) current
+            else current.copy(network = current.network.copy(
+                isActionRunning = false,
+                error = error.message ?: fallback,
+            ))
+        }
+    }
+
     companion object {
         fun factory(
             sessionRepository: SessionRepository,
@@ -923,6 +1093,7 @@ class MainViewModel(
             planRepository: PlanRepository,
             voucherRepository: VoucherRepository,
             salesRepository: SalesRepository,
+            networkRepository: NetworkRepository,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
@@ -932,6 +1103,7 @@ class MainViewModel(
                     planRepository,
                     voucherRepository,
                     salesRepository,
+                    networkRepository,
                 ) as T
         }
     }

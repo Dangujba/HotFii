@@ -3,6 +3,7 @@ package com.innobytes.hotfii.ui
 import com.innobytes.hotfii.MainDispatcherRule
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
+import com.innobytes.hotfii.data.repository.NetworkRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
 import com.innobytes.hotfii.data.repository.SalesRepository
 import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
@@ -12,6 +13,19 @@ import com.innobytes.hotfii.domain.DashboardPulse
 import com.innobytes.hotfii.domain.DashboardSnapshot
 import com.innobytes.hotfii.domain.HourlySessions
 import com.innobytes.hotfii.domain.IssuedCredential
+import com.innobytes.hotfii.domain.HotspotSessionCatalog
+import com.innobytes.hotfii.domain.HotspotSessionFilters
+import com.innobytes.hotfii.domain.HotspotSessionPermissions
+import com.innobytes.hotfii.domain.HotspotSessionOptions
+import com.innobytes.hotfii.domain.HotspotSessionSummary
+import com.innobytes.hotfii.domain.NetworkCatalog
+import com.innobytes.hotfii.domain.NetworkFilters
+import com.innobytes.hotfii.domain.NetworkOptions
+import com.innobytes.hotfii.domain.NetworkPagination
+import com.innobytes.hotfii.domain.NetworkPermissions
+import com.innobytes.hotfii.domain.NetworkRouterDetail
+import com.innobytes.hotfii.domain.NetworkSummary
+import com.innobytes.hotfii.domain.DisconnectResult
 import com.innobytes.hotfii.domain.OrganizationSummary
 import com.innobytes.hotfii.domain.AccessPlanSummary
 import com.innobytes.hotfii.domain.PlanCatalog
@@ -72,7 +86,7 @@ class MainViewModelTest {
         )
         val dashboardRepository = FakeDashboardRepository()
 
-        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository())
+        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository())
 
         assertFalse(viewModel.state.value.isRestoring)
         assertEquals("org-two", viewModel.state.value.selectedOrganization?.id)
@@ -82,7 +96,7 @@ class MainViewModelTest {
     @Test
     fun `successful sign in opens the server default organization`() = runTest {
         val repository = FakeSessionRepository(signInSession = session())
-        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository())
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository())
 
         viewModel.signIn("owner@example.com", "password")
 
@@ -97,7 +111,7 @@ class MainViewModelTest {
             signInSession = session(),
             twoFactorRequired = true,
         )
-        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository())
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository())
 
         viewModel.signIn("owner@example.com", "password")
 
@@ -114,7 +128,7 @@ class MainViewModelTest {
     fun `organization selection is limited to the authenticated membership list`() = runTest {
         val repository = FakeSessionRepository(restoredSession = session())
         val dashboardRepository = FakeDashboardRepository()
-        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository())
+        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository())
 
         viewModel.selectOrganization("outside-org")
         assertEquals("org-one", viewModel.state.value.selectedOrganization?.id)
@@ -133,6 +147,7 @@ class MainViewModelTest {
             FakePlanRepository(),
             FakeVoucherRepository(),
             FakeSalesRepository(),
+            FakeNetworkRepository(),
         )
 
         viewModel.selectRouter("outside-router")
@@ -152,6 +167,7 @@ class MainViewModelTest {
             FakePlanRepository(),
             vouchers,
             FakeSalesRepository(),
+            FakeNetworkRepository(),
         )
         val filters = VoucherFilters(search = "VB-2609", status = "printed")
 
@@ -171,6 +187,7 @@ class MainViewModelTest {
             plans,
             FakeVoucherRepository(),
             FakeSalesRepository(),
+            FakeNetworkRepository(),
         )
         val filters = PlanFilters(search = "Day", type = "paid", state = "active")
 
@@ -190,6 +207,7 @@ class MainViewModelTest {
             FakePlanRepository(),
             FakeVoucherRepository(),
             sales,
+            FakeNetworkRepository(),
         )
         val filters = SalesFilters(channel = "voucher", routerId = "router-one")
 
@@ -210,6 +228,7 @@ class MainViewModelTest {
             FakePlanRepository(),
             FakeVoucherRepository(),
             sales,
+            FakeNetworkRepository(),
         )
 
         viewModel.recordCashSale(CashSaleInput("plan-one", "router-one", "Aisha", "08030000000"))
@@ -220,6 +239,29 @@ class MainViewModelTest {
         assertEquals("org-two", viewModel.state.value.selectedOrganizationId)
         assertNull(viewModel.state.value.sales.issuedCredential)
         assertNull(viewModel.state.value.sales.notice)
+    }
+
+    @Test
+    fun `network and session filters use independent pagination`() = runTest {
+        val network = FakeNetworkRepository()
+        val viewModel = MainViewModel(
+            FakeSessionRepository(restoredSession = session()),
+            FakeDashboardRepository(),
+            FakePlanRepository(),
+            FakeVoucherRepository(),
+            FakeSalesRepository(),
+            network,
+        )
+        val routerFilters = NetworkFilters(status = "online", vendor = "mikrotik")
+        val sessionFilters = HotspotSessionFilters(view = "recent", routerId = "router-one")
+
+        viewModel.loadRouters(routerFilters, 2)
+        viewModel.loadHotspotSessions(sessionFilters, 4)
+
+        assertEquals(Triple("org-one", routerFilters, 2), network.routerRequests.single())
+        assertEquals(Triple("org-one", sessionFilters, 4), network.sessionRequests.single())
+        assertEquals(2, viewModel.state.value.network.catalog?.pagination?.currentPage)
+        assertEquals(4, viewModel.state.value.network.sessionCatalog?.pagination?.currentPage)
     }
 
     private fun session() = UserSession(
@@ -313,6 +355,50 @@ private class FakeSalesRepository(
     )
 
     override suspend fun customer(organizationId: String, customerId: String): CustomerDetail =
+        error("Not used in this test")
+}
+
+private class FakeNetworkRepository : NetworkRepository {
+    val routerRequests = mutableListOf<Triple<String, NetworkFilters, Int>>()
+    val sessionRequests = mutableListOf<Triple<String, HotspotSessionFilters, Int>>()
+
+    override suspend fun routers(
+        organizationId: String,
+        filters: NetworkFilters,
+        page: Int,
+    ): NetworkCatalog {
+        routerRequests += Triple(organizationId, filters, page)
+        return NetworkCatalog(
+            summary = NetworkSummary(0, 0, 0, 0),
+            routers = emptyList(),
+            pagination = NetworkPagination(page, page, 20, 0),
+            options = NetworkOptions(emptyList(), emptyList(), emptyList()),
+            permissions = NetworkPermissions(canManage = true),
+        )
+    }
+
+    override suspend fun router(organizationId: String, routerId: String): NetworkRouterDetail =
+        error("Not used in this test")
+
+    override suspend fun runTests(organizationId: String, routerId: String): String =
+        error("Not used in this test")
+
+    override suspend fun sessions(
+        organizationId: String,
+        filters: HotspotSessionFilters,
+        page: Int,
+    ): HotspotSessionCatalog {
+        sessionRequests += Triple(organizationId, filters, page)
+        return HotspotSessionCatalog(
+            summary = HotspotSessionSummary(0, 0, 0),
+            sessions = emptyList(),
+            pagination = NetworkPagination(page, page, 30, 0),
+            options = HotspotSessionOptions(emptyList(), emptyList()),
+            permissions = HotspotSessionPermissions(canDisconnect = true),
+        )
+    }
+
+    override suspend fun disconnect(organizationId: String, sessionId: String): DisconnectResult =
         error("Not used in this test")
 }
 

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Tune
@@ -72,11 +73,13 @@ import com.innobytes.hotfii.domain.TwoFactorSetup
 import com.innobytes.hotfii.domain.UserSession
 import com.innobytes.hotfii.ui.vouchers.VoucherScreen
 import com.innobytes.hotfii.ui.plans.PlanScreen
+import com.innobytes.hotfii.ui.network.NetworkScreen
 import com.innobytes.hotfii.ui.sales.SalesScreen
 import com.innobytes.hotfii.ui.workspace.WorkspaceScreen
 
 private enum class MainDestination(val label: String, val icon: ImageVector) {
-    Dashboard("Dashboard", Icons.Outlined.Dashboard),
+    Dashboard("Home", Icons.Outlined.Dashboard),
+    Network("Network", Icons.Outlined.Router),
     Sales("Sales", Icons.Outlined.Storefront),
     Plans("Plans", Icons.Outlined.Tune),
     Vouchers("Vouchers", Icons.Outlined.ConfirmationNumber),
@@ -110,6 +113,7 @@ fun AuthenticatedShell(
                         onClick = { destination = item },
                         icon = { Icon(item.icon, contentDescription = null) },
                         label = { Text(item.label) },
+                        alwaysShowLabel = false,
                     )
                 }
             }
@@ -141,8 +145,24 @@ fun AuthenticatedShell(
                     onOpenCustomer = viewModel::openCustomer,
                     onCloseCustomer = viewModel::closeCustomer,
                     onRecordCash = viewModel::recordCashSale,
+                    onRetryCash = viewModel::retryCashSale,
                     onFeedbackDismissed = viewModel::clearSalesFeedback,
                     onCredentialConsumed = viewModel::consumeIssuedCredential,
+                )
+
+                MainDestination.Network -> NetworkScreen(
+                    organizationId = state.selectedOrganizationId,
+                    organizationName = state.selectedOrganization?.name,
+                    state = state.network,
+                    onLoadRouters = viewModel::loadRouters,
+                    onOpenRouter = viewModel::openRouter,
+                    onCloseRouter = viewModel::closeRouter,
+                    onRunRouterTests = viewModel::runRouterTests,
+                    onLoadSessions = viewModel::loadHotspotSessions,
+                    onOpenSession = viewModel::openHotspotSession,
+                    onCloseSession = viewModel::closeHotspotSession,
+                    onDisconnectSession = viewModel::disconnectHotspotSession,
+                    onFeedbackDismissed = viewModel::clearNetworkFeedback,
                 )
 
                 MainDestination.Plans -> PlanScreen(
