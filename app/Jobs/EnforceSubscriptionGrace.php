@@ -7,17 +7,20 @@ use App\Domain\Enums\OrganizationMode;
 use App\Domain\Enums\OrganizationStatus;
 use App\Models\Invoice;
 use App\Models\Organization;
+use App\Notifications\HotFiiAlert;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Notification;
 
 class EnforceSubscriptionGrace implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
+
     public int $timeout = 45;
 
     public function __construct()
@@ -47,11 +50,27 @@ class EnforceSubscriptionGrace implements ShouldQueue
                     // applied from the console. Without that mark this job
                     // would either strand paying customers or start reversing
                     // suspensions imposed for abuse.
-                    $organization->markBillingSuspended(
-                        $graceEndsAt->isPast()
-                            ? OrganizationStatus::Suspended
-                            : OrganizationStatus::Grace,
-                    );
+                    $targetStatus = $graceEndsAt->isPast()
+                        ? OrganizationStatus::Suspended
+                        : OrganizationStatus::Grace;
+                    $before = $organization->status;
+                    $organization->markBillingSuspended($targetStatus);
+
+                    if ($before !== $targetStatus) {
+                        $recipients = $organization->users()
+                            ->wherePivotIn('role', ['owner', 'manager', 'accountant'])
+                            ->get();
+                        Notification::send($recipients, new HotFiiAlert(
+                            $targetStatus === OrganizationStatus::Suspended ? 'HotFii account suspended' : 'Invoice payment overdue',
+                            $targetStatus === OrganizationStatus::Suspended
+                                ? 'Access sales are restricted until the overdue invoice is settled.'
+                                : 'Your invoice is overdue and is now within its payment grace period.',
+                            route('finance.index'),
+                            category: 'account',
+                            organizationId: $organization->uuid,
+                            mobileData: ['screen' => 'finance', 'invoice_id' => $invoice->uuid],
+                        ));
+                    }
                 }
             });
 

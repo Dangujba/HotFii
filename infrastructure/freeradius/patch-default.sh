@@ -45,3 +45,40 @@ END {
 ' "$FILE" > "$TMP"
 
 mv "$TMP" "$FILE"
+
+
+# HotFii: install CoovaChilli RADIUS VSA dictionary.
+# CoovaChilli enterprise number: 14559.
+DICT="$(find /etc/freeradius -maxdepth 2 -type f -name dictionary | head -n 1)"
+
+if [ -z "$DICT" ]; then
+    DICT="/etc/freeradius/3.0/dictionary"
+    mkdir -p "$(dirname "$DICT")"
+    touch "$DICT"
+fi
+
+if ! grep -Rqs "CoovaChilli-Max-Total-Octets" \
+    /usr/share/freeradius /etc/freeradius 2>/dev/null
+then
+    if ! grep -RqsE '^VENDOR[[:space:]]+CoovaChilli[[:space:]]+14559' \
+        /usr/share/freeradius /etc/freeradius 2>/dev/null
+    then
+        cat >> "$DICT" <<'EOF'
+
+VENDOR CoovaChilli 14559
+EOF
+    fi
+
+    cat >> "$DICT" <<'EOF'
+BEGIN-VENDOR CoovaChilli
+ATTRIBUTE CoovaChilli-Max-Input-Octets      1 integer
+ATTRIBUTE CoovaChilli-Max-Output-Octets     2 integer
+ATTRIBUTE CoovaChilli-Max-Total-Octets      3 integer
+ATTRIBUTE CoovaChilli-Bandwidth-Max-Up      4 integer
+ATTRIBUTE CoovaChilli-Bandwidth-Max-Down    5 integer
+ATTRIBUTE CoovaChilli-Config                6 string
+ATTRIBUTE CoovaChilli-Lang                  7 string
+ATTRIBUTE CoovaChilli-Version               8 string
+END-VENDOR CoovaChilli
+EOF
+fi

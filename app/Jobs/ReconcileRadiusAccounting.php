@@ -78,8 +78,32 @@ class ReconcileRadiusAccounting implements ShouldQueue
 
                     $credential->update(['last_used_at' => now()]);
                     $credential->customer?->update(['last_authenticated_at' => now()]);
-                    $devices->markEvidence($device, 'radius_auth', 'A valid RADIUS authentication produced accounting traffic.');
-                    $devices->markEvidence($device, 'accounting', 'Accounting-Start or interim traffic received.', ['session' => $session->uuid]);
+                    $devices->markEvidence(
+                        $device,
+                        'radius_auth',
+                        'A valid RADIUS authentication produced accounting traffic.'
+                    );
+
+                    $devices->markEvidence(
+                        $device,
+                        'accounting',
+                        'Accounting-Start or interim traffic received.',
+                        [
+                            'session' =>
+                                $session->uuid,
+                        ]
+                    );
+
+                    $devices->markEvidence(
+                        $device,
+                        'session_tracking',
+                        'A live RADIUS accounting session is being tracked by HotFii.',
+                        [
+                            'session' =>
+                                $session->uuid,
+                        ]
+                    );
+
                     HotspotSessionUpdated::dispatch($session);
                 }
             }, 'radacctid');

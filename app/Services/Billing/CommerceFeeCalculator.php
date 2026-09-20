@@ -14,25 +14,14 @@ class CommerceFeeCalculator
         $billableSalesKobo = max(0, $billableSalesKobo);
         $percentage = intdiv($billableSalesKobo * (int) config('hotfii.commerce.platform_fee_bps'), 10_000);
 
-        // Nothing is charged before the trial clock has started, which happens
-        // on the first real activation rather than at registration.
-        $beforeFirstActivation = ! $organization->trial_started_at;
-
-        if ($organization->inTrial() || $organization->billing_plan === BillingPlan::Sandbox || $beforeFirstActivation) {
-            return new FeeQuote($billableSalesKobo, $percentage, 0, 0, 'trial_or_sandbox');
-        }
-
         if ($organization->mode === OrganizationMode::Internal) {
             return new FeeQuote($billableSalesKobo, 0, 0, 0, 'internal_subscription');
         }
 
-        if ($organization->mode === OrganizationMode::Hybrid || $organization->billing_plan === BillingPlan::MicroSeller) {
-            return new FeeQuote($billableSalesKobo, $percentage, 0, $percentage, 'percentage_only');
-        }
-
-        $minimum = (int) config('hotfii.commerce.standard_minimum_kobo');
-
-        return new FeeQuote($billableSalesKobo, $percentage, $minimum, max($percentage, $minimum), 'standard_minimum_or_percentage');
+        // Every real paid activation is quoted at the running percentage. The
+        // monthly minimum and included-sales band are reconciled once, at the
+        // end of the month, by CommerceMonthlyFeeCalculator.
+        return new FeeQuote($billableSalesKobo, $percentage, 0, $percentage, 'percentage_only');
     }
 
     public function shouldGraduateFromMicro(Organization $organization, int $monthlySalesKobo): bool

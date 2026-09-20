@@ -11,7 +11,7 @@ class FeeLedgerEntry extends Model
     use HasPublicUuid;
 
     protected $fillable = [
-        'organization_id', 'source_type', 'source_id', 'billing_period',
+        'organization_id', 'network_device_id', 'source_type', 'source_id', 'billing_period',
         'billable_sales_kobo', 'fee_amount_kobo', 'status', 'metadata',
     ];
 
@@ -21,4 +21,5 @@ class FeeLedgerEntry extends Model
     }
 
     public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
+    public function networkDevice(): BelongsTo { return $this->belongsTo(NetworkDevice::class); }
 }

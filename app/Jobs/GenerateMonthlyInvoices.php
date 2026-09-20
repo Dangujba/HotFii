@@ -4,10 +4,11 @@ namespace App\Jobs;
 
 use App\Domain\Enums\BillingPlan;
 use App\Domain\Enums\OrganizationMode;
-use App\Domain\Enums\OrganizationStatus;
 use App\Models\FeeLedgerEntry;
 use App\Models\Invoice;
 use App\Models\Organization;
+use App\Notifications\HotFiiAlert;
+use App\Services\Billing\CommerceMonthlyFeeCalculator;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 class GenerateMonthlyInvoices implements ShouldQueue
@@ -22,6 +24,7 @@ class GenerateMonthlyInvoices implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public int $timeout = 120;
 
     public function __construct(public readonly ?string $period = null)
@@ -34,17 +37,17 @@ class GenerateMonthlyInvoices implements ShouldQueue
         return [(new WithoutOverlapping('monthly-invoices-'.$this->billingPeriod()))->expireAfter(180)];
     }
 
-    public function handle(): void
+    public function handle(?CommerceMonthlyFeeCalculator $monthlyFees = null): void
     {
+        $monthlyFees ??= app(CommerceMonthlyFeeCalculator::class);
         $period = $this->billingPeriod();
 
-        // Organizations are Live from registration, so status can no longer
-        // stand in for "has started paying". An untouched account has no
-        // trial_started_at and must never be invoiced for a subscription.
+        // Registration alone does not start billing. The first paid activation
+        // sets trial_started_at, after which Trial and Sandbox are lifecycle
+        // labels only and never exempt real sales from fees or invoicing.
         Organization::query()
             ->whereNotNull('trial_started_at')
-            ->where('status', '!=', OrganizationStatus::PaymentRejected)
-            ->chunkById(100, function ($organizations) use ($period) {
+            ->chunkById(100, function ($organizations) use ($period, $monthlyFees) {
                 foreach ($organizations as $organization) {
                     $ledger = FeeLedgerEntry::where('organization_id', $organization->id)
                         ->whereDate('billing_period', $period)
@@ -54,22 +57,21 @@ class GenerateMonthlyInvoices implements ShouldQueue
                     $percentageFees = $ledger->sum('fee_amount_kobo');
                     $collected = $ledger->where('status', 'collected')->sum('fee_amount_kobo');
 
-                    $sellerMinimum = $organization->mode === OrganizationMode::Commerce
-                        && $organization->billing_plan === BillingPlan::StandardSeller
-                            ? (int) config('hotfii.commerce.standard_minimum_kobo')
-                            : 0;
-
                     $subscriptionBase = (int) (
                         config('hotfii.internal_plans.'.$organization->billing_plan->value.'.price_kobo')
                         ?? 0
                     );
 
-                    $sellerFee = max($percentageFees, $sellerMinimum);
+                    $sellerFee = match ($organization->mode) {
+                        OrganizationMode::Commerce => $monthlyFees->calculate($sales),
+                        OrganizationMode::Hybrid => $percentageFees,
+                        default => 0,
+                    };
                     $total = $subscriptionBase + $sellerFee;
                     $balance = max(0, $total - $collected);
 
                     if ($balance > 0) {
-                        Invoice::firstOrCreate(
+                        $invoice = Invoice::firstOrCreate(
                             ['organization_id' => $organization->id, 'billing_period' => $period],
                             [
                                 'number' => 'HF-INV-'.Str::upper(Str::random(10)),
@@ -79,6 +81,19 @@ class GenerateMonthlyInvoices implements ShouldQueue
                                 'due_at' => now()->addDays(7),
                             ],
                         );
+                        if ($invoice->wasRecentlyCreated) {
+                            $recipients = $organization->users()
+                                ->wherePivotIn('role', ['owner', 'manager', 'accountant'])
+                                ->get();
+                            Notification::send($recipients, new HotFiiAlert(
+                                'New HotFii invoice: '.$invoice->number,
+                                sprintf('₦%s is due by %s.', number_format($invoice->total_kobo / 100, 2), $invoice->due_at->format('j M Y')),
+                                route('finance.index'),
+                                category: 'invoice',
+                                organizationId: $organization->uuid,
+                                mobileData: ['screen' => 'finance', 'invoice_id' => $invoice->uuid],
+                            ));
+                        }
                     }
 
                     if ($organization->billing_plan === BillingPlan::MicroSeller

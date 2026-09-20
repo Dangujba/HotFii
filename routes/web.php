@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\MobileInvoicePaymentController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -11,7 +12,9 @@ use App\Http\Controllers\Operator\FinanceController;
 use App\Http\Controllers\Operator\InvoicePaymentController;
 use App\Http\Controllers\Operator\LocationController;
 use App\Http\Controllers\Operator\NetworkDeviceController;
+use App\Http\Controllers\Operator\NetworkDeviceGuideController;
 use App\Http\Controllers\Operator\NotificationController;
+use App\Http\Controllers\Operator\OmadaSetupController;
 use App\Http\Controllers\Operator\OrganizationContextController;
 use App\Http\Controllers\Operator\ProvisioningController;
 use App\Http\Controllers\Operator\ReportsController;
@@ -19,6 +22,7 @@ use App\Http\Controllers\Operator\SalesController;
 use App\Http\Controllers\Operator\SessionController;
 use App\Http\Controllers\Operator\SettingsController;
 use App\Http\Controllers\Operator\TeamController;
+use App\Http\Controllers\Operator\UnifiSetupController;
 use App\Http\Controllers\Operator\VoucherBatchController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaystackWebhookController;
@@ -29,10 +33,12 @@ use App\Http\Controllers\Platform\ImpersonationController;
 use App\Http\Controllers\Platform\InvoiceController as PlatformInvoiceController;
 use App\Http\Controllers\Platform\OrganizationController as PlatformOrganizationController;
 use App\Http\Controllers\Platform\PaymentReviewController;
+use App\Http\Controllers\Platform\RouterController as PlatformRouterController;
 use App\Http\Controllers\Platform\SystemController as PlatformSystemController;
 use App\Http\Controllers\Platform\TransactionController as PlatformTransactionController;
 use App\Http\Controllers\Platform\UserController as PlatformUserController;
 use App\Http\Controllers\PortalController;
+use App\Http\Controllers\UnifiPortalController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -42,6 +48,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [RegisteredUserController::class, 'store']);
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+    Route::get('/two-factor-challenge', [AuthenticatedSessionController::class, 'challenge'])->name('two-factor.challenge');
+    Route::post('/two-factor-challenge', [AuthenticatedSessionController::class, 'verify'])
+        ->middleware('throttle:10,1')
+        ->name('two-factor.verify');
 });
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('auth')->name('logout');
@@ -55,12 +65,16 @@ Route::prefix('connect/{device}')->name('portal.')->middleware('throttle:120,1')
     Route::get('/status', [PortalController::class, 'status'])->name('status');
     Route::get('/connected', [PortalController::class, 'connected'])->name('connected');
     Route::get('/mikrotik/login.html', [PortalController::class, 'mikrotikLogin'])->name('mikrotik-login');
+    Route::post('/unifi/authorize', [UnifiPortalController::class, 'authorize'])->name('unifi-authorize');
     Route::post('/payment', [PaymentController::class, 'initialize'])->name('payment');
     Route::get('/payment/{transaction}/callback', [PaymentController::class, 'callback'])->name('payment.callback');
     Route::get('/payment/{transaction}/status', [PaymentController::class, 'status'])->name('payment.status');
     Route::get('/payment/{transaction}/poll', [PaymentController::class, 'poll'])->name('payment.poll');
 });
 Route::post('/webhooks/paystack', PaystackWebhookController::class)->name('webhooks.paystack');
+Route::get('/mobile/invoice-payments/{invoice}/callback', [MobileInvoicePaymentController::class, 'callback'])
+    ->middleware('throttle:30,1')
+    ->name('mobile.invoice-payments.callback');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/organizations/{organization}/switch', OrganizationContextController::class)->name('organizations.switch');
@@ -76,6 +90,22 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
     Route::post('/network/devices/{device}/test', [NetworkDeviceController::class, 'test'])->middleware('role:owner,manager,technician')->name('network.devices.test');
     Route::post('/network/devices/{device}/provisioning-link', ProvisioningController::class)->middleware('role:owner,manager,technician')->name('network.devices.provisioning-link');
 
+    Route::post('/network/devices/{device}/unifi/discover', [UnifiSetupController::class, 'discover'])
+        ->middleware('role:owner,manager,technician')
+        ->name('network.devices.unifi.discover');
+
+    Route::post('/network/devices/{device}/unifi/site', [UnifiSetupController::class, 'selectSite'])
+        ->middleware('role:owner,manager,technician')
+        ->name('network.devices.unifi.site');
+
+    Route::post('/network/devices/{device}/omada/setup', [OmadaSetupController::class, 'update'])
+        ->middleware('role:owner,manager,technician')
+        ->name('network.devices.omada.setup');
+
+    Route::get('/network/devices/{device}/guide', [NetworkDeviceGuideController::class, 'show'])
+        ->middleware('role:owner,manager,technician')
+        ->name('network.devices.guide');
+
     Route::get('/sessions', [SessionController::class, 'index'])->name('sessions.index');
     Route::post('/sessions/{session}/disconnect', [SessionController::class, 'disconnect'])->middleware('role:owner,manager,technician')->name('sessions.disconnect');
 
@@ -87,10 +117,15 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
 
     Route::get('/plans', [AccessPlanController::class, 'index'])->name('plans.index');
     Route::post('/plans', [AccessPlanController::class, 'store'])->middleware('role:owner,manager')->name('plans.store');
+    Route::patch('/plans/{plan}', [AccessPlanController::class, 'update'])->middleware('role:owner,manager')->name('plans.update');
+    Route::delete('/plans/{plan}', [AccessPlanController::class, 'destroy'])->middleware('role:owner,manager')->name('plans.destroy');
 
     Route::get('/vouchers', [VoucherBatchController::class, 'index'])->name('vouchers.index');
     Route::post('/vouchers', [VoucherBatchController::class, 'store'])->middleware('role:owner,manager,agent')->name('vouchers.store');
+    Route::patch('/vouchers/{batch}', [VoucherBatchController::class, 'update'])->middleware('role:owner,manager')->name('vouchers.update');
+    Route::delete('/vouchers/{batch}', [VoucherBatchController::class, 'destroy'])->middleware('role:owner,manager')->name('vouchers.destroy');
     Route::get('/vouchers/{batch}/print', [VoucherBatchController::class, 'print'])->name('vouchers.print');
+    Route::get('/vouchers/{batch}/thermal', [VoucherBatchController::class, 'thermal'])->name('vouchers.thermal');
 
     Route::get('/sales', [SalesController::class, 'index'])->name('sales.index');
     Route::post('/sales/cash', [SalesController::class, 'store'])->middleware('role:owner,manager,agent')->name('sales.cash.store');
@@ -120,6 +155,9 @@ Route::middleware(['auth', 'verified', 'organization'])->group(function () {
 // organization. Anything that changes what a customer owes stays out of the UI.
 Route::middleware(['auth', 'verified', 'platform-admin'])->prefix('platform')->name('platform.')->group(function () {
     Route::get('/', PlatformDashboardController::class)->name('index');
+
+    Route::get('/routers', PlatformRouterController::class)
+        ->name('routers.index');
 
     Route::get('/organizations', [PlatformOrganizationController::class, 'index'])->name('organizations.index');
     // withTrashed: a soft-deleted organization still has money and an audit

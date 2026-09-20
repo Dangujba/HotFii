@@ -97,9 +97,9 @@ class OrganizationController extends Controller
                 'this_month_fees' => (int) FeeLedgerEntry::where('organization_id', $organization->id)->whereDate('billing_period', $period)->sum('fee_amount_kobo'),
             ],
             'subscription' => $organization->subscriptions()->latest()->first(),
-            'transactions' => $organization->transactions()->with('accessPlan')->latest()->limit(10)->get(),
+            'transactions' => $organization->transactions()->with('accessPlan', 'networkDevice')->latest()->limit(10)->get(),
             'invoices' => Invoice::where('organization_id', $organization->id)->latest()->limit(10)->get(),
-            'entries' => FeeLedgerEntry::where('organization_id', $organization->id)->latest()->limit(10)->get(),
+            'entries' => FeeLedgerEntry::where('organization_id', $organization->id)->with('networkDevice')->latest()->limit(10)->get(),
             'audits' => AuditLog::where('organization_id', $organization->id)->with('user')->latest()->limit(10)->get(),
         ]);
     }

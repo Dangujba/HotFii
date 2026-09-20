@@ -101,11 +101,17 @@ ROS, [
  /radius add address="{{RADIUS_HOST}}" secret="{{RADIUS_SECRET}}" service=hotspot authentication-port={{AUTH_PORT}} accounting-port={{ACCT_PORT}} timeout=3s require-message-auth=yes-for-request-resp comment=$hotfiiComment
  /radius incoming set accept=yes port={{COA_PORT}}
 
-# Enable RADIUS on the default profile and every profile used by a HotSpot server.
+# Enable HotFii RADIUS on the default profile.
  /ip hotspot profile set [find where name="default"] use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie
+
+# Normalize every profile actively used by a HotSpot server.
+# Keep the customer's existing HotSpot server, interface, address pool,
+# DHCP, LAN and WAN configuration, but replace legacy captive-portal
+# branding/files with the HotFii-managed portal.
 :foreach hotspotId in=[/ip hotspot find] do={
     :local profileName [/ip hotspot get $hotspotId profile]
-    /ip hotspot profile set [find where name=$profileName] use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie
+
+    /ip hotspot profile set [find where name=$profileName]         use-radius=yes         radius-accounting=yes         radius-interim-update=1m         login-by=http-pap,cookie         dns-name=""         html-directory=hotspot         html-directory-override=""
 }
 
  /ip hotspot walled-garden remove [find where comment=$hotfiiComment]
@@ -145,7 +151,63 @@ ROS, [
 
  /system script add name="hotfii-heartbeat" policy=ftp,read,test source={
     :local firmwareVersion [/system resource get version]
-    :local heartbeatBody ("{\"firmware_version\":\"" . $firmwareVersion . "\"}")
+
+    # Build a small list of currently active HotSpot clients and their
+    # DHCP host names. HotFii uses this only as display metadata.
+    :local clientsJson ""
+    :local clientCount 0
+
+    :foreach activeId in=[/ip hotspot active find] do={
+
+        :if ($clientCount < 50) do={
+
+            :local clientMac [/ip hotspot active get $activeId mac-address]
+
+            :local clientName ""
+
+            :foreach leaseId in=[
+                /ip dhcp-server lease find where mac-address=$clientMac
+            ] do={
+
+                :if ([:len $clientName] = 0) do={
+                    :set clientName [/ip dhcp-server lease get $leaseId host-name]
+                }
+            }
+
+            # DHCP host names normally contain safe DNS-style characters.
+            # Skip JSON-sensitive values rather than break the heartbeat.
+            :if (
+                ([:len $clientName] > 0)
+                && ([:find $clientName "\""] = nil)
+                && ([:find $clientName "\\"] = nil)
+            ) do={
+
+                :if ([:len $clientsJson] > 0) do={
+                    :set clientsJson ($clientsJson . ",")
+                }
+
+                :set clientsJson (
+                    $clientsJson
+                    . "{\"mac\":\""
+                    . $clientMac
+                    . "\",\"name\":\""
+                    . $clientName
+                    . "\"}"
+                )
+
+                :set clientCount ($clientCount + 1)
+            }
+        }
+    }
+
+    :local heartbeatBody (
+        "{\"firmware_version\":\""
+        . $firmwareVersion
+        . "\",\"clients\":["
+        . $clientsJson
+        . "]}"
+    )
+
     /tool fetch url="{{HEARTBEAT_URL}}" http-method=post http-header-field="Content-Type: application/json,X-HotFii-Secret: {{RADIUS_SECRET}}" http-data=$heartbeatBody check-certificate=yes-without-crl keep-result=no
 }
 

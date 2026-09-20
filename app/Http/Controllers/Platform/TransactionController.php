@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Platform;
 
 use App\Domain\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\NetworkDevice;
 use App\Models\Organization;
 use App\Models\Transaction;
 use App\Support\ListFilters;
@@ -22,19 +23,29 @@ class TransactionController extends Controller
 {
     public function __invoke(Request $request): View
     {
+        $routers = NetworkDevice::query()
+            ->with('organization')
+            ->orderBy('organization_id')
+            ->orderBy('name')
+            ->get();
+        $requestedRouter = ListFilters::id($request, 'router');
+
         $filters = [
             'search' => ListFilters::text($request, 'search'),
             'organization' => ListFilters::id($request, 'organization'),
             'status' => ListFilters::choice($request, 'status', ListFilters::enumValues(PaymentStatus::class)),
             'from' => ListFilters::date($request, 'from'),
             'to' => ListFilters::date($request, 'to'),
+            'router' => $requestedRouter !== null && $routers->contains('id', $requestedRouter)
+                ? $requestedRouter
+                : null,
         ];
 
         $transactions = $this->query($filters);
 
         return view('platform.transactions', [
             'transactions' => (clone $transactions)
-                ->with(['organization', 'accessPlan'])
+                ->with(['organization', 'accessPlan', 'networkDevice'])
                 ->latest()
                 ->paginate(25)
                 ->withQueryString(),
@@ -46,6 +57,7 @@ class TransactionController extends Controller
                 'fees' => (int) (clone $transactions)->sum('platform_fee_kobo'),
             ],
             'organizations' => Organization::orderBy('name')->get(['id', 'name']),
+            'routers' => $routers,
             'statuses' => PaymentStatus::cases(),
             'filters' => $filters,
             'filtered' => ListFilters::any($filters),
@@ -60,6 +72,7 @@ class TransactionController extends Controller
         return Transaction::query()
             ->when($filters['search'], fn ($query, $term) => $query->where('reference', 'like', "%{$term}%"))
             ->when($filters['organization'], fn ($query, $id) => $query->where('organization_id', $id))
+            ->when($filters['router'], fn ($query, $id) => $query->where('network_device_id', $id))
             ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
             ->when($filters['from'], fn ($query, $date) => $query->where('created_at', '>=', CarbonImmutable::parse($date)->startOfDay()))
             ->when($filters['to'], fn ($query, $date) => $query->where('created_at', '<=', CarbonImmutable::parse($date)->endOfDay()));

@@ -68,6 +68,7 @@ class BillingController extends Controller
             'pricing' => [
                 'fee_bps' => (int) config('hotfii.commerce.platform_fee_bps'),
                 'standard_minimum_kobo' => (int) config('hotfii.commerce.standard_minimum_kobo'),
+                'minimum_included_sales_kobo' => (int) config('hotfii.commerce.minimum_included_sales_kobo'),
                 'micro_sales_limit_kobo' => (int) config('hotfii.commerce.micro_sales_limit_kobo'),
                 'trial_sales_cap_kobo' => (int) config('hotfii.commerce.trial_sales_cap_kobo'),
                 'trial_days' => (int) config('hotfii.commerce.trial_days'),

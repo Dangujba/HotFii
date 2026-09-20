@@ -5,7 +5,9 @@ namespace App\Services\Billing;
 use App\Models\AuditLog;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Notifications\HotFiiAlert;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * The one place an invoice becomes paid.
@@ -25,7 +27,7 @@ class InvoiceSettlement
     /**
      * @param  string  $method  'paystack' for an online payment, 'manual' for a transfer received out of band
      * @param  ?User  $actor  the platform admin recording a manual payment; null for machine paths
-     * @return bool  true when this call was the one that settled it
+     * @return bool true when this call was the one that settled it
      */
     public function settle(
         Invoice $invoice,
@@ -62,6 +64,24 @@ class InvoiceSettlement
             ]);
 
             $this->restore($invoice);
+
+            DB::afterCommit(function () use ($invoice): void {
+                $organization = $invoice->organization;
+                if ($organization === null) {
+                    return;
+                }
+                $recipients = $organization->users()
+                    ->wherePivotIn('role', ['owner', 'manager', 'accountant'])
+                    ->get();
+                Notification::send($recipients, new HotFiiAlert(
+                    'Invoice paid: '.$invoice->number,
+                    sprintf('Your payment of ₦%s has been confirmed.', number_format($invoice->total_kobo / 100, 2)),
+                    route('finance.index'),
+                    category: 'invoice',
+                    organizationId: $organization->uuid,
+                    mobileData: ['screen' => 'finance', 'invoice_id' => $invoice->uuid],
+                ));
+            });
 
             return true;
         });

@@ -1,0 +1,318 @@
+package com.innobytes.hotfii.ui.auth
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import com.innobytes.hotfii.R
+
+@Composable
+fun LoginScreen(
+    isSubmitting: Boolean,
+    error: String?,
+    requiresTwoFactor: Boolean,
+    onSignIn: (String, String) -> Unit,
+    onVerifyTwoFactor: (String) -> Unit,
+    onCancelTwoFactor: () -> Unit,
+    onInputChanged: () -> Unit,
+    onCloseApp: () -> Unit,
+) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var twoFactorCode by rememberSaveable { mutableStateOf("") }
+    var showCloseConfirmation by rememberSaveable { mutableStateOf(false) }
+    var hasAttemptedSubmit by rememberSaveable { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val submit: () -> Unit = {
+        hasAttemptedSubmit = true
+        focusManager.clearFocus()
+        if (requiresTwoFactor) {
+            onVerifyTwoFactor(twoFactorCode)
+        } else if (!validateLoginInputs(email, password).hasErrors) {
+            onSignIn(email, password)
+        }
+    }
+    val inputErrors = if (hasAttemptedSubmit) {
+        validateLoginInputs(email, password)
+    } else {
+        LoginInputErrors()
+    }
+    val credentialsRejected = error?.isCredentialError() == true
+    val passwordMessage = inputErrors.password ?: error?.takeIf { credentialsRejected }
+    val generalError = error?.takeUnless { credentialsRejected }
+
+    if (showCloseConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showCloseConfirmation = false },
+            title = { Text("Close HotFii?") },
+            text = { Text("This will completely close the app.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCloseConfirmation = false
+                        onCloseApp()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text("Close app")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloseConfirmation = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        IconButton(
+            onClick = { showCloseConfirmation = true },
+            modifier = Modifier.align(Alignment.TopEnd),
+        ) {
+            Icon(Icons.Outlined.Close, contentDescription = "Close HotFii")
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 460.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.hotfii_icon),
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp),
+                )
+                Text(
+                    text = "HotFii",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
+            }
+
+            Spacer(Modifier.height(40.dp))
+            Text(
+                text = if (requiresTwoFactor) "Two-factor verification" else "Sign in",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = if (requiresTwoFactor) {
+                    "Enter the code from your authenticator app or a recovery code"
+                } else {
+                    "Use your HotFii operator account"
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp, bottom = 24.dp),
+            )
+
+            if (generalError != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                ) {
+                    Text(generalError, modifier = Modifier.padding(14.dp))
+                }
+            }
+
+            if (requiresTwoFactor) {
+                OutlinedTextField(
+                    value = twoFactorCode,
+                    onValueChange = {
+                        twoFactorCode = it
+                        if (error != null) onInputChanged()
+                    },
+                    label = { Text("Verification code") },
+                    leadingIcon = { Icon(Icons.Outlined.Security, contentDescription = null) },
+                    isError = error != null,
+                    supportingText = error?.let { message -> { Text(message) } },
+                    singleLine = true,
+                    enabled = !isSubmitting,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+            OutlinedTextField(
+                value = email,
+                onValueChange = {
+                    email = it
+                    if (error != null) onInputChanged()
+                },
+                label = { Text("Email address") },
+                leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null) },
+                isError = inputErrors.email != null || credentialsRejected,
+                supportingText = inputErrors.email?.let { message ->
+                    { Text(message) }
+                },
+                singleLine = true,
+                enabled = !isSubmitting,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = {
+                    password = it
+                    if (error != null) onInputChanged()
+                },
+                label = { Text("Password") },
+                leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+                isError = passwordMessage != null || credentialsRejected,
+                supportingText = passwordMessage?.let { message ->
+                    { Text(message) }
+                },
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                        )
+                    }
+                },
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                singleLine = true,
+                enabled = !isSubmitting,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp),
+            )
+            }
+
+            Button(
+                onClick = submit,
+                enabled = !isSubmitting,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+                    .height(52.dp),
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White,
+                    )
+                } else {
+                    Text(if (requiresTwoFactor) "Verify" else "Sign in")
+                }
+            }
+            if (requiresTwoFactor) {
+                TextButton(
+                    onClick = {
+                        twoFactorCode = ""
+                        onCancelTwoFactor()
+                    },
+                    enabled = !isSubmitting,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    Text("Use another account")
+                }
+            }
+        }
+    }
+}
+
+internal data class LoginInputErrors(
+    val email: String? = null,
+    val password: String? = null,
+) {
+    val hasErrors: Boolean
+        get() = email != null || password != null
+}
+
+internal fun validateLoginInputs(email: String, password: String): LoginInputErrors {
+    val emailError = when {
+        email.isBlank() -> "Email address is required."
+        !email.trim().matches(EMAIL_PATTERN) -> "Enter a valid email address."
+        else -> null
+    }
+    val passwordError = if (password.isBlank()) "Password is required." else null
+
+    return LoginInputErrors(email = emailError, password = passwordError)
+}
+
+private fun String.isCredentialError(): Boolean =
+    contains("credential", ignoreCase = true) ||
+        contains("email or password", ignoreCase = true) ||
+        contains("incorrect password", ignoreCase = true)
+
+private val EMAIL_PATTERN = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")

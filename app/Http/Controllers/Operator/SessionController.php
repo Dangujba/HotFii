@@ -7,6 +7,7 @@ use App\Jobs\DisconnectHotspotSession;
 use App\Models\HotspotSession;
 use App\Models\Organization;
 use App\Support\ListFilters;
+use App\Support\OrganizationRouterFilter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -18,10 +19,12 @@ class SessionController extends Controller
 
     public function index(Request $request, Organization $organization): View
     {
+        [$devices, $deviceId] = OrganizationRouterFilter::resolve($request, $organization, 'device');
+
         $filters = [
             'search' => ListFilters::text($request, 'search'),
             'status' => ListFilters::choice($request, 'status', self::STATUSES),
-            'device' => ListFilters::id($request, 'device'),
+            'device' => $deviceId,
         ];
 
         return view('operator.sessions', [
@@ -37,7 +40,7 @@ class SessionController extends Controller
                 ->latest('started_at')
                 ->paginate(30)
                 ->withQueryString(),
-            'devices' => $organization->networkDevices()->orderBy('name')->get(['id', 'name']),
+            'devices' => $devices,
             'statuses' => self::STATUSES,
             'filters' => $filters,
             'filtered' => ListFilters::any($filters),

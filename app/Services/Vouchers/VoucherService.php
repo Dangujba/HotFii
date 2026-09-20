@@ -9,24 +9,29 @@ use App\Events\VoucherActivated;
 use App\Models\AccessPlan;
 use App\Models\Customer;
 use App\Models\FeeLedgerEntry;
+use App\Models\NetworkDevice;
 use App\Models\Organization;
 use App\Models\Voucher;
 use App\Models\VoucherBatch;
+use App\Notifications\HotFiiAlert;
 use App\Services\Billing\CommerceFeeCalculator;
 use App\Services\Billing\TrialManager;
 use App\Services\Radius\RadiusCredentialService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class VoucherService
 {
-    private const PIN_LENGTH = 12;
-
     public function __construct(
         private readonly RadiusCredentialService $credentials,
         private readonly CommerceFeeCalculator $fees,
         private readonly TrialManager $trials,
+        private readonly VoucherSaleTransactionRecorder $sales,
+        private readonly VoucherPinGenerator $pins,
     ) {}
 
     public function createBatch(
@@ -36,65 +41,309 @@ class VoucherService
         ?int $priceKobo = null,
         VoucherPinFormat $pinFormat = VoucherPinFormat::Numbers,
         bool $dashedPin = true,
+        int $pinLength = 12,
+        ?NetworkDevice $device = null,
     ): VoucherBatch {
+        /*
+         * A specific device means router-scoped vouchers.
+         * NULL intentionally means organization-wide / All routers.
+         */
+        if (
+            $device
+            && $device->organization_id !== $organization->id
+        ) {
+            throw ValidationException::withMessages([
+                'network_device_id' => 'The selected router does not belong to this organization.',
+            ]);
+        }
+
         if ($quantity < 1 || $quantity > 5000) {
             throw new RuntimeException('Voucher quantity must be between 1 and 5,000.');
         }
 
-        return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin) {
+        if (! in_array($pinLength, VoucherPinGenerator::LENGTHS, true)) {
+            throw ValidationException::withMessages(['pin_length' => 'Choose a PIN length of 2, 4, 6, 8, 10, or 12.']);
+        }
+        if ($quantity > $this->pins->capacity($pinFormat, $pinLength)) {
+            throw ValidationException::withMessages(['quantity' => 'This PIN length cannot provide enough unique codes. Choose a longer PIN or fewer vouchers.']);
+        }
+
+        // An operator may mark a voucher up, but may not reduce the sale below
+        // the paid plan it grants. Otherwise a ₦500 plan could be reported as
+        // a ₦100 sale while the operator takes the difference off-system.
+        // Keep this in the service so imports and future callers cannot bypass
+        // the same rule enforced by the web form.
+        if ($priceKobo !== null && $priceKobo < $plan->price_kobo) {
+            throw new RuntimeException('A voucher cannot be priced below its access plan. Leave the price blank to use the plan price.');
+        }
+
+        return DB::transaction(function () use ($organization, $plan, $quantity, $priceKobo, $pinFormat, $dashedPin, $pinLength, $device) {
             $batch = VoucherBatch::create([
                 'organization_id' => $organization->id,
                 'access_plan_id' => $plan->id,
+                'network_device_id' => $device?->id,
                 'reference' => 'VB-'.now()->format('ymd').'-'.Str::upper(Str::random(6)),
                 'quantity' => $quantity,
+                'pin_length' => $pinLength,
                 'retail_price_kobo' => $priceKobo ?? $plan->price_kobo,
                 'status' => VoucherStatus::Generated->value,
             ]);
 
-            for ($index = 0; $index < $quantity; $index++) {
-                $code = $this->newCode($pinFormat, $dashedPin);
-                $batch->vouchers()->create([
-                    'organization_id' => $organization->id,
-                    'code_lookup' => $this->lookup($code),
-                    'code_cipher' => $code,
-                    'code_last_four' => substr($code, -4),
-                    'status' => VoucherStatus::Generated,
-                    'price_snapshot_kobo' => $batch->retail_price_kobo,
+            /*
+             * Reserve today's voucher serial sequence.
+             *
+             * The row lock is held by the surrounding transaction, so
+             * concurrent batches generated on the same day cannot receive
+             * overlapping serial numbers.
+             *
+             * Example:
+             * 20260907-001
+             * 20260907-002
+             *
+             * Another batch today continues the sequence.
+             * A new calendar day starts again from 001.
+             */
+            $serialDate =
+                now(config('hotfii.timezone', 'Africa/Lagos'))
+                    ->format('Ymd');
+
+            DB::table('voucher_serial_counters')
+                ->insertOrIgnore([
+                    'serial_date' => $serialDate,
+                    'last_number' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
+
+            $serialCounter =
+                DB::table('voucher_serial_counters')
+                    ->where('serial_date', $serialDate)
+                    ->lockForUpdate()
+                    ->first();
+
+            if (! $serialCounter) {
+                throw new RuntimeException(
+                    'Unable to reserve voucher serial numbers.'
+                );
             }
 
-            return $batch->load('vouchers', 'accessPlan');
+            $serialStart =
+                ((int) $serialCounter->last_number) + 1;
+
+            $created = 0;
+
+            foreach ($this->pins->candidates($pinFormat, $pinLength, $dashedPin, $quantity) as $code) {
+                $lookup = $this->lookup($code);
+                if (Voucher::where('code_lookup', $lookup)->exists()) {
+                    continue;
+                }
+
+                try {
+                    // A savepoint lets concurrent batch collisions retry on PostgreSQL.
+                    DB::transaction(fn () => $batch->vouchers()->create([
+                        'organization_id' => $organization->id,
+                        'network_device_id' => $device?->id,
+                        'code_lookup' => $lookup,
+                        'code_cipher' => $code,
+                        'code_last_four' => substr($code, -4),
+
+                        'serial_number' => sprintf(
+                            '%s-%03d',
+                            $serialDate,
+                            $serialStart + $created
+                        ),
+
+                        'status' => VoucherStatus::Generated,
+                        'price_snapshot_kobo' => $batch->retail_price_kobo,
+                    ]));
+                } catch (UniqueConstraintViolationException $exception) {
+                    if (! Voucher::where('code_lookup', $lookup)->exists()) {
+                        throw $exception;
+                    }
+
+                    continue;
+                }
+
+                if (++$created === $quantity) {
+                    DB::table('voucher_serial_counters')
+                        ->where('serial_date', $serialDate)
+                        ->update([
+                            'last_number' => $serialStart + $quantity - 1,
+
+                            'updated_at' => now(),
+                        ]);
+
+                    return $batch->load(
+                        'vouchers',
+                        'accessPlan'
+                    );
+                }
+            }
+
+            throw ValidationException::withMessages(['pin_length' => 'Not enough unused PINs remain for this batch. Choose a longer PIN or fewer vouchers.']);
         });
     }
 
-    public function redeem(Organization $organization, string $code, ?string $phone = null): Voucher
-    {
-        return DB::transaction(function () use ($organization, $code, $phone) {
+    public function redeem(
+        Organization $organization,
+        string $code,
+        ?string $phone = null,
+        ?NetworkDevice $device = null,
+    ): Voucher {
+        if ($device && $device->organization_id !== $organization->id) {
+            throw new RuntimeException(
+                'This voucher is not valid for this hotspot.'
+            );
+        }
+
+        return DB::transaction(function () use ($organization, $code, $phone, $device) {
             $voucher = Voucher::query()
                 ->where('organization_id', $organization->id)
                 ->where('code_lookup', $this->lookup($code))
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            /*
+             * A non-null network_device_id restricts the voucher to one router.
+             * NULL intentionally means All routers in this organization.
+             * Historical vouchers with NULL therefore retain their previous
+             * organization-wide behaviour.
+             */
+            $boundDeviceId =
+                $voucher->network_device_id
+                ?? $voucher->batch?->network_device_id;
+
+            if (
+                $boundDeviceId !== null
+                && (
+                    ! $device
+                    || (int) $boundDeviceId !== (int) $device->id
+                )
+            ) {
+                throw new RuntimeException(
+                    'This voucher is not valid for this hotspot. Please use a voucher issued for this router.'
+                );
+            }
+
             if ($voucher->expires_at?->isPast()) {
                 $voucher->update(['status' => VoucherStatus::Expired]);
             }
 
-            if (in_array($voucher->status, [VoucherStatus::Expired, VoucherStatus::Revoked], true)) {
-                throw new RuntimeException('This voucher is no longer valid.');
+            if (in_array(
+                $voucher->status,
+                [
+                    VoucherStatus::Expired,
+                    VoucherStatus::Revoked,
+                ],
+                true
+            )) {
+                throw new RuntimeException(
+                    'This voucher is no longer valid.'
+                );
             }
 
+            $plan =
+                $voucher
+                    ->batch
+                    ->accessPlan;
+
+            /*
+             * Resume an already-activated unlimited voucher.
+             *
+             * Unlimited means the plan has neither a cumulative
+             * session-time allowance nor a data allowance.
+             *
+             * IMPORTANT:
+             * - do not activate the voucher again
+             * - do not issue another RADIUS credential
+             * - do not restart validity
+             * - do not extend expires_at
+             * - do not record another sale/fee
+             * - do not dispatch VoucherActivated again
+             *
+             * The existing credential is simply returned so the
+             * router can create a new network session.
+             */
             if ($voucher->status === VoucherStatus::Active) {
-                throw new RuntimeException('This voucher has already been activated.');
+                $isUnlimited =
+                    $plan->duration_minutes === null
+                    && $plan->data_limit_bytes === null;
+
+                if (! $isUnlimited) {
+                    /*
+                     * Preserve the existing behaviour for capped
+                     * plans. Their resume/allowance handling must
+                     * not be changed here.
+                     */
+                    throw new RuntimeException(
+                        'This voucher has already been activated.'
+                    );
+                }
+
+                $voucher->loadMissing('credential');
+
+                $credential =
+                    $voucher->credential;
+
+                if (! $credential) {
+                    throw new RuntimeException(
+                        'This voucher is active but its access credential is unavailable.'
+                    );
+                }
+
+                $credentialStatus =
+                    $credential->status instanceof \BackedEnum
+                        ? $credential->status->value
+                        : (string) $credential->status;
+
+                if ($credentialStatus !== 'active') {
+                    throw new RuntimeException(
+                        'This voucher is no longer valid.'
+                    );
+                }
+
+                /*
+                 * Normally voucher.expires_at and
+                 * credential.expires_at are identical.
+                 *
+                 * Check the credential as well so an expired
+                 * credential can never be resumed because of
+                 * inconsistent historical data.
+                 */
+                if ($credential->expires_at?->isPast()) {
+                    $voucher->update([
+                        'status' => VoucherStatus::Expired,
+                    ]);
+
+                    throw new RuntimeException(
+                        'This voucher is no longer valid.'
+                    );
+                }
+
+                return $voucher
+                    ->refresh()
+                    ->load(
+                        'credential',
+                        'batch.accessPlan'
+                    );
             }
 
-            $plan = $voucher->batch->accessPlan;
+            // Last line of defence for the batch-pricing hole above. A paid
+            // voucher that reaches activation worth under ₦1 would otherwise
+            // activate silently and skip every sales counter and fee entry, so
+            // the operator sees ₦0 sales and HotFii bills nothing. Refusing is
+            // the lesser harm: the operator hits a clear error and can reprice
+            // the batch, rather than giving away access and revenue unnoticed.
+            if (
+                ! $voucher->is_complimentary
+                && $plan->access_type === 'paid'
+                && $voucher->price_snapshot_kobo < 100
+            ) {
+                throw new RuntimeException('This voucher was generated with an invalid price and cannot be activated. Regenerate the batch at the correct price.');
+            }
+
             if ($organization->status === OrganizationStatus::Suspended && ! $voucher->is_complimentary) {
                 throw new RuntimeException('Paid voucher activation is unavailable while the organization is suspended.');
-            }
-            if (! $organization->trial_started_at
-                && $organization->networkDevices()->where('status', 'online')->exists()) {
-                $organization = $this->trials->start($organization);
             }
             $customer = $phone
                 ? Customer::firstOrCreate(
@@ -104,12 +353,14 @@ class VoucherService
                 : null;
 
             $wasRecordedSold = $voucher->sold_at !== null;
-            $expiresAt = $plan->validity_days ? now()->addDays($plan->validity_days) : null;
+            $activatedAt = now();
+            $expiresAt = $plan->expiresAt($activatedAt, $organization->timezone ?: config('app.timezone'));
 
             $voucher->update([
                 'customer_id' => $customer?->id,
+                'activated_network_device_id' => $device?->id ?? $boundDeviceId,
                 'status' => VoucherStatus::Active,
-                'activated_at' => now(),
+                'activated_at' => $activatedAt,
                 'sold_at' => $voucher->sold_at ?? now(),
                 'expires_at' => $expiresAt,
             ]);
@@ -124,6 +375,13 @@ class VoucherService
             );
 
             if (! $voucher->is_complimentary && $voucher->price_snapshot_kobo > 0) {
+                // Redeeming a paid voucher is the commercial start signal even
+                // for a cash-only operator with no payment profile or online
+                // router. Trial tracks onboarding; it never waives the fee.
+                if (! $organization->trial_started_at) {
+                    $organization = $this->trials->start($organization);
+                }
+
                 // The same two counters a card sale moves in PaymentProcessor.
                 // Without them a voucher-only operator reads as a zero-sales
                 // business to everything downstream: they never graduate off
@@ -136,6 +394,8 @@ class VoucherService
                 }
 
                 $quote = $this->fees->quote($organization, $voucher->price_snapshot_kobo);
+                $transaction = $this->sales->record($voucher, $quote->chargeablePercentageFeeKobo(), $device);
+
                 FeeLedgerEntry::updateOrCreate(
                     [
                         'organization_id' => $organization->id,
@@ -143,6 +403,7 @@ class VoucherService
                         'source_id' => $voucher->id,
                     ],
                     [
+                        'network_device_id' => $device?->id ?? $boundDeviceId,
                         'billing_period' => now()->startOfMonth()->toDateString(),
                         'billable_sales_kobo' => $voucher->price_snapshot_kobo,
                         'fee_amount_kobo' => $quote->chargeablePercentageFeeKobo(),
@@ -150,28 +411,28 @@ class VoucherService
                         'metadata' => ['unrecorded_sale' => ! $wasRecordedSold],
                     ],
                 );
+
+                DB::afterCommit(function () use ($organization, $transaction, $voucher): void {
+                    $recipients = $organization->users()
+                        ->wherePivotIn('role', ['owner', 'manager', 'accountant'])
+                        ->get();
+                    Notification::send($recipients, new HotFiiAlert(
+                        'Voucher sale recorded',
+                        sprintf('A ₦%s voucher was activated.', number_format($voucher->price_snapshot_kobo / 100, 2)),
+                        route('sales.index'),
+                        category: 'payment',
+                        organizationId: $organization->uuid,
+                        mobileData: ['screen' => 'sales', 'transaction_id' => $transaction->uuid],
+                        sendMail: false,
+                    ));
+                });
             }
 
             $voucher = $voucher->refresh()->load('credential', 'batch.accessPlan');
             VoucherActivated::dispatch($voucher);
+
             return $voucher;
         });
-    }
-
-    private function newCode(VoucherPinFormat $format, bool $dashed): string
-    {
-        $alphabet = $format->alphabet();
-        $highest = strlen($alphabet) - 1;
-
-        do {
-            $pin = '';
-            for ($position = 0; $position < self::PIN_LENGTH; $position++) {
-                $pin .= $alphabet[random_int(0, $highest)];
-            }
-            $code = $dashed ? implode('-', str_split($pin, 4)) : $pin;
-        } while (Voucher::where('code_lookup', $this->lookup($code))->exists());
-
-        return $code;
     }
 
     private function lookup(string $code): string

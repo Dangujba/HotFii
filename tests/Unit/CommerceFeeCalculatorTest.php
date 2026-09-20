@@ -11,7 +11,24 @@ use Tests\TestCase;
 
 class CommerceFeeCalculatorTest extends TestCase
 {
-    public function test_sandbox_and_trial_fees_are_waived(): void
+    public function test_trial_and_sandbox_sales_are_charged_the_transaction_percentage(): void
+    {
+        $organization = new Organization([
+            'mode' => OrganizationMode::Commerce,
+            'status' => OrganizationStatus::Trial,
+            'billing_plan' => BillingPlan::Sandbox,
+        ]);
+        $organization->trial_started_at = now()->subDay();
+        $organization->trial_ends_at = now()->addDays(13);
+
+        $quote = app(CommerceFeeCalculator::class)->quote($organization, 10000000);
+
+        $this->assertSame(200000, $quote->percentageFeeKobo);
+        $this->assertSame(200000, $quote->chargeablePercentageFeeKobo());
+        $this->assertSame(200000, $quote->totalFeeKobo);
+    }
+
+    public function test_the_first_live_sale_is_quoted_at_the_transaction_percentage(): void
     {
         $organization = new Organization([
             'mode' => OrganizationMode::Commerce,
@@ -21,41 +38,23 @@ class CommerceFeeCalculatorTest extends TestCase
 
         $quote = app(CommerceFeeCalculator::class)->quote($organization, 10000000);
 
-        $this->assertSame(200000, $quote->percentageFeeKobo);
-        $this->assertSame(0, $quote->chargeablePercentageFeeKobo());
-        $this->assertSame(0, $quote->totalFeeKobo);
+        $this->assertSame(200000, $quote->chargeablePercentageFeeKobo());
+        $this->assertSame('percentage_only', $quote->reason);
     }
 
-    public function test_a_live_organization_that_never_sold_is_not_charged(): void
-    {
-        // Live is now the registration default, so status alone must not make
-        // an untouched organization billable.
-        $organization = new Organization([
-            'mode' => OrganizationMode::Commerce,
-            'status' => OrganizationStatus::Live,
-            'billing_plan' => BillingPlan::StandardSeller,
-        ]);
-
-        $quote = app(CommerceFeeCalculator::class)->quote($organization, 10000000);
-
-        $this->assertSame(0, $quote->totalFeeKobo);
-        $this->assertSame('trial_or_sandbox', $quote->reason);
-    }
-
-    public function test_standard_uses_two_percent_or_monthly_minimum(): void
+    public function test_every_standard_sale_is_quoted_at_two_percent(): void
     {
         $organization = new Organization([
             'mode' => OrganizationMode::Commerce,
             'status' => OrganizationStatus::Live,
             'billing_plan' => BillingPlan::StandardSeller,
         ]);
-        $organization->trial_started_at = now()->subMonth();
+        $low = app(CommerceFeeCalculator::class)->quote($organization, 10_000_00);
+        $high = app(CommerceFeeCalculator::class)->quote($organization, 500_000_00);
 
-        $low = app(CommerceFeeCalculator::class)->quote($organization, 10000000);
-        $high = app(CommerceFeeCalculator::class)->quote($organization, 50000000);
-
-        $this->assertSame(250000, $low->totalFeeKobo);
-        $this->assertSame(1000000, $high->totalFeeKobo);
+        $this->assertSame(20_000, $low->totalFeeKobo);
+        $this->assertSame(1_000_000, $high->totalFeeKobo);
+        $this->assertSame(0, $low->minimumFeeKobo);
     }
 
     public function test_hybrid_never_adds_seller_minimum(): void
@@ -65,8 +64,6 @@ class CommerceFeeCalculatorTest extends TestCase
             'status' => OrganizationStatus::Live,
             'billing_plan' => BillingPlan::Organization20,
         ]);
-        $organization->trial_started_at = now()->subMonth();
-
         $quote = app(CommerceFeeCalculator::class)->quote($organization, 1000000);
 
         $this->assertSame(20000, $quote->totalFeeKobo);

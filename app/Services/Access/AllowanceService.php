@@ -24,12 +24,17 @@ class AllowanceService
 
         $plan = $credential->accessPlan;
         $limitSeconds = $plan->duration_minutes ? $plan->duration_minutes * 60 : null;
+        $remainingSeconds = $limitSeconds !== null ? max(0, $limitSeconds - $usedSeconds) : null;
+        if ($credential->expires_at) {
+            $untilExpiry = max(0, (int) now()->diffInSeconds($credential->expires_at));
+            $remainingSeconds = $remainingSeconds === null ? $untilExpiry : min($remainingSeconds, $untilExpiry);
+        }
 
         return [
             'used_bytes' => $usedBytes,
             'remaining_bytes' => $plan->data_limit_bytes !== null ? max(0, $plan->data_limit_bytes - $usedBytes) : null,
             'used_seconds' => $usedSeconds,
-            'remaining_seconds' => $limitSeconds !== null ? max(0, $limitSeconds - $usedSeconds) : null,
+            'remaining_seconds' => $remainingSeconds,
             'expires_at' => $credential->expires_at,
         ];
     }

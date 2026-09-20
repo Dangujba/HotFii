@@ -91,9 +91,10 @@
             <div class="card-header"><h2 class="h5 mb-0">Current pricing</h2></div>
             <div class="list-group list-group-flush">
                 @foreach([
-                    'Platform fee per sale' => number_format($pricing['fee_bps'] / 100, 2) . '%',
-                    'Standard seller monthly minimum' => \App\Support\Naira::from($pricing['standard_minimum_kobo']),
-                    'Micro seller sales ceiling' => \App\Support\Naira::from($pricing['micro_sales_limit_kobo']) . ' / month',
+                    'Running fee per paid sale' => number_format($pricing['fee_bps'] / 100, 2) . '%',
+                    'Monthly charge through the included band' => \App\Support\Naira::from($pricing['standard_minimum_kobo']),
+                    'Sales included in that charge' => 'Up to ' . \App\Support\Naira::from($pricing['minimum_included_sales_kobo']),
+                    'Sales above the included band' => number_format($pricing['fee_bps'] / 100, 2) . '% of the excess',
                     'Trial sales cap' => \App\Support\Naira::from($pricing['trial_sales_cap_kobo']),
                     'Trial length' => $pricing['trial_days'] . ' days',
                     'Grace period' => $pricing['grace_days'] . ' days',

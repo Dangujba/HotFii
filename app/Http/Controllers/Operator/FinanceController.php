@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\FeeLedgerEntry;
 use App\Models\Invoice;
 use App\Models\Organization;
+use App\Services\Billing\OrganizationFinanceService;
 use App\Support\ListFilters;
+use App\Support\OrganizationRouterFilter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -18,23 +20,32 @@ class FinanceController extends Controller
 
     private const INVOICE_STATUSES = ['draft', 'open', 'paid'];
 
-    public function __invoke(Request $request, Organization $organization): View
-    {
+    public function __invoke(
+        Request $request,
+        Organization $organization,
+        OrganizationFinanceService $finance,
+    ): View {
         $period = now()->startOfMonth()->toDateString();
+        [$routers, $routerId] = OrganizationRouterFilter::resolve($request, $organization);
 
         $filters = [
             'status' => ListFilters::choice($request, 'status', self::ENTRY_STATUSES),
             'period' => ListFilters::month($request, 'period'),
             'invoice_status' => ListFilters::choice($request, 'invoice_status', self::INVOICE_STATUSES),
+            'router' => $routerId,
         ];
+
+        $selectedRouter = $routers->firstWhere('id', $routerId);
 
         return view('operator.finance', [
             'entries' => FeeLedgerEntry::where('organization_id', $organization->id)
+                ->with('networkDevice')
                 ->when($filters['status'], fn ($query, $status) => $query->where('status', $status))
                 ->when($filters['period'], fn ($query, $month) => $query->whereBetween('billing_period', [
                     Carbon::parse($month.'-01')->startOfMonth()->toDateString(),
                     Carbon::parse($month.'-01')->endOfMonth()->toDateString(),
                 ]))
+                ->when($filters['router'], fn ($query, $router) => $query->where('network_device_id', $router))
                 ->latest()
                 ->paginate(25)
                 ->withQueryString(),
@@ -54,13 +65,12 @@ class FinanceController extends Controller
                 || in_array($request->user()->roleFor($organization), ['owner', 'manager'], true),
             'entryStatuses' => self::ENTRY_STATUSES,
             'invoiceStatuses' => self::INVOICE_STATUSES,
+            'routers' => $routers,
+            'selectedRouter' => $selectedRouter,
             'filters' => $filters,
-            'ledgerFiltered' => ListFilters::any(['status' => $filters['status'], 'period' => $filters['period']]),
+            'ledgerFiltered' => ListFilters::any(['status' => $filters['status'], 'period' => $filters['period'], 'router' => $filters['router']]),
             'invoicesFiltered' => $filters['invoice_status'] !== '',
-            'current' => [
-                'sales' => FeeLedgerEntry::where('organization_id', $organization->id)->whereDate('billing_period', $period)->sum('billable_sales_kobo'),
-                'fees' => FeeLedgerEntry::where('organization_id', $organization->id)->whereDate('billing_period', $period)->sum('fee_amount_kobo'),
-            ],
+            'current' => $finance->current($organization, $selectedRouter),
         ]);
     }
 }

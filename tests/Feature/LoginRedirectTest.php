@@ -7,6 +7,7 @@ use App\Domain\Enums\OrganizationMode;
 use App\Domain\Enums\OrganizationStatus;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Auth\TwoFactorAuthentication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -49,6 +50,35 @@ class LoginRedirectTest extends TestCase
 
         $this->post('/login', ['email' => 'op@hotfii.test', 'password' => 'Strong-Password-123!'])
             ->assertRedirect(route('dashboard'));
+    }
+
+    public function test_two_factor_enabled_operator_must_complete_the_challenge(): void
+    {
+        $twoFactor = app(TwoFactorAuthentication::class);
+        $secret = $twoFactor->generateSecret();
+        $user = User::factory()->create([
+            'email' => 'secure@hotfii.test',
+            'password' => 'Strong-Password-123!',
+            'two_factor_secret' => $secret,
+            'two_factor_confirmed_at' => now(),
+            'two_factor_recovery_codes' => [],
+        ]);
+        $this->organizationFor($user);
+
+        $this->post('/login', [
+            'email' => 'secure@hotfii.test',
+            'password' => 'Strong-Password-123!',
+        ])->assertRedirect(route('two-factor.challenge'));
+        $this->assertGuest();
+
+        $this->get(route('two-factor.challenge'))
+            ->assertOk()
+            ->assertSee('Two-factor verification');
+
+        $this->post(route('two-factor.verify'), [
+            'code' => $twoFactor->currentCode($secret),
+        ])->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($user);
     }
 
     private function organizationFor(User $user): Organization

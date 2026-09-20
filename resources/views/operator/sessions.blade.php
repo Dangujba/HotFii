@@ -13,7 +13,16 @@
 <thead><tr><th>User</th><th>Router</th><th>Device / IP</th><th>Usage</th><th>Started</th><th>Status</th><th></th></tr></thead>
 <tbody>@forelse($sessions as $session)<tr>
 <td><strong>{{ $session->customer?->name ?: $session->radius_username }}</strong><div class="small text-secondary">{{ $session->accessPlan?->name }}</div></td>
-<td>{{ $session->networkDevice->name }}</td><td><code>{{ $session->mac_address ?: 'Unknown MAC' }}</code><div class="small text-secondary">{{ $session->ip_address }}</div></td>
+<td>{{ $session->networkDevice->name }}</td>
+<td>
+    <strong>{{ $session->client_name ?: 'Unknown device' }}</strong>
+    <div>
+        <code>{{ $session->mac_address ?: 'Unknown MAC' }}</code>
+    </div>
+    <div class="small text-secondary">
+        {{ $session->ip_address ?: 'Unknown IP' }}
+    </div>
+</td>
 <td>{{ \App\Support\Bytes::human($session->totalBytes()) }}</td><td>{{ $session->started_at?->diffForHumans() }}</td>
 <td><span class="badge text-bg-{{ $session->status === 'active' ? 'success' : ($session->status === 'disconnect_pending' ? 'warning' : 'secondary') }}">{{ str_replace('_', ' ', ucfirst($session->status)) }}</span></td>
 <td>@if(in_array($session->status, ['active','disconnect_pending'], true))<form method="POST" action="{{ route('sessions.disconnect', $session) }}">@csrf<button class="btn btn-sm btn-outline-danger" data-confirm-title="Disconnect {{ $session->customer?->name ?: $session->radius_username }}?" data-confirm="A Change-of-Authorization is sent to {{ $session->networkDevice->name }} and the session drops immediately. Remaining plan time is not refunded." data-confirm-icon="danger" data-confirm-button="Disconnect now">Disconnect</button></form>@endif</td>

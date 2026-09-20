@@ -27,9 +27,38 @@ class Customer extends Model
         ];
     }
 
-    public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
-    public function accessGroups(): BelongsToMany { return $this->belongsToMany(AccessGroup::class); }
-    public function sessions(): HasMany { return $this->hasMany(HotspotSession::class); }
-    public function credentials(): HasMany { return $this->hasMany(AccessCredential::class); }
-    public function currentCredential(): HasOne { return $this->hasOne(AccessCredential::class)->latestOfMany(); }
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function accessGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(AccessGroup::class);
+    }
+
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(HotspotSession::class);
+    }
+
+    public function credentials(): HasMany
+    {
+        return $this->hasMany(AccessCredential::class);
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    public function vouchers(): HasMany
+    {
+        return $this->hasMany(Voucher::class);
+    }
+
+    public function currentCredential(): HasOne
+    {
+        return $this->hasOne(AccessCredential::class)->latestOfMany();
+    }
 }

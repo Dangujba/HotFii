@@ -632,7 +632,7 @@
             <div class="col-6 col-md-3">
                 <div class="stat-item">
                     <div class="stat-number">2%</div>
-                    <div class="stat-label">Commerce fee · No hidden charges</div>
+                    <div class="stat-label">Running fee on each paid activation</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
@@ -682,20 +682,20 @@
         <div class="text-center mb-5 reveal">
             <div class="section-eyebrow">Transparent pricing</div>
             <h2 class="section-title">Pricing that grows with you.</h2>
-            <p class="section-sub mt-3">No setup fees. No per-router charges. Pay for what you actually use.</p>
+            <p class="section-sub mt-3">No setup or per-router fees. Billing begins with the first paid activation.</p>
         </div>
         <div class="row g-4 justify-content-center">
             <div class="col-lg-4 col-md-6 reveal reveal-delay-1">
                 <div class="pricing-card">
                     <div class="pricing-tag secondary">Commerce</div>
-                    <div class="pricing-price">2%</div>
-                    <div class="pricing-period">of billable sales &nbsp;·&nbsp; min ₦2,500/mo after ₦50k</div>
+                    <div class="pricing-price">₦2,500</div>
+                    <div class="pricing-period">/ month for up to ₦50,000 in paid sales</div>
                     <div class="pricing-desc">Perfect for Wi-Fi hotspot sellers, café operators and market vendors monetising internet access.</div>
                     <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Voucher &amp; agent sales</div>
                     <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Paystack online checkout</div>
                     <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Printed QR voucher batches</div>
                     <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Live session monitoring</div>
-                    <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Micro seller · No minimum up to ₦50k</div>
+                    <div class="pricing-feature"><i class="bi bi-check-circle-fill"></i>Then 2% only on sales above ₦50,000</div>
                     <div class="mt-4">
                         <a href="{{ route('register') }}" class="btn-lp-ghost" style="justify-content: center; width: 100%;">Start free sandbox</a>
                     </div>
