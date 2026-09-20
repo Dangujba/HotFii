@@ -47,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -196,6 +197,13 @@ private fun AccountScreen(
     var confirmationCode by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     val clipboard = LocalClipboardManager.current
+
+    LaunchedEffect(session.user.twoFactorEnabled) {
+        if (!session.user.twoFactorEnabled && showDisableTwoFactor) {
+            showDisableTwoFactor = false
+            password = ""
+        }
+    }
 
     if (confirmSignOut) {
         AlertDialog(
