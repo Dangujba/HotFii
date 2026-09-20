@@ -1,5 +1,6 @@
 package com.innobytes.hotfii
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.Process
 import androidx.activity.compose.setContent
@@ -24,6 +25,8 @@ class MainActivity : FragmentActivity() {
     private var biometricEnabled by mutableStateOf(false)
     private var biometricUnlocked by mutableStateOf(true)
     private var biometricMessage by mutableStateOf<String?>(null)
+    private var openFinanceRequest by mutableStateOf(0)
+    private var invoicePaymentStatus by mutableStateOf<String?>(null)
     private val viewModel: MainViewModel by viewModels {
         val application = application as HotFiiApplication
         MainViewModel.factory(
@@ -33,11 +36,13 @@ class MainActivity : FragmentActivity() {
             application.container.voucherRepository,
             application.container.salesRepository,
             application.container.networkRepository,
+            application.container.financeRepository,
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleInvoicePaymentReturn(intent)
         appPreferences = (application as HotFiiApplication).container.appPreferences
         themeMode = appPreferences.themeMode()
         biometricEnabled = appPreferences.biometricEnabled()
@@ -56,8 +61,24 @@ class MainActivity : FragmentActivity() {
                     onRequestBiometricUnlock = ::requestBiometricUnlock,
                     onBiometricChanged = ::changeBiometricSetting,
                     onBiometricMessageDismissed = { biometricMessage = null },
+                    openFinanceRequest = openFinanceRequest,
+                    invoicePaymentStatus = invoicePaymentStatus,
                 )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleInvoicePaymentReturn(intent)
+    }
+
+    private fun handleInvoicePaymentReturn(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme == "hotfii" && uri.host == "invoice-payment") {
+            invoicePaymentStatus = uri.getQueryParameter("status")
+            openFinanceRequest += 1
         }
     }
 

@@ -4,6 +4,7 @@ import com.innobytes.hotfii.MainDispatcherRule
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.NetworkRepository
+import com.innobytes.hotfii.data.repository.FinanceRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
 import com.innobytes.hotfii.data.repository.SalesRepository
 import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
@@ -62,6 +63,21 @@ import com.innobytes.hotfii.domain.VoucherOptions
 import com.innobytes.hotfii.domain.VoucherPagination
 import com.innobytes.hotfii.domain.VoucherPermissions
 import com.innobytes.hotfii.domain.VoucherShare
+import com.innobytes.hotfii.domain.FinanceCatalog
+import com.innobytes.hotfii.domain.FinanceCurrent
+import com.innobytes.hotfii.domain.FinanceFilters
+import com.innobytes.hotfii.domain.FinanceInvoiceDetail
+import com.innobytes.hotfii.domain.FinanceOptions
+import com.innobytes.hotfii.domain.FinancePermissions
+import com.innobytes.hotfii.domain.FinancePlan
+import com.innobytes.hotfii.domain.InvoiceCheckout
+import com.innobytes.hotfii.domain.ReportData
+import com.innobytes.hotfii.domain.ReportExport
+import com.innobytes.hotfii.domain.ReportFilters
+import com.innobytes.hotfii.domain.ReportSalesTrend
+import com.innobytes.hotfii.domain.ReportSummary
+import com.innobytes.hotfii.domain.ReportUsage
+import com.innobytes.hotfii.domain.ReportUsageTrend
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -86,7 +102,7 @@ class MainViewModelTest {
         )
         val dashboardRepository = FakeDashboardRepository()
 
-        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository())
+        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository(), FakeFinanceRepository())
 
         assertFalse(viewModel.state.value.isRestoring)
         assertEquals("org-two", viewModel.state.value.selectedOrganization?.id)
@@ -96,7 +112,7 @@ class MainViewModelTest {
     @Test
     fun `successful sign in opens the server default organization`() = runTest {
         val repository = FakeSessionRepository(signInSession = session())
-        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository())
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository(), FakeFinanceRepository())
 
         viewModel.signIn("owner@example.com", "password")
 
@@ -111,7 +127,7 @@ class MainViewModelTest {
             signInSession = session(),
             twoFactorRequired = true,
         )
-        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository())
+        val viewModel = MainViewModel(repository, FakeDashboardRepository(), FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository(), FakeFinanceRepository())
 
         viewModel.signIn("owner@example.com", "password")
 
@@ -128,7 +144,7 @@ class MainViewModelTest {
     fun `organization selection is limited to the authenticated membership list`() = runTest {
         val repository = FakeSessionRepository(restoredSession = session())
         val dashboardRepository = FakeDashboardRepository()
-        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository())
+        val viewModel = MainViewModel(repository, dashboardRepository, FakePlanRepository(), FakeVoucherRepository(), FakeSalesRepository(), FakeNetworkRepository(), FakeFinanceRepository())
 
         viewModel.selectOrganization("outside-org")
         assertEquals("org-one", viewModel.state.value.selectedOrganization?.id)
@@ -148,6 +164,7 @@ class MainViewModelTest {
             FakeVoucherRepository(),
             FakeSalesRepository(),
             FakeNetworkRepository(),
+            FakeFinanceRepository(),
         )
 
         viewModel.selectRouter("outside-router")
@@ -168,6 +185,7 @@ class MainViewModelTest {
             vouchers,
             FakeSalesRepository(),
             FakeNetworkRepository(),
+            FakeFinanceRepository(),
         )
         val filters = VoucherFilters(search = "VB-2609", status = "printed")
 
@@ -188,6 +206,7 @@ class MainViewModelTest {
             FakeVoucherRepository(),
             FakeSalesRepository(),
             FakeNetworkRepository(),
+            FakeFinanceRepository(),
         )
         val filters = PlanFilters(search = "Day", type = "paid", state = "active")
 
@@ -208,6 +227,7 @@ class MainViewModelTest {
             FakeVoucherRepository(),
             sales,
             FakeNetworkRepository(),
+            FakeFinanceRepository(),
         )
         val filters = SalesFilters(channel = "voucher", routerId = "router-one")
 
@@ -229,6 +249,7 @@ class MainViewModelTest {
             FakeVoucherRepository(),
             sales,
             FakeNetworkRepository(),
+            FakeFinanceRepository(),
         )
 
         viewModel.recordCashSale(CashSaleInput("plan-one", "router-one", "Aisha", "08030000000"))
@@ -251,6 +272,7 @@ class MainViewModelTest {
             FakeVoucherRepository(),
             FakeSalesRepository(),
             network,
+            FakeFinanceRepository(),
         )
         val routerFilters = NetworkFilters(status = "online", vendor = "mikrotik")
         val sessionFilters = HotspotSessionFilters(view = "recent", routerId = "router-one")
@@ -262,6 +284,36 @@ class MainViewModelTest {
         assertEquals(Triple("org-one", sessionFilters, 4), network.sessionRequests.single())
         assertEquals(2, viewModel.state.value.network.catalog?.pagination?.currentPage)
         assertEquals(4, viewModel.state.value.network.sessionCatalog?.pagination?.currentPage)
+    }
+
+    @Test
+    fun `finance pages and report filters are sent independently`() = runTest {
+        val finance = FakeFinanceRepository()
+        val viewModel = MainViewModel(
+            FakeSessionRepository(restoredSession = session()),
+            FakeDashboardRepository(),
+            FakePlanRepository(),
+            FakeVoucherRepository(),
+            FakeSalesRepository(),
+            FakeNetworkRepository(),
+            finance,
+        )
+        val financeFilters = FinanceFilters(
+            ledgerStatus = "accrued",
+            period = "2026-09",
+            invoiceStatus = "open",
+            routerId = "router-one",
+        )
+        val reportFilters = ReportFilters("2026-09-01", "2026-09-20", "router-one")
+
+        viewModel.loadFinance(financeFilters, ledgerPage = 2, invoicePage = 3)
+        viewModel.loadReport(reportFilters)
+
+        assertEquals(FinanceRequest("org-one", financeFilters, 2, 3), finance.financeRequests.single())
+        assertEquals("org-one" to reportFilters, finance.reportRequests.single())
+        assertEquals(2, viewModel.state.value.finance.catalog?.ledgerPagination?.currentPage)
+        assertEquals(3, viewModel.state.value.finance.catalog?.invoicePagination?.currentPage)
+        assertEquals(reportFilters, viewModel.state.value.reports.filters)
     }
 
     private fun session() = UserSession(
@@ -400,6 +452,65 @@ private class FakeNetworkRepository : NetworkRepository {
 
     override suspend fun disconnect(organizationId: String, sessionId: String): DisconnectResult =
         error("Not used in this test")
+}
+
+private data class FinanceRequest(
+    val organizationId: String,
+    val filters: FinanceFilters,
+    val ledgerPage: Int,
+    val invoicePage: Int,
+)
+
+private class FakeFinanceRepository : FinanceRepository {
+    val financeRequests = mutableListOf<FinanceRequest>()
+    val reportRequests = mutableListOf<Pair<String, ReportFilters>>()
+
+    override suspend fun finance(
+        organizationId: String,
+        filters: FinanceFilters,
+        ledgerPage: Int,
+        invoicePage: Int,
+    ): FinanceCatalog {
+        financeRequests += FinanceRequest(organizationId, filters, ledgerPage, invoicePage)
+        return FinanceCatalog(
+            current = FinanceCurrent(0, 0, 0, 0, 0, 0),
+            plan = FinancePlan("starter", "trial"),
+            ledger = emptyList(),
+            ledgerPagination = NetworkPagination(ledgerPage, ledgerPage, 20, 0),
+            invoices = emptyList(),
+            invoicePagination = NetworkPagination(invoicePage, invoicePage, 20, 0),
+            options = FinanceOptions(emptyList(), emptyList(), emptyList()),
+            permissions = FinancePermissions(true),
+        )
+    }
+
+    override suspend fun invoice(organizationId: String, invoiceId: String): FinanceInvoiceDetail =
+        error("Not used in this test")
+
+    override suspend fun startInvoicePayment(organizationId: String, invoiceId: String): InvoiceCheckout =
+        error("Not used in this test")
+
+    override suspend fun report(organizationId: String, filters: ReportFilters): ReportData {
+        reportRequests += organizationId to filters
+        return ReportData(
+            from = filters.from ?: "2026-09-01",
+            to = filters.to ?: "2026-09-20",
+            routerId = filters.routerId,
+            summary = ReportSummary(0, 0),
+            usage = ReportUsage(0, 0),
+            salesTrend = ReportSalesTrend(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()),
+            channels = emptyList(),
+            topPlans = emptyList(),
+            usageTrend = ReportUsageTrend(emptyList(), emptyList(), emptyList(), emptyList()),
+            routers = emptyList(),
+        )
+    }
+
+    override suspend fun exportReport(
+        organizationId: String,
+        filters: ReportFilters,
+        format: String,
+    ): ReportExport = error("Not used in this test")
 }
 
 private class FakePlanRepository : PlanRepository {

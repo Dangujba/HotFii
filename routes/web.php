@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\MobileInvoicePaymentController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -12,9 +13,8 @@ use App\Http\Controllers\Operator\InvoicePaymentController;
 use App\Http\Controllers\Operator\LocationController;
 use App\Http\Controllers\Operator\NetworkDeviceController;
 use App\Http\Controllers\Operator\NetworkDeviceGuideController;
-use App\Http\Controllers\Operator\OmadaSetupController;
-use App\Http\Controllers\Operator\UnifiSetupController;
 use App\Http\Controllers\Operator\NotificationController;
+use App\Http\Controllers\Operator\OmadaSetupController;
 use App\Http\Controllers\Operator\OrganizationContextController;
 use App\Http\Controllers\Operator\ProvisioningController;
 use App\Http\Controllers\Operator\ReportsController;
@@ -22,6 +22,7 @@ use App\Http\Controllers\Operator\SalesController;
 use App\Http\Controllers\Operator\SessionController;
 use App\Http\Controllers\Operator\SettingsController;
 use App\Http\Controllers\Operator\TeamController;
+use App\Http\Controllers\Operator\UnifiSetupController;
 use App\Http\Controllers\Operator\VoucherBatchController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaystackWebhookController;
@@ -71,6 +72,9 @@ Route::prefix('connect/{device}')->name('portal.')->middleware('throttle:120,1')
     Route::get('/payment/{transaction}/poll', [PaymentController::class, 'poll'])->name('payment.poll');
 });
 Route::post('/webhooks/paystack', PaystackWebhookController::class)->name('webhooks.paystack');
+Route::get('/mobile/invoice-payments/{invoice}/callback', [MobileInvoicePaymentController::class, 'callback'])
+    ->middleware('throttle:30,1')
+    ->name('mobile.invoice-payments.callback');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/organizations/{organization}/switch', OrganizationContextController::class)->name('organizations.switch');

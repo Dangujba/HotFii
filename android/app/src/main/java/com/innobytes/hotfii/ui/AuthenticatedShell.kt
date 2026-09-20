@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ConfirmationNumber
 import androidx.compose.material.icons.outlined.Dashboard
@@ -32,6 +33,9 @@ import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,14 +80,22 @@ import com.innobytes.hotfii.ui.plans.PlanScreen
 import com.innobytes.hotfii.ui.network.NetworkScreen
 import com.innobytes.hotfii.ui.sales.SalesScreen
 import com.innobytes.hotfii.ui.workspace.WorkspaceScreen
+import com.innobytes.hotfii.ui.finance.FinanceScreen
+import com.innobytes.hotfii.ui.reports.ReportScreen
 
 private enum class MainDestination(val label: String, val icon: ImageVector) {
     Dashboard("Home", Icons.Outlined.Dashboard),
-    Network("Network", Icons.Outlined.Router),
     Sales("Sales", Icons.Outlined.Storefront),
-    Plans("Plans", Icons.Outlined.Tune),
-    Vouchers("Vouchers", Icons.Outlined.ConfirmationNumber),
-    Account("Account", Icons.Outlined.Person),
+    Network("Network", Icons.Outlined.Router),
+    Finance("Finance", Icons.Outlined.AccountBalanceWallet),
+    More("More", Icons.Outlined.MoreHoriz),
+}
+
+private enum class MoreDestination {
+    Plans,
+    Vouchers,
+    Reports,
+    Account,
 }
 
 @Composable
@@ -96,21 +108,37 @@ fun AuthenticatedShell(
     biometricMessage: String?,
     onBiometricChanged: (Boolean) -> Unit,
     onBiometricMessageDismissed: () -> Unit,
+    openFinanceRequest: Int = 0,
+    invoicePaymentStatus: String? = null,
 ) {
     val session = requireNotNull(state.session)
     var destination by rememberSaveable { mutableStateOf(MainDestination.Dashboard) }
+    var moreDestination by rememberSaveable { mutableStateOf<MoreDestination?>(null) }
+    val canViewFinance = state.selectedOrganization?.role in setOf("owner", "manager", "accountant", "viewer")
+    val bottomDestinations = MainDestination.entries.filter { it != MainDestination.Finance || canViewFinance }
 
-    BackHandler(enabled = destination != MainDestination.Dashboard) {
-        destination = MainDestination.Dashboard
+    LaunchedEffect(openFinanceRequest) {
+        if (openFinanceRequest > 0 && canViewFinance) {
+            destination = MainDestination.Finance
+            moreDestination = null
+            viewModel.refreshFinanceAfterPayment(invoicePaymentStatus)
+        }
+    }
+
+    BackHandler(enabled = destination != MainDestination.Dashboard || moreDestination != null) {
+        if (moreDestination != null) moreDestination = null else destination = MainDestination.Dashboard
     }
 
     Scaffold(
         bottomBar = {
             NavigationBar {
-                MainDestination.entries.forEach { item ->
+                bottomDestinations.forEach { item ->
                     NavigationBarItem(
                         selected = destination == item,
-                        onClick = { destination = item },
+                        onClick = {
+                            destination = item
+                            if (item != MainDestination.More) moreDestination = null
+                        },
                         icon = { Icon(item.icon, contentDescription = null) },
                         label = { Text(item.label) },
                         alwaysShowLabel = false,
@@ -165,60 +193,108 @@ fun AuthenticatedShell(
                     onFeedbackDismissed = viewModel::clearNetworkFeedback,
                 )
 
-                MainDestination.Plans -> PlanScreen(
+                MainDestination.Finance -> FinanceScreen(
                     organizationId = state.selectedOrganizationId,
                     organizationName = state.selectedOrganization?.name,
-                    state = state.plans,
-                    onLoad = viewModel::loadPlans,
-                    onCreate = viewModel::createPlan,
-                    onUpdate = viewModel::updatePlan,
-                    onDelete = viewModel::deletePlan,
-                    onFeedbackDismissed = viewModel::clearPlanFeedback,
+                    state = state.finance,
+                    onLoad = viewModel::loadFinance,
+                    onOpenInvoice = viewModel::openInvoice,
+                    onCloseInvoice = viewModel::closeInvoice,
+                    onPayInvoice = viewModel::payInvoice,
+                    onCheckoutConsumed = viewModel::consumeInvoiceCheckout,
+                    onFeedbackDismissed = viewModel::clearFinanceFeedback,
                 )
 
-                MainDestination.Vouchers -> VoucherScreen(
-                    organizationId = state.selectedOrganizationId,
-                    organizationName = state.selectedOrganization?.name,
-                    state = state.vouchers,
-                    onLoad = viewModel::loadVouchers,
-                    onOpen = viewModel::openVoucherBatch,
-                    onClose = viewModel::closeVoucherBatch,
-                    onCreate = viewModel::createVoucherBatch,
-                    onUpdate = viewModel::updateVoucherBatch,
-                    onDelete = viewModel::deleteVoucherBatch,
-                    onShare = viewModel::shareVoucherPdf,
-                    onShareConsumed = viewModel::consumeVoucherPdfShare,
-                    onThermalPrint = viewModel::prepareVoucherThermalPrint,
-                    onThermalPrintConsumed = viewModel::consumeVoucherThermalPrint,
-                    onFeedbackDismissed = viewModel::clearVoucherFeedback,
-                )
-
-                MainDestination.Account -> AccountScreen(
-                    session = session,
-                    selectedOrganization = state.selectedOrganization,
-                    isBusy = state.isSubmitting || state.securityActionRunning,
-                    themeMode = themeMode,
-                    biometricEnabled = biometricEnabled,
-                    biometricMessage = biometricMessage,
-                    twoFactorSetup = state.twoFactorSetup,
-                    recoveryCodes = state.recoveryCodes,
-                    securityError = state.securityError,
-                    securityNotice = state.securityNotice,
-                    onOrganizationSelected = viewModel::selectOrganization,
-                    onThemeModeChanged = onThemeModeChanged,
-                    onBiometricChanged = onBiometricChanged,
-                    onBiometricMessageDismissed = onBiometricMessageDismissed,
-                    onBeginTwoFactorSetup = viewModel::beginTwoFactorSetup,
-                    onConfirmTwoFactor = viewModel::confirmTwoFactor,
-                    onCancelTwoFactorSetup = viewModel::cancelTwoFactorSetup,
-                    onDisableTwoFactor = viewModel::disableTwoFactor,
-                    onSecurityFeedbackDismissed = viewModel::clearSecurityFeedback,
-                    onRefresh = viewModel::refresh,
-                    onSignOut = viewModel::signOut,
-                )
+                MainDestination.More -> when (moreDestination) {
+                    null -> MoreScreen(canViewFinance = canViewFinance, onOpen = { moreDestination = it })
+                    MoreDestination.Plans -> PlanScreen(
+                        organizationId = state.selectedOrganizationId,
+                        organizationName = state.selectedOrganization?.name,
+                        state = state.plans,
+                        onLoad = viewModel::loadPlans,
+                        onCreate = viewModel::createPlan,
+                        onUpdate = viewModel::updatePlan,
+                        onDelete = viewModel::deletePlan,
+                        onFeedbackDismissed = viewModel::clearPlanFeedback,
+                    )
+                    MoreDestination.Vouchers -> VoucherScreen(
+                        organizationId = state.selectedOrganizationId,
+                        organizationName = state.selectedOrganization?.name,
+                        state = state.vouchers,
+                        onLoad = viewModel::loadVouchers,
+                        onOpen = viewModel::openVoucherBatch,
+                        onClose = viewModel::closeVoucherBatch,
+                        onCreate = viewModel::createVoucherBatch,
+                        onUpdate = viewModel::updateVoucherBatch,
+                        onDelete = viewModel::deleteVoucherBatch,
+                        onShare = viewModel::shareVoucherPdf,
+                        onShareConsumed = viewModel::consumeVoucherPdfShare,
+                        onThermalPrint = viewModel::prepareVoucherThermalPrint,
+                        onThermalPrintConsumed = viewModel::consumeVoucherThermalPrint,
+                        onFeedbackDismissed = viewModel::clearVoucherFeedback,
+                    )
+                    MoreDestination.Reports -> ReportScreen(
+                        organizationId = state.selectedOrganizationId,
+                        organizationName = state.selectedOrganization?.name,
+                        state = state.reports,
+                        onBack = { moreDestination = null },
+                        onLoad = viewModel::loadReport,
+                        onExport = viewModel::exportReport,
+                        onExportConsumed = viewModel::consumeReportExport,
+                        onFeedbackDismissed = viewModel::clearReportFeedback,
+                    )
+                    MoreDestination.Account -> AccountScreen(
+                        session = session,
+                        selectedOrganization = state.selectedOrganization,
+                        isBusy = state.isSubmitting || state.securityActionRunning,
+                        themeMode = themeMode,
+                        biometricEnabled = biometricEnabled,
+                        biometricMessage = biometricMessage,
+                        twoFactorSetup = state.twoFactorSetup,
+                        recoveryCodes = state.recoveryCodes,
+                        securityError = state.securityError,
+                        securityNotice = state.securityNotice,
+                        onOrganizationSelected = viewModel::selectOrganization,
+                        onThemeModeChanged = onThemeModeChanged,
+                        onBiometricChanged = onBiometricChanged,
+                        onBiometricMessageDismissed = onBiometricMessageDismissed,
+                        onBeginTwoFactorSetup = viewModel::beginTwoFactorSetup,
+                        onConfirmTwoFactor = viewModel::confirmTwoFactor,
+                        onCancelTwoFactorSetup = viewModel::cancelTwoFactorSetup,
+                        onDisableTwoFactor = viewModel::disableTwoFactor,
+                        onSecurityFeedbackDismissed = viewModel::clearSecurityFeedback,
+                        onRefresh = viewModel::refresh,
+                        onSignOut = viewModel::signOut,
+                    )
+                }
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MoreScreen(canViewFinance: Boolean, onOpen: (MoreDestination) -> Unit) {
+    Scaffold(topBar = { TopAppBar(title = { Text("More") }) }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding)) {
+            item { MoreRow("Plans", "Create and manage access plans", Icons.Outlined.Tune) { onOpen(MoreDestination.Plans) } }
+            item { MoreRow("Vouchers", "Generate, print, and manage voucher batches", Icons.Outlined.ConfirmationNumber) { onOpen(MoreDestination.Vouchers) } }
+            if (canViewFinance) item { MoreRow("Reports", "Sales, channels, plans, and network usage", Icons.Outlined.Assessment) { onOpen(MoreDestination.Reports) } }
+            item { MoreRow("Account", "Organization, theme, fingerprint, and security", Icons.Outlined.Person) { onOpen(MoreDestination.Account) } }
+        }
+    }
+}
+
+@Composable
+private fun MoreRow(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(title, fontWeight = FontWeight.SemiBold) },
+        supportingContent = { Text(subtitle) },
+        leadingContent = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) },
+        trailingContent = { Icon(Icons.Outlined.ChevronRight, null) },
+        modifier = Modifier.clickable(onClick = onClick),
+    )
+    HorizontalDivider(Modifier.padding(start = 56.dp))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

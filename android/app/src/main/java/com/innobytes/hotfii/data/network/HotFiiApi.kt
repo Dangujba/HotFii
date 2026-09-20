@@ -29,6 +29,10 @@ import com.innobytes.hotfii.data.network.dto.HotspotSessionRecordDto
 import com.innobytes.hotfii.data.network.dto.MessageDto
 import com.innobytes.hotfii.data.network.dto.NetworkCatalogDto
 import com.innobytes.hotfii.data.network.dto.NetworkRouterDetailDto
+import com.innobytes.hotfii.data.network.dto.FinanceCatalogDto
+import com.innobytes.hotfii.data.network.dto.FinanceInvoiceDetailDto
+import com.innobytes.hotfii.data.network.dto.InvoiceCheckoutDto
+import com.innobytes.hotfii.data.network.dto.ReportDataDto
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -167,6 +171,26 @@ interface HotFiiApi {
         @Path("organization") organizationId: String,
         @Path("session") sessionId: String,
     ): ApiMessageEnvelope<HotspotSessionRecordDto>
+
+    @GET("organizations/{organization}/finance")
+    suspend fun finance(@Path("organization") organizationId: String, @Query("ledger_status") ledgerStatus: String? = null, @Query("period") period: String? = null, @Query("invoice_status") invoiceStatus: String? = null, @Query("router") routerId: String? = null, @Query("ledger_page") ledgerPage: Int = 1, @Query("invoice_page") invoicePage: Int = 1): ApiEnvelope<FinanceCatalogDto>
+
+    @GET("organizations/{organization}/finance/invoices/{invoice}")
+    suspend fun financeInvoice(@Path("organization") organizationId: String, @Path("invoice") invoiceId: String): ApiEnvelope<FinanceInvoiceDetailDto>
+
+    @POST("organizations/{organization}/finance/invoices/{invoice}/pay")
+    suspend fun startInvoicePayment(@Path("organization") organizationId: String, @Path("invoice") invoiceId: String): ApiEnvelope<InvoiceCheckoutDto>
+
+    @GET("organizations/{organization}/reports")
+    suspend fun report(@Path("organization") organizationId: String, @Query("from") from: String? = null, @Query("to") to: String? = null, @Query("router") routerId: String? = null): ApiEnvelope<ReportDataDto>
+
+    @Streaming
+    @GET("organizations/{organization}/reports/export/pdf")
+    suspend fun exportReportPdf(@Path("organization") organizationId: String, @Query("from") from: String? = null, @Query("to") to: String? = null, @Query("router") routerId: String? = null): ResponseBody
+
+    @Streaming
+    @GET("organizations/{organization}/reports/export/csv")
+    suspend fun exportReportCsv(@Path("organization") organizationId: String, @Query("from") from: String? = null, @Query("to") to: String? = null, @Query("router") routerId: String? = null): ResponseBody
 
     @GET("organizations/{organization}/voucher-batches")
     suspend fun voucherBatches(

@@ -19,6 +19,8 @@ fun HotFiiApp(
     onRequestBiometricUnlock: () -> Unit,
     onBiometricChanged: (Boolean) -> Unit,
     onBiometricMessageDismissed: () -> Unit,
+    openFinanceRequest: Int = 0,
+    invoicePaymentStatus: String? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val session = state.session
@@ -53,6 +55,8 @@ fun HotFiiApp(
             biometricMessage = biometricMessage,
             onBiometricChanged = onBiometricChanged,
             onBiometricMessageDismissed = onBiometricMessageDismissed,
+            openFinanceRequest = openFinanceRequest,
+            invoicePaymentStatus = invoicePaymentStatus,
         )
     }
 }

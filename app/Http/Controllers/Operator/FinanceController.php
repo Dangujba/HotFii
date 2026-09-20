@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers\Operator;
 
-use App\Domain\Enums\OrganizationMode;
 use App\Http\Controllers\Controller;
 use App\Models\FeeLedgerEntry;
 use App\Models\Invoice;
 use App\Models\Organization;
-use App\Services\Billing\CommerceMonthlyFeeCalculator;
+use App\Services\Billing\OrganizationFinanceService;
 use App\Support\ListFilters;
 use App\Support\OrganizationRouterFilter;
 use Carbon\Carbon;
@@ -24,9 +23,8 @@ class FinanceController extends Controller
     public function __invoke(
         Request $request,
         Organization $organization,
-        CommerceMonthlyFeeCalculator $monthlyFees,
-    ): View
-    {
+        OrganizationFinanceService $finance,
+    ): View {
         $period = now()->startOfMonth()->toDateString();
         [$routers, $routerId] = OrganizationRouterFilter::resolve($request, $organization);
 
@@ -37,25 +35,7 @@ class FinanceController extends Controller
             'router' => $routerId,
         ];
 
-        $allCurrentEntries = FeeLedgerEntry::where('organization_id', $organization->id)
-            ->whereDate('billing_period', $period)
-            ->get();
-        $currentEntries = $routerId
-            ? $allCurrentEntries->where('network_device_id', $routerId)
-            : $allCurrentEntries;
-        $currentSales = (int) $currentEntries->sum('billable_sales_kobo');
-        $currentCollected = (int) $currentEntries->where('status', 'collected')->sum('fee_amount_kobo');
-        $allCurrentCollected = (int) $allCurrentEntries->where('status', 'collected')->sum('fee_amount_kobo');
-        $billingStarted = $organization->trial_started_at !== null || $allCurrentEntries->sum('billable_sales_kobo') > 0;
-        $subscriptionBase = $billingStarted
-            ? (int) (config('hotfii.internal_plans.'.$organization->billing_plan->value.'.price_kobo') ?? 0)
-            : 0;
-        $sellerFee = match ($organization->mode) {
-            OrganizationMode::Commerce => $billingStarted ? $monthlyFees->calculate((int) $allCurrentEntries->sum('billable_sales_kobo')) : 0,
-            OrganizationMode::Hybrid => (int) $allCurrentEntries->sum('fee_amount_kobo'),
-            default => 0,
-        };
-        $estimatedMonthEndFee = $subscriptionBase + $sellerFee;
+        $selectedRouter = $routers->firstWhere('id', $routerId);
 
         return view('operator.finance', [
             'entries' => FeeLedgerEntry::where('organization_id', $organization->id)
@@ -86,18 +66,11 @@ class FinanceController extends Controller
             'entryStatuses' => self::ENTRY_STATUSES,
             'invoiceStatuses' => self::INVOICE_STATUSES,
             'routers' => $routers,
-            'selectedRouter' => $routers->firstWhere('id', $routerId),
+            'selectedRouter' => $selectedRouter,
             'filters' => $filters,
             'ledgerFiltered' => ListFilters::any(['status' => $filters['status'], 'period' => $filters['period'], 'router' => $filters['router']]),
             'invoicesFiltered' => $filters['invoice_status'] !== '',
-            'current' => [
-                'sales' => $currentSales,
-                'fees' => (int) $currentEntries->sum('fee_amount_kobo'),
-                'accrued' => (int) $currentEntries->where('status', 'accrued')->sum('fee_amount_kobo'),
-                'collected' => $currentCollected,
-                'estimated_month_end_fee' => $estimatedMonthEndFee,
-                'estimated_invoice_balance' => max(0, $estimatedMonthEndFee - $allCurrentCollected),
-            ],
+            'current' => $finance->current($organization, $selectedRouter),
         ]);
     }
 }

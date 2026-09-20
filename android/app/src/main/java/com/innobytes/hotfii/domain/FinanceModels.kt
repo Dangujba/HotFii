@@ -1,0 +1,23 @@
+package com.innobytes.hotfii.domain
+
+data class FinanceFilters(val ledgerStatus: String? = null, val period: String? = null, val invoiceStatus: String? = null, val routerId: String? = null)
+data class FinanceCurrent(val salesKobo: Long, val feesKobo: Long, val accruedKobo: Long, val collectedKobo: Long, val estimatedMonthEndFeeKobo: Long, val estimatedInvoiceBalanceKobo: Long)
+data class FinancePlan(val code: String, val subscriptionStatus: String?)
+data class FinanceRouterOption(val id: String, val name: String)
+data class FeeLedgerRecord(val id: String, val billingPeriod: String, val routerId: String?, val routerName: String?, val sourceType: String, val sourceId: String?, val billableSalesKobo: Long, val feeAmountKobo: Long, val status: String, val createdAt: String?)
+data class FinanceInvoice(val id: String, val number: String, val billingPeriod: String, val subtotalKobo: Long, val totalKobo: Long, val status: String, val isOverdue: Boolean, val dueAt: String?, val paidAt: String?, val paymentMethod: String?, val createdAt: String?)
+data class FinanceOptions(val ledgerStatuses: List<String>, val invoiceStatuses: List<String>, val routers: List<FinanceRouterOption>)
+data class FinancePermissions(val canPayInvoices: Boolean)
+data class FinanceCatalog(val current: FinanceCurrent, val plan: FinancePlan, val ledger: List<FeeLedgerRecord>, val ledgerPagination: NetworkPagination, val invoices: List<FinanceInvoice>, val invoicePagination: NetworkPagination, val options: FinanceOptions, val permissions: FinancePermissions)
+data class FinanceInvoiceDetail(val invoice: FinanceInvoice, val canPay: Boolean)
+data class InvoiceCheckout(val authorizationUrl: String, val reference: String)
+
+data class ReportFilters(val from: String? = null, val to: String? = null, val routerId: String? = null)
+data class ReportSummary(val sales: Int, val grossKobo: Long)
+data class ReportUsage(val sessions: Int, val bytes: Long)
+data class ReportSalesTrend(val dates: List<String>, val labels: List<String>, val onlineKobo: List<Long>, val voucherKobo: List<Long>, val cashKobo: List<Long>)
+data class ReportChannel(val key: String, val label: String, val sales: Int, val totalKobo: Long)
+data class ReportPlan(val name: String, val sales: Int, val totalKobo: Long)
+data class ReportUsageTrend(val dates: List<String>, val labels: List<String>, val sessions: List<Int>, val bytes: List<Long>)
+data class ReportData(val from: String, val to: String, val routerId: String?, val summary: ReportSummary, val usage: ReportUsage, val salesTrend: ReportSalesTrend, val channels: List<ReportChannel>, val topPlans: List<ReportPlan>, val usageTrend: ReportUsageTrend, val routers: List<FinanceRouterOption>)
+data class ReportExport(val path: String, val mimeType: String)

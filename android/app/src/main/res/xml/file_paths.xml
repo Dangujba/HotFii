@@ -3,4 +3,7 @@
     <cache-path
         name="shared_vouchers"
         path="shared_vouchers/" />
+    <cache-path
+        name="shared_reports"
+        path="shared_reports/" />
 </paths>

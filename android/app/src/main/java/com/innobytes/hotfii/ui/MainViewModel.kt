@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.NetworkRepository
+import com.innobytes.hotfii.data.repository.FinanceRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
 import com.innobytes.hotfii.data.repository.SalesRepository
 import com.innobytes.hotfii.data.repository.TwoFactorRequiredException
@@ -38,6 +39,12 @@ import com.innobytes.hotfii.domain.VoucherCreateInput
 import com.innobytes.hotfii.domain.VoucherEditInput
 import com.innobytes.hotfii.domain.VoucherFilters
 import com.innobytes.hotfii.domain.VoucherShare
+import com.innobytes.hotfii.domain.FinanceCatalog
+import com.innobytes.hotfii.domain.FinanceFilters
+import com.innobytes.hotfii.domain.FinanceInvoiceDetail
+import com.innobytes.hotfii.domain.ReportData
+import com.innobytes.hotfii.domain.ReportExport
+import com.innobytes.hotfii.domain.ReportFilters
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,6 +99,27 @@ data class NetworkUiState(
     val notice: String? = null,
 )
 
+data class FinanceUiState(
+    val isLoading: Boolean = false,
+    val isActionRunning: Boolean = false,
+    val catalog: FinanceCatalog? = null,
+    val filters: FinanceFilters = FinanceFilters(),
+    val selectedInvoice: FinanceInvoiceDetail? = null,
+    val checkoutUrl: String? = null,
+    val error: String? = null,
+    val notice: String? = null,
+)
+
+data class ReportUiState(
+    val isLoading: Boolean = false,
+    val isActionRunning: Boolean = false,
+    val report: ReportData? = null,
+    val filters: ReportFilters = ReportFilters(),
+    val pendingExport: ReportExport? = null,
+    val error: String? = null,
+    val notice: String? = null,
+)
+
 data class MainUiState(
     val isRestoring: Boolean = true,
     val isSubmitting: Boolean = false,
@@ -112,6 +140,8 @@ data class MainUiState(
     val vouchers: VoucherUiState = VoucherUiState(),
     val sales: SalesUiState = SalesUiState(),
     val network: NetworkUiState = NetworkUiState(),
+    val finance: FinanceUiState = FinanceUiState(),
+    val reports: ReportUiState = ReportUiState(),
 ) {
     val selectedOrganization: OrganizationSummary?
         get() = session?.organizations?.firstOrNull { it.id == selectedOrganizationId }
@@ -125,6 +155,7 @@ class MainViewModel(
     private val voucherRepository: VoucherRepository,
     private val salesRepository: SalesRepository,
     private val networkRepository: NetworkRepository,
+    private val financeRepository: FinanceRepository,
 ) : ViewModel() {
     private var pendingLoginEmail: String? = null
     private var pendingLoginPassword: String? = null
@@ -250,6 +281,8 @@ class MainViewModel(
                 vouchers = VoucherUiState(),
                 sales = SalesUiState(),
                 network = NetworkUiState(),
+                finance = FinanceUiState(),
+                reports = ReportUiState(),
             )
         }
         loadDashboard(id, null)
@@ -975,6 +1008,137 @@ class MainViewModel(
         _state.update { it.copy(network = it.network.copy(error = null, notice = null)) }
     }
 
+    fun loadFinance(
+        filters: FinanceFilters = _state.value.finance.filters,
+        ledgerPage: Int = 1,
+        invoicePage: Int = 1,
+    ) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(finance = it.finance.copy(
+                isLoading = true,
+                filters = filters,
+                selectedInvoice = null,
+                error = null,
+            )) }
+            runCatching { financeRepository.finance(organizationId, filters, ledgerPage, invoicePage) }
+                .onSuccess { catalog ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(finance = current.finance.copy(isLoading = false, catalog = catalog))
+                    }
+                }
+                .onFailure { error -> financeFailed(organizationId, error, "Finance could not be loaded.") }
+        }
+    }
+
+    fun openInvoice(invoiceId: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(finance = it.finance.copy(isLoading = true, error = null, notice = null)) }
+            runCatching { financeRepository.invoice(organizationId, invoiceId) }
+                .onSuccess { invoice ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(finance = current.finance.copy(isLoading = false, selectedInvoice = invoice))
+                    }
+                }
+                .onFailure { error -> financeFailed(organizationId, error, "Invoice details could not be loaded.") }
+        }
+    }
+
+    fun closeInvoice() {
+        _state.update { it.copy(finance = it.finance.copy(selectedInvoice = null, error = null, notice = null)) }
+    }
+
+    fun payInvoice(invoiceId: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(finance = it.finance.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching { financeRepository.startInvoicePayment(organizationId, invoiceId) }
+                .onSuccess { checkout ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(finance = current.finance.copy(
+                            isActionRunning = false,
+                            checkoutUrl = checkout.authorizationUrl,
+                        ))
+                    }
+                }
+                .onFailure { error -> financeFailed(organizationId, error, "Invoice payment could not be started.") }
+        }
+    }
+
+    fun consumeInvoiceCheckout() {
+        _state.update { it.copy(finance = it.finance.copy(checkoutUrl = null)) }
+    }
+
+    fun refreshFinanceAfterPayment(status: String? = null) {
+        _state.update { current ->
+            current.copy(finance = current.finance.copy(
+                notice = if (status == "paid") "Invoice payment received." else "Payment status is being confirmed.",
+            ))
+        }
+        val current = _state.value.finance
+        loadFinance(
+            current.filters,
+            current.catalog?.ledgerPagination?.currentPage ?: 1,
+            current.catalog?.invoicePagination?.currentPage ?: 1,
+        )
+    }
+
+    fun clearFinanceFeedback() {
+        _state.update { it.copy(finance = it.finance.copy(error = null, notice = null)) }
+    }
+
+    fun loadReport(filters: ReportFilters = _state.value.reports.filters) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(reports = it.reports.copy(
+                isLoading = true,
+                filters = filters,
+                error = null,
+                notice = null,
+            )) }
+            runCatching { financeRepository.report(organizationId, filters) }
+                .onSuccess { report ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(reports = current.reports.copy(
+                            isLoading = false,
+                            report = report,
+                            filters = ReportFilters(report.from, report.to, report.routerId),
+                        ))
+                    }
+                }
+                .onFailure { error -> reportFailed(organizationId, error, "Reports could not be loaded.") }
+        }
+    }
+
+    fun exportReport(format: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val filters = _state.value.reports.filters
+        viewModelScope.launch {
+            _state.update { it.copy(reports = it.reports.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching { financeRepository.exportReport(organizationId, filters, format) }
+                .onSuccess { export ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(reports = current.reports.copy(isActionRunning = false, pendingExport = export))
+                    }
+                }
+                .onFailure { error -> reportFailed(organizationId, error, "The report could not be prepared.") }
+        }
+    }
+
+    fun consumeReportExport() {
+        _state.update { it.copy(reports = it.reports.copy(pendingExport = null)) }
+    }
+
+    fun clearReportFeedback() {
+        _state.update { it.copy(reports = it.reports.copy(error = null, notice = null)) }
+    }
+
     private fun restoreSession() {
         viewModelScope.launch {
             runCatching { sessionRepository.restore() }
@@ -1086,6 +1250,28 @@ class MainViewModel(
         }
     }
 
+    private fun financeFailed(organizationId: String, error: Throwable, fallback: String) {
+        _state.update { current ->
+            if (current.selectedOrganizationId != organizationId) current
+            else current.copy(finance = current.finance.copy(
+                isLoading = false,
+                isActionRunning = false,
+                error = error.message ?: fallback,
+            ))
+        }
+    }
+
+    private fun reportFailed(organizationId: String, error: Throwable, fallback: String) {
+        _state.update { current ->
+            if (current.selectedOrganizationId != organizationId) current
+            else current.copy(reports = current.reports.copy(
+                isLoading = false,
+                isActionRunning = false,
+                error = error.message ?: fallback,
+            ))
+        }
+    }
+
     companion object {
         fun factory(
             sessionRepository: SessionRepository,
@@ -1094,6 +1280,7 @@ class MainViewModel(
             voucherRepository: VoucherRepository,
             salesRepository: SalesRepository,
             networkRepository: NetworkRepository,
+            financeRepository: FinanceRepository,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
@@ -1104,6 +1291,7 @@ class MainViewModel(
                     voucherRepository,
                     salesRepository,
                     networkRepository,
+                    financeRepository,
                 ) as T
         }
     }

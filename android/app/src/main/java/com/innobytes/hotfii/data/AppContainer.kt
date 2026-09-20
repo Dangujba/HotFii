@@ -16,6 +16,8 @@ import com.innobytes.hotfii.data.repository.DefaultSalesRepository
 import com.innobytes.hotfii.data.repository.SalesRepository
 import com.innobytes.hotfii.data.repository.DefaultNetworkRepository
 import com.innobytes.hotfii.data.repository.NetworkRepository
+import com.innobytes.hotfii.data.repository.DefaultFinanceRepository
+import com.innobytes.hotfii.data.repository.FinanceRepository
 import com.innobytes.hotfii.data.repository.DefaultVoucherRepository
 import com.innobytes.hotfii.data.repository.DefaultPlanRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
@@ -76,4 +78,5 @@ class AppContainer(context: Context) {
     val salesRepository: SalesRepository = DefaultSalesRepository(api, gson)
 
     val networkRepository: NetworkRepository = DefaultNetworkRepository(api, gson)
+    val financeRepository: FinanceRepository = DefaultFinanceRepository(api, gson, context.cacheDir)
 }
