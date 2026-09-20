@@ -137,7 +137,8 @@ class MobileSessionController extends Controller
     private function permissions(string $role): array
     {
         return match ($role) {
-            'owner', 'manager' => ['manage_plans', 'manage_vouchers', 'create_vouchers', 'record_cash', 'manage_network', 'disconnect_sessions'],
+            'owner' => ['manage_plans', 'manage_vouchers', 'create_vouchers', 'record_cash', 'manage_network', 'disconnect_sessions', 'manage_organization', 'manage_payment_profile', 'manage_team'],
+            'manager' => ['manage_plans', 'manage_vouchers', 'create_vouchers', 'record_cash', 'manage_network', 'disconnect_sessions', 'manage_organization', 'invite_team'],
             'agent' => ['create_vouchers', 'record_cash'],
             'technician' => ['manage_network', 'disconnect_sessions'],
             default => [],

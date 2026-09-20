@@ -84,6 +84,7 @@ import com.innobytes.hotfii.ui.workspace.WorkspaceScreen
 import com.innobytes.hotfii.ui.finance.FinanceScreen
 import com.innobytes.hotfii.ui.reports.ReportScreen
 import com.innobytes.hotfii.ui.notifications.NotificationScreen
+import com.innobytes.hotfii.ui.settings.OrganizationSettingsScreen
 
 private enum class MainDestination(val label: String, val icon: ImageVector) {
     Dashboard("Home", Icons.Outlined.Dashboard),
@@ -98,6 +99,7 @@ private enum class MoreDestination {
     Vouchers,
     Reports,
     Notifications,
+    Settings,
     Account,
 }
 
@@ -268,6 +270,21 @@ fun AuthenticatedShell(
                         onRequestPermission = onRequestNotificationPermission,
                         pushAvailable = pushNotificationsAvailable,
                     )
+                    MoreDestination.Settings -> OrganizationSettingsScreen(
+                        organizationId = state.selectedOrganizationId,
+                        organizationName = state.selectedOrganization?.name,
+                        state = state.settings,
+                        onBack = { moreDestination = null },
+                        onLoad = viewModel::loadSettings,
+                        onLoadAuditPage = viewModel::loadAuditPage,
+                        onLoadTeamPage = viewModel::loadTeamPage,
+                        onUpdateOrganization = viewModel::updateOrganizationSettings,
+                        onSubmitPaymentProfile = viewModel::submitPaymentProfile,
+                        onAddTeamMember = viewModel::addTeamMember,
+                        onUpdateTeamRole = viewModel::updateTeamRole,
+                        onRevokeDeviceSession = viewModel::revokeDeviceSession,
+                        onFeedbackDismissed = viewModel::clearSettingsFeedback,
+                    )
                     MoreDestination.Account -> AccountScreen(
                         session = session,
                         selectedOrganization = state.selectedOrganization,
@@ -306,7 +323,8 @@ private fun MoreScreen(canViewFinance: Boolean, onOpen: (MoreDestination) -> Uni
             item { MoreRow("Vouchers", "Generate, print, and manage voucher batches", Icons.Outlined.ConfirmationNumber) { onOpen(MoreDestination.Vouchers) } }
             if (canViewFinance) item { MoreRow("Reports", "Sales, channels, plans, and network usage", Icons.Outlined.Assessment) { onOpen(MoreDestination.Reports) } }
             item { MoreRow("Notifications", "Router, payment, invoice, and account alerts", Icons.Outlined.Notifications) { onOpen(MoreDestination.Notifications) } }
-            item { MoreRow("Account", "Organization, theme, fingerprint, and security", Icons.Outlined.Person) { onOpen(MoreDestination.Account) } }
+            item { MoreRow("Organization settings", "Profile, payments, team, audit, and devices", Icons.Outlined.Business) { onOpen(MoreDestination.Settings) } }
+            item { MoreRow("Account", "Theme, fingerprint, authenticator, and sign out", Icons.Outlined.Person) { onOpen(MoreDestination.Account) } }
         }
     }
 }

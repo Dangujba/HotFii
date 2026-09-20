@@ -39,6 +39,16 @@ import com.innobytes.hotfii.data.network.dto.NotificationPreferencesResponseDto
 import com.innobytes.hotfii.data.network.dto.NotificationReadRequestDto
 import com.innobytes.hotfii.data.network.dto.MobileDeviceRequestDto
 import com.innobytes.hotfii.data.network.dto.MobileDeviceDeleteRequestDto
+import com.innobytes.hotfii.data.network.dto.DeviceSessionCatalogDto
+import com.innobytes.hotfii.data.network.dto.OrganizationSettingsCatalogDto
+import com.innobytes.hotfii.data.network.dto.OrganizationSettingsRequestDto
+import com.innobytes.hotfii.data.network.dto.OrganizationSettingsUpdateDto
+import com.innobytes.hotfii.data.network.dto.PaymentProfileRequestDto
+import com.innobytes.hotfii.data.network.dto.PaymentProfileUpdateDto
+import com.innobytes.hotfii.data.network.dto.TeamCatalogDto
+import com.innobytes.hotfii.data.network.dto.TeamMemberRequestDto
+import com.innobytes.hotfii.data.network.dto.TeamMemberResponseDto
+import com.innobytes.hotfii.data.network.dto.TeamRoleRequestDto
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -61,6 +71,12 @@ interface HotFiiApi {
 
     @DELETE("auth/logout")
     suspend fun logout()
+
+    @GET("auth/sessions")
+    suspend fun deviceSessions(): ApiEnvelope<DeviceSessionCatalogDto>
+
+    @DELETE("auth/sessions/{session}")
+    suspend fun revokeDeviceSession(@Path("session") sessionId: String)
 
     @PUT("device")
     suspend fun registerDevice(@Body request: MobileDeviceRequestDto): Response<Unit>
@@ -101,6 +117,43 @@ interface HotFiiApi {
         @Path("organization") organizationId: String,
         @Body request: NotificationReadRequestDto,
     ): ApiEnvelope<MessageDto>
+
+    @GET("organizations/{organization}/settings")
+    suspend fun organizationSettings(
+        @Path("organization") organizationId: String,
+        @Query("audit_page") auditPage: Int = 1,
+    ): ApiEnvelope<OrganizationSettingsCatalogDto>
+
+    @PATCH("organizations/{organization}/settings")
+    suspend fun updateOrganizationSettings(
+        @Path("organization") organizationId: String,
+        @Body request: OrganizationSettingsRequestDto,
+    ): ApiEnvelope<OrganizationSettingsUpdateDto>
+
+    @POST("organizations/{organization}/settings/payment-profile")
+    suspend fun submitPaymentProfile(
+        @Path("organization") organizationId: String,
+        @Body request: PaymentProfileRequestDto,
+    ): ApiEnvelope<PaymentProfileUpdateDto>
+
+    @GET("organizations/{organization}/team")
+    suspend fun team(
+        @Path("organization") organizationId: String,
+        @Query("page") page: Int = 1,
+    ): ApiEnvelope<TeamCatalogDto>
+
+    @POST("organizations/{organization}/team")
+    suspend fun addTeamMember(
+        @Path("organization") organizationId: String,
+        @Body request: TeamMemberRequestDto,
+    ): ApiEnvelope<TeamMemberResponseDto>
+
+    @PATCH("organizations/{organization}/team/{member}")
+    suspend fun updateTeamMember(
+        @Path("organization") organizationId: String,
+        @Path("member") memberId: String,
+        @Body request: TeamRoleRequestDto,
+    ): ApiEnvelope<TeamMemberResponseDto>
 
     @GET("organizations/{organization}/plans")
     suspend fun plans(

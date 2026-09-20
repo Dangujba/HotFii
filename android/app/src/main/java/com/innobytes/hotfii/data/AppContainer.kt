@@ -24,6 +24,8 @@ import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.VoucherRepository
 import com.innobytes.hotfii.data.repository.DefaultNotificationRepository
 import com.innobytes.hotfii.data.repository.NotificationRepository
+import com.innobytes.hotfii.data.repository.DefaultSettingsRepository
+import com.innobytes.hotfii.data.repository.SettingsRepository
 import com.innobytes.hotfii.data.security.SecureSessionStore
 import com.innobytes.hotfii.notifications.PushNotificationManager
 import okhttp3.OkHttpClient
@@ -83,5 +85,6 @@ class AppContainer(context: Context) {
     val networkRepository: NetworkRepository = DefaultNetworkRepository(api, gson)
     val financeRepository: FinanceRepository = DefaultFinanceRepository(api, gson, context.cacheDir)
     val notificationRepository: NotificationRepository = DefaultNotificationRepository(api, gson, sessionStore)
+    val settingsRepository: SettingsRepository = DefaultSettingsRepository(api, gson)
     val pushNotificationManager = PushNotificationManager(context, notificationRepository)
 }

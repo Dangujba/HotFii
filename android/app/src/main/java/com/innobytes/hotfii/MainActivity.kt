@@ -44,6 +44,7 @@ class MainActivity : FragmentActivity() {
             application.container.networkRepository,
             application.container.financeRepository,
             application.container.notificationRepository,
+            application.container.settingsRepository,
             application.container.pushNotificationManager,
         )
     }

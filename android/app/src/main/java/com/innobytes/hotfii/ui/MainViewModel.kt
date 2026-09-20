@@ -8,6 +8,7 @@ import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.NetworkRepository
 import com.innobytes.hotfii.data.repository.NotificationRepository
+import com.innobytes.hotfii.data.repository.SettingsRepository
 import com.innobytes.hotfii.data.repository.FinanceRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
 import com.innobytes.hotfii.data.repository.SalesRepository
@@ -48,6 +49,11 @@ import com.innobytes.hotfii.domain.ReportExport
 import com.innobytes.hotfii.domain.ReportFilters
 import com.innobytes.hotfii.domain.NotificationCatalog
 import com.innobytes.hotfii.domain.NotificationPreferences
+import com.innobytes.hotfii.domain.DeviceSession
+import com.innobytes.hotfii.domain.OrganizationSettingsCatalog
+import com.innobytes.hotfii.domain.OrganizationSettingsInput
+import com.innobytes.hotfii.domain.PaymentProfileInput
+import com.innobytes.hotfii.domain.TeamCatalog
 import com.innobytes.hotfii.notifications.PushNotificationManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -133,6 +139,16 @@ data class NotificationUiState(
     val notice: String? = null,
 )
 
+data class SettingsUiState(
+    val isLoading: Boolean = false,
+    val isActionRunning: Boolean = false,
+    val catalog: OrganizationSettingsCatalog? = null,
+    val team: TeamCatalog? = null,
+    val deviceSessions: List<DeviceSession> = emptyList(),
+    val error: String? = null,
+    val notice: String? = null,
+)
+
 data class MainUiState(
     val isRestoring: Boolean = true,
     val isSubmitting: Boolean = false,
@@ -156,6 +172,7 @@ data class MainUiState(
     val finance: FinanceUiState = FinanceUiState(),
     val reports: ReportUiState = ReportUiState(),
     val notifications: NotificationUiState = NotificationUiState(),
+    val settings: SettingsUiState = SettingsUiState(),
 ) {
     val selectedOrganization: OrganizationSummary?
         get() = session?.organizations?.firstOrNull { it.id == selectedOrganizationId }
@@ -171,6 +188,7 @@ class MainViewModel(
     private val networkRepository: NetworkRepository,
     private val financeRepository: FinanceRepository,
     private val notificationRepository: NotificationRepository? = null,
+    private val settingsRepository: SettingsRepository? = null,
     private val pushNotificationManager: PushNotificationManager? = null,
 ) : ViewModel() {
     private var pendingLoginEmail: String? = null
@@ -300,6 +318,7 @@ class MainViewModel(
                 finance = FinanceUiState(),
                 reports = ReportUiState(),
                 notifications = NotificationUiState(),
+                settings = SettingsUiState(),
             )
         }
         loadDashboard(id, null)
@@ -1221,6 +1240,178 @@ class MainViewModel(
         _state.update { it.copy(notifications = it.notifications.copy(error = null, notice = null)) }
     }
 
+    fun loadSettings(auditPage: Int = 1, teamPage: Int = 1) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = settingsRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(settings = it.settings.copy(isLoading = true, error = null, notice = null)) }
+            runCatching {
+                Triple(
+                    repository.settings(organizationId, auditPage),
+                    repository.team(organizationId, teamPage),
+                    repository.deviceSessions(),
+                )
+            }.onSuccess { (catalog, team, sessions) ->
+                _state.update { current ->
+                    if (current.selectedOrganizationId != organizationId) current
+                    else current.copy(settings = current.settings.copy(
+                        isLoading = false,
+                        catalog = catalog,
+                        team = team,
+                        deviceSessions = sessions,
+                    ))
+                }
+            }.onFailure { error -> settingsFailed(organizationId, error, "Settings could not be loaded.") }
+        }
+    }
+
+    fun loadAuditPage(page: Int) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = settingsRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(settings = it.settings.copy(isLoading = true, error = null)) }
+            runCatching { repository.settings(organizationId, page) }
+                .onSuccess { catalog ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(settings = current.settings.copy(isLoading = false, catalog = catalog))
+                    }
+                }
+                .onFailure { error -> settingsFailed(organizationId, error, "Audit history could not be loaded.") }
+        }
+    }
+
+    fun loadTeamPage(page: Int) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = settingsRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(settings = it.settings.copy(isLoading = true, error = null)) }
+            runCatching { repository.team(organizationId, page) }
+                .onSuccess { team ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(settings = current.settings.copy(isLoading = false, team = team))
+                    }
+                }
+                .onFailure { error -> settingsFailed(organizationId, error, "Team members could not be loaded.") }
+        }
+    }
+
+    fun updateOrganizationSettings(input: OrganizationSettingsInput) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = settingsRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(settings = it.settings.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching { repository.updateOrganization(organizationId, input) }
+                .onSuccess { organization ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(
+                            session = current.session?.copy(
+                                organizations = current.session.organizations.map {
+                                    if (it.id == organizationId) it.copy(name = organization.name, timezone = organization.timezone) else it
+                                },
+                            ),
+                            settings = current.settings.copy(
+                                isActionRunning = false,
+                                catalog = current.settings.catalog?.copy(organization = organization),
+                                notice = "Organization settings updated.",
+                            ),
+                        )
+                    }
+                }
+                .onFailure { error -> settingsFailed(organizationId, error, "Organization settings could not be updated.") }
+        }
+    }
+
+    fun submitPaymentProfile(input: PaymentProfileInput) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = settingsRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(settings = it.settings.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching { repository.submitPaymentProfile(organizationId, input) }
+                .onSuccess { profile ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(settings = current.settings.copy(
+                            isActionRunning = false,
+                            catalog = current.settings.catalog?.copy(paymentProfile = profile),
+                            notice = "Payment details submitted.",
+                        ))
+                    }
+                }
+                .onFailure { error -> settingsFailed(organizationId, error, "Payment details could not be submitted.") }
+        }
+    }
+
+    fun addTeamMember(email: String, role: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = settingsRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(settings = it.settings.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching { repository.addTeamMember(organizationId, email, role) }
+                .onSuccess {
+                    val team = repository.team(organizationId, 1)
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(settings = current.settings.copy(
+                            isActionRunning = false,
+                            team = team,
+                            notice = "Team member added.",
+                        ))
+                    }
+                }
+                .onFailure { error -> settingsFailed(organizationId, error, "The team member could not be added.") }
+        }
+    }
+
+    fun updateTeamRole(memberId: String, role: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = settingsRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(settings = it.settings.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching { repository.updateTeamRole(organizationId, memberId, role) }
+                .onSuccess {
+                    val page = _state.value.settings.team?.pagination?.currentPage ?: 1
+                    val team = repository.team(organizationId, page)
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(settings = current.settings.copy(
+                            isActionRunning = false,
+                            team = team,
+                            notice = "Member role updated.",
+                        ))
+                    }
+                }
+                .onFailure { error -> settingsFailed(organizationId, error, "The member role could not be updated.") }
+        }
+    }
+
+    fun revokeDeviceSession(sessionId: String) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = settingsRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(settings = it.settings.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching { repository.revokeDeviceSession(sessionId) }
+                .onSuccess {
+                    val sessions = repository.deviceSessions()
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(settings = current.settings.copy(
+                            isActionRunning = false,
+                            deviceSessions = sessions,
+                            notice = "Device session revoked.",
+                        ))
+                    }
+                }
+                .onFailure { error -> settingsFailed(organizationId, error, "The device session could not be revoked.") }
+        }
+    }
+
+    fun clearSettingsFeedback() {
+        _state.update { it.copy(settings = it.settings.copy(error = null, notice = null)) }
+    }
+
     private fun restoreSession() {
         viewModelScope.launch {
             runCatching { sessionRepository.restore() }
@@ -1368,6 +1559,18 @@ class MainViewModel(
         }
     }
 
+    private fun settingsFailed(organizationId: String, error: Throwable, fallback: String) {
+        Log.e("HotFiiSettings", fallback, error)
+        _state.update { current ->
+            if (current.selectedOrganizationId != organizationId) current
+            else current.copy(settings = current.settings.copy(
+                isLoading = false,
+                isActionRunning = false,
+                error = error.message ?: fallback,
+            ))
+        }
+    }
+
     companion object {
         fun factory(
             sessionRepository: SessionRepository,
@@ -1378,6 +1581,7 @@ class MainViewModel(
             networkRepository: NetworkRepository,
             financeRepository: FinanceRepository,
             notificationRepository: NotificationRepository,
+            settingsRepository: SettingsRepository,
             pushNotificationManager: PushNotificationManager,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -1391,6 +1595,7 @@ class MainViewModel(
                     networkRepository,
                     financeRepository,
                     notificationRepository,
+                    settingsRepository,
                     pushNotificationManager,
                 ) as T
         }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Operator;
 
 use App\Domain\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\ListFilters;
@@ -42,15 +43,21 @@ class TeamController extends Controller
 
     public function store(Request $request, Organization $organization): RedirectResponse
     {
+        $actorRole = (string) $request->user()->roleFor($organization);
+        $assignableRoles = $actorRole === 'owner'
+            ? array_column(MembershipRole::cases(), 'value')
+            : ['technician', 'accountant', 'agent', 'viewer'];
         $data = $request->validate([
             'email' => ['required', 'email', 'exists:users,email'],
-            'role' => ['required', 'in:'.implode(',', array_column(MembershipRole::cases(), 'value'))],
+            'role' => ['required', 'in:'.implode(',', $assignableRoles)],
         ]);
 
         $user = User::where('email', $data['email'])->firstOrFail();
         abort_if($organization->users()->whereKey($user->id)->exists(), 422, 'That user is already a team member.');
 
         $organization->users()->attach($user->id, ['role' => $data['role'], 'joined_at' => now()]);
+        $this->audit($request, $organization, $user, 'team.member.added', [], ['role' => $data['role']]);
+
         return back()->with('success', 'Team member added.');
     }
 
@@ -61,7 +68,38 @@ class TeamController extends Controller
             'role' => ['required', 'in:'.implode(',', array_column(MembershipRole::cases(), 'value'))],
         ]);
 
+        $previousRole = (string) $member->roleFor($organization);
+        if ($previousRole === 'owner' && $data['role'] !== 'owner') {
+            abort_if(
+                $organization->users()->wherePivot('role', 'owner')->count() <= 1,
+                422,
+                'The organization must keep at least one owner.',
+            );
+        }
+
         $organization->users()->updateExistingPivot($member->id, ['role' => $data['role']]);
+        $this->audit($request, $organization, $member, 'team.member.role-updated', ['role' => $previousRole], ['role' => $data['role']]);
+
         return back()->with('success', 'Role updated.');
+    }
+
+    private function audit(
+        Request $request,
+        Organization $organization,
+        User $member,
+        string $action,
+        array $before,
+        array $after,
+    ): void {
+        AuditLog::create([
+            'organization_id' => $organization->id,
+            'user_id' => $request->user()->id,
+            'action' => $action,
+            'subject_type' => User::class,
+            'subject_id' => $member->id,
+            'ip_address' => $request->ip(),
+            'before' => $before,
+            'after' => $after,
+        ]);
     }
 }
