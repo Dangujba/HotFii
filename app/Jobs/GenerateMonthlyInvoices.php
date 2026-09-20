@@ -7,6 +7,7 @@ use App\Domain\Enums\OrganizationMode;
 use App\Models\FeeLedgerEntry;
 use App\Models\Invoice;
 use App\Models\Organization;
+use App\Notifications\HotFiiAlert;
 use App\Services\Billing\CommerceMonthlyFeeCalculator;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 class GenerateMonthlyInvoices implements ShouldQueue
@@ -22,6 +24,7 @@ class GenerateMonthlyInvoices implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public int $timeout = 120;
 
     public function __construct(public readonly ?string $period = null)
@@ -68,7 +71,7 @@ class GenerateMonthlyInvoices implements ShouldQueue
                     $balance = max(0, $total - $collected);
 
                     if ($balance > 0) {
-                        Invoice::firstOrCreate(
+                        $invoice = Invoice::firstOrCreate(
                             ['organization_id' => $organization->id, 'billing_period' => $period],
                             [
                                 'number' => 'HF-INV-'.Str::upper(Str::random(10)),
@@ -78,6 +81,19 @@ class GenerateMonthlyInvoices implements ShouldQueue
                                 'due_at' => now()->addDays(7),
                             ],
                         );
+                        if ($invoice->wasRecentlyCreated) {
+                            $recipients = $organization->users()
+                                ->wherePivotIn('role', ['owner', 'manager', 'accountant'])
+                                ->get();
+                            Notification::send($recipients, new HotFiiAlert(
+                                'New HotFii invoice: '.$invoice->number,
+                                sprintf('₦%s is due by %s.', number_format($invoice->total_kobo / 100, 2), $invoice->due_at->format('j M Y')),
+                                route('finance.index'),
+                                category: 'invoice',
+                                organizationId: $organization->uuid,
+                                mobileData: ['screen' => 'finance', 'invoice_id' => $invoice->uuid],
+                            ));
+                        }
                     }
 
                     if ($organization->billing_plan === BillingPlan::MicroSeller

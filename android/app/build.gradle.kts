@@ -10,6 +10,10 @@ val debugApiBaseUrl = providers.gradleProperty("HOTFII_API_BASE_URL")
     .orElse("https://hotfii.com/api/v1/mobile/")
 val debugAllowsCleartext = providers.gradleProperty("HOTFII_ALLOW_CLEARTEXT")
     .orElse("false")
+val firebaseProjectId = providers.gradleProperty("HOTFII_FIREBASE_PROJECT_ID").orElse(providers.environmentVariable("HOTFII_FIREBASE_PROJECT_ID")).orElse("")
+val firebaseApplicationId = providers.gradleProperty("HOTFII_FIREBASE_APPLICATION_ID").orElse(providers.environmentVariable("HOTFII_FIREBASE_APPLICATION_ID")).orElse("")
+val firebaseApiKey = providers.gradleProperty("HOTFII_FIREBASE_API_KEY").orElse(providers.environmentVariable("HOTFII_FIREBASE_API_KEY")).orElse("")
+val firebaseSenderId = providers.gradleProperty("HOTFII_FIREBASE_SENDER_ID").orElse(providers.environmentVariable("HOTFII_FIREBASE_SENDER_ID")).orElse("")
 
 android {
     namespace = "com.innobytes.hotfii"
@@ -21,6 +25,11 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${firebaseProjectId.get()}\"")
+        buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${firebaseApplicationId.get()}\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\"${firebaseApiKey.get()}\"")
+        buildConfigField("String", "FIREBASE_SENDER_ID", "\"${firebaseSenderId.get()}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -92,6 +101,7 @@ dependencies {
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
     implementation(libs.androidx.biometric)
+    implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -1,7 +1,10 @@
 package com.innobytes.hotfii
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Build
 import android.os.Process
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -12,12 +15,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
 import com.innobytes.hotfii.data.preferences.AppPreferences
 import com.innobytes.hotfii.data.preferences.AppThemeMode
 import com.innobytes.hotfii.ui.HotFiiApp
 import com.innobytes.hotfii.ui.MainViewModel
 import com.innobytes.hotfii.ui.theme.HotFiiTheme
+import com.innobytes.hotfii.notifications.PushNotificationManager
 
 class MainActivity : FragmentActivity() {
     private lateinit var appPreferences: AppPreferences
@@ -27,6 +32,7 @@ class MainActivity : FragmentActivity() {
     private var biometricMessage by mutableStateOf<String?>(null)
     private var openFinanceRequest by mutableStateOf(0)
     private var invoicePaymentStatus by mutableStateOf<String?>(null)
+    private var openNotificationsRequest by mutableStateOf(0)
     private val viewModel: MainViewModel by viewModels {
         val application = application as HotFiiApplication
         MainViewModel.factory(
@@ -37,12 +43,15 @@ class MainActivity : FragmentActivity() {
             application.container.salesRepository,
             application.container.networkRepository,
             application.container.financeRepository,
+            application.container.notificationRepository,
+            application.container.pushNotificationManager,
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleInvoicePaymentReturn(intent)
+        handleNotificationOpen(intent)
         appPreferences = (application as HotFiiApplication).container.appPreferences
         themeMode = appPreferences.themeMode()
         biometricEnabled = appPreferences.biometricEnabled()
@@ -63,6 +72,9 @@ class MainActivity : FragmentActivity() {
                     onBiometricMessageDismissed = { biometricMessage = null },
                     openFinanceRequest = openFinanceRequest,
                     invoicePaymentStatus = invoicePaymentStatus,
+                    openNotificationsRequest = openNotificationsRequest,
+                    onRequestNotificationPermission = ::requestNotificationPermission,
+                    pushNotificationsAvailable = (application as HotFiiApplication).container.pushNotificationManager.configured(),
                 )
             }
         }
@@ -72,6 +84,7 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleInvoicePaymentReturn(intent)
+        handleNotificationOpen(intent)
     }
 
     private fun handleInvoicePaymentReturn(intent: Intent?) {
@@ -80,6 +93,28 @@ class MainActivity : FragmentActivity() {
             invoicePaymentStatus = uri.getQueryParameter("status")
             openFinanceRequest += 1
         }
+    }
+
+    private fun handleNotificationOpen(intent: Intent?) {
+        if (intent?.getStringExtra(PushNotificationManager.EXTRA_SCREEN) != null) {
+            openNotificationsRequest++
+            intent.removeExtra(PushNotificationManager.EXTRA_SCREEN)
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                NOTIFICATION_PERMISSION_REQUEST,
+            )
+        }
+    }
+
+    private companion object {
+        const val NOTIFICATION_PERMISSION_REQUEST = 1001
     }
 
     private fun applyThemeMode(mode: AppThemeMode) {

@@ -33,6 +33,12 @@ import com.innobytes.hotfii.data.network.dto.FinanceCatalogDto
 import com.innobytes.hotfii.data.network.dto.FinanceInvoiceDetailDto
 import com.innobytes.hotfii.data.network.dto.InvoiceCheckoutDto
 import com.innobytes.hotfii.data.network.dto.ReportDataDto
+import com.innobytes.hotfii.data.network.dto.NotificationCatalogDto
+import com.innobytes.hotfii.data.network.dto.NotificationPreferencesRequestDto
+import com.innobytes.hotfii.data.network.dto.NotificationPreferencesResponseDto
+import com.innobytes.hotfii.data.network.dto.NotificationReadRequestDto
+import com.innobytes.hotfii.data.network.dto.MobileDeviceRequestDto
+import com.innobytes.hotfii.data.network.dto.MobileDeviceDeleteRequestDto
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -43,6 +49,7 @@ import retrofit2.http.Path
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Query
+import retrofit2.http.PUT
 import retrofit2.http.Streaming
 
 interface HotFiiApi {
@@ -54,6 +61,12 @@ interface HotFiiApi {
 
     @DELETE("auth/logout")
     suspend fun logout()
+
+    @PUT("device")
+    suspend fun registerDevice(@Body request: MobileDeviceRequestDto): Response<Unit>
+
+    @HTTP(method = "DELETE", path = "device", hasBody = true)
+    suspend fun unregisterDevice(@Body request: MobileDeviceDeleteRequestDto)
 
     @POST("auth/two-factor/setup")
     suspend fun setupTwoFactor(): ApiEnvelope<TwoFactorSetupDto>
@@ -69,6 +82,25 @@ interface HotFiiApi {
         @Path("organization") organizationId: String,
         @Query("router") routerId: String? = null,
     ): ApiEnvelope<DashboardDto>
+
+    @GET("organizations/{organization}/notifications")
+    suspend fun notifications(
+        @Path("organization") organizationId: String,
+        @Query("category") category: String? = null,
+        @Query("page") page: Int = 1,
+    ): ApiEnvelope<NotificationCatalogDto>
+
+    @PATCH("organizations/{organization}/notifications/preferences")
+    suspend fun updateNotificationPreferences(
+        @Path("organization") organizationId: String,
+        @Body request: NotificationPreferencesRequestDto,
+    ): ApiEnvelope<NotificationPreferencesResponseDto>
+
+    @POST("organizations/{organization}/notifications/read")
+    suspend fun readNotifications(
+        @Path("organization") organizationId: String,
+        @Body request: NotificationReadRequestDto,
+    ): ApiEnvelope<MessageDto>
 
     @GET("organizations/{organization}/plans")
     suspend fun plans(

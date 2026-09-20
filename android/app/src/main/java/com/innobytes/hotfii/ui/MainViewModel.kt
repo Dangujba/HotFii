@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.innobytes.hotfii.data.repository.DashboardRepository
 import com.innobytes.hotfii.data.repository.PlanRepository
 import com.innobytes.hotfii.data.repository.NetworkRepository
+import com.innobytes.hotfii.data.repository.NotificationRepository
 import com.innobytes.hotfii.data.repository.FinanceRepository
 import com.innobytes.hotfii.data.repository.SessionRepository
 import com.innobytes.hotfii.data.repository.SalesRepository
@@ -45,6 +46,9 @@ import com.innobytes.hotfii.domain.FinanceInvoiceDetail
 import com.innobytes.hotfii.domain.ReportData
 import com.innobytes.hotfii.domain.ReportExport
 import com.innobytes.hotfii.domain.ReportFilters
+import com.innobytes.hotfii.domain.NotificationCatalog
+import com.innobytes.hotfii.domain.NotificationPreferences
+import com.innobytes.hotfii.notifications.PushNotificationManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -120,6 +124,15 @@ data class ReportUiState(
     val notice: String? = null,
 )
 
+data class NotificationUiState(
+    val isLoading: Boolean = false,
+    val isActionRunning: Boolean = false,
+    val catalog: NotificationCatalog? = null,
+    val category: String? = null,
+    val error: String? = null,
+    val notice: String? = null,
+)
+
 data class MainUiState(
     val isRestoring: Boolean = true,
     val isSubmitting: Boolean = false,
@@ -142,6 +155,7 @@ data class MainUiState(
     val network: NetworkUiState = NetworkUiState(),
     val finance: FinanceUiState = FinanceUiState(),
     val reports: ReportUiState = ReportUiState(),
+    val notifications: NotificationUiState = NotificationUiState(),
 ) {
     val selectedOrganization: OrganizationSummary?
         get() = session?.organizations?.firstOrNull { it.id == selectedOrganizationId }
@@ -156,6 +170,8 @@ class MainViewModel(
     private val salesRepository: SalesRepository,
     private val networkRepository: NetworkRepository,
     private val financeRepository: FinanceRepository,
+    private val notificationRepository: NotificationRepository? = null,
+    private val pushNotificationManager: PushNotificationManager? = null,
 ) : ViewModel() {
     private var pendingLoginEmail: String? = null
     private var pendingLoginPassword: String? = null
@@ -283,6 +299,7 @@ class MainViewModel(
                 network = NetworkUiState(),
                 finance = FinanceUiState(),
                 reports = ReportUiState(),
+                notifications = NotificationUiState(),
             )
         }
         loadDashboard(id, null)
@@ -297,6 +314,7 @@ class MainViewModel(
     fun signOut() {
         viewModelScope.launch {
             _state.update { it.copy(isSubmitting = true, error = null) }
+            notificationRepository?.let { runCatching { it.unregisterDevice() } }
             sessionRepository.signOut()
             _state.value = MainUiState(isRestoring = false)
         }
@@ -420,6 +438,7 @@ class MainViewModel(
                         if (current.selectedOrganizationId != organizationId) current
                         else current.copy(plans = current.plans.copy(
                             isLoading = false,
+                            isActionRunning = false,
                             catalog = catalog,
                         ))
                     }
@@ -1139,6 +1158,69 @@ class MainViewModel(
         _state.update { it.copy(reports = it.reports.copy(error = null, notice = null)) }
     }
 
+    fun loadNotifications(category: String? = _state.value.notifications.category, page: Int = 1) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = notificationRepository ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(notifications = it.notifications.copy(
+                    isLoading = true,
+                    category = category,
+                    error = null,
+                    notice = null,
+                ))
+            }
+            runCatching { repository.notifications(organizationId, category, page) }
+                .onSuccess { catalog ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(notifications = current.notifications.copy(
+                            isLoading = false,
+                            catalog = catalog,
+                            category = category,
+                        ))
+                    }
+                }
+                .onFailure { error -> notificationFailed(organizationId, error, "Notifications could not be loaded.") }
+        }
+    }
+
+    fun updateNotificationPreferences(preferences: NotificationPreferences) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = notificationRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(notifications = it.notifications.copy(isActionRunning = true, error = null, notice = null)) }
+            runCatching { repository.updatePreferences(organizationId, preferences) }
+                .onSuccess { updated ->
+                    _state.update { current ->
+                        if (current.selectedOrganizationId != organizationId) current
+                        else current.copy(notifications = current.notifications.copy(
+                            isActionRunning = false,
+                            catalog = current.notifications.catalog?.copy(preferences = updated),
+                            notice = "Notification preferences updated.",
+                        ))
+                    }
+                    if (updated.pushEnabled) pushNotificationManager?.syncRegistration()
+                }
+                .onFailure { error -> notificationFailed(organizationId, error, "Notification preferences could not be updated.") }
+        }
+    }
+
+    fun markNotificationsRead(notificationId: String? = null) {
+        val organizationId = _state.value.selectedOrganizationId ?: return
+        val repository = notificationRepository ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(notifications = it.notifications.copy(isActionRunning = true, error = null)) }
+            runCatching { repository.markRead(organizationId, notificationId) }
+                .onSuccess { loadNotifications(_state.value.notifications.category, _state.value.notifications.catalog?.pagination?.currentPage ?: 1) }
+                .onFailure { error -> notificationFailed(organizationId, error, "Notifications could not be marked as read.") }
+        }
+    }
+
+    fun clearNotificationFeedback() {
+        _state.update { it.copy(notifications = it.notifications.copy(error = null, notice = null)) }
+    }
+
     private fun restoreSession() {
         viewModelScope.launch {
             runCatching { sessionRepository.restore() }
@@ -1173,6 +1255,7 @@ class MainViewModel(
             selectedOrganizationId = selectedId,
         )
         loadDashboard(selectedId, null)
+        pushNotificationManager?.syncRegistration()
     }
 
     private fun loadDashboard(organizationId: String?, routerId: String?) {
@@ -1273,6 +1356,18 @@ class MainViewModel(
         }
     }
 
+    private fun notificationFailed(organizationId: String, error: Throwable, fallback: String) {
+        Log.e("HotFiiNotification", fallback, error)
+        _state.update { current ->
+            if (current.selectedOrganizationId != organizationId) current
+            else current.copy(notifications = current.notifications.copy(
+                isLoading = false,
+                isActionRunning = false,
+                error = error.message ?: fallback,
+            ))
+        }
+    }
+
     companion object {
         fun factory(
             sessionRepository: SessionRepository,
@@ -1282,6 +1377,8 @@ class MainViewModel(
             salesRepository: SalesRepository,
             networkRepository: NetworkRepository,
             financeRepository: FinanceRepository,
+            notificationRepository: NotificationRepository,
+            pushNotificationManager: PushNotificationManager,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
@@ -1293,6 +1390,8 @@ class MainViewModel(
                     salesRepository,
                     networkRepository,
                     financeRepository,
+                    notificationRepository,
+                    pushNotificationManager,
                 ) as T
         }
     }

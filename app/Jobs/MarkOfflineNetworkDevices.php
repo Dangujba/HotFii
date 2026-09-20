@@ -50,6 +50,9 @@ class MarkOfflineNetworkDevices implements ShouldQueue
                         'Router offline: '.$device->name,
                         'No heartbeat has been received for more than 90 seconds.',
                         route('network.devices.show', $device),
+                        category: 'router',
+                        organizationId: $device->organization->uuid,
+                        mobileData: ['screen' => 'network', 'router_id' => $device->uuid],
                     ));
                 }
             });

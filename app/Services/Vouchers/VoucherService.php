@@ -9,15 +9,17 @@ use App\Events\VoucherActivated;
 use App\Models\AccessPlan;
 use App\Models\Customer;
 use App\Models\FeeLedgerEntry;
-use App\Models\Organization;
 use App\Models\NetworkDevice;
+use App\Models\Organization;
 use App\Models\Voucher;
 use App\Models\VoucherBatch;
+use App\Notifications\HotFiiAlert;
 use App\Services\Billing\CommerceFeeCalculator;
 use App\Services\Billing\TrialManager;
 use App\Services\Radius\RadiusCredentialService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -51,8 +53,7 @@ class VoucherService
             && $device->organization_id !== $organization->id
         ) {
             throw ValidationException::withMessages([
-                'network_device_id' =>
-                    'The selected router does not belong to this organization.',
+                'network_device_id' => 'The selected router does not belong to this organization.',
             ]);
         }
 
@@ -167,8 +168,7 @@ class VoucherService
                     DB::table('voucher_serial_counters')
                         ->where('serial_date', $serialDate)
                         ->update([
-                            'last_number' =>
-                                $serialStart + $quantity - 1,
+                            'last_number' => $serialStart + $quantity - 1,
 
                             'updated_at' => now(),
                         ]);
@@ -312,8 +312,7 @@ class VoucherService
                  */
                 if ($credential->expires_at?->isPast()) {
                     $voucher->update([
-                        'status' =>
-                            VoucherStatus::Expired,
+                        'status' => VoucherStatus::Expired,
                     ]);
 
                     throw new RuntimeException(
@@ -395,7 +394,7 @@ class VoucherService
                 }
 
                 $quote = $this->fees->quote($organization, $voucher->price_snapshot_kobo);
-                $this->sales->record($voucher, $quote->chargeablePercentageFeeKobo(), $device);
+                $transaction = $this->sales->record($voucher, $quote->chargeablePercentageFeeKobo(), $device);
 
                 FeeLedgerEntry::updateOrCreate(
                     [
@@ -412,10 +411,26 @@ class VoucherService
                         'metadata' => ['unrecorded_sale' => ! $wasRecordedSold],
                     ],
                 );
+
+                DB::afterCommit(function () use ($organization, $transaction, $voucher): void {
+                    $recipients = $organization->users()
+                        ->wherePivotIn('role', ['owner', 'manager', 'accountant'])
+                        ->get();
+                    Notification::send($recipients, new HotFiiAlert(
+                        'Voucher sale recorded',
+                        sprintf('A ₦%s voucher was activated.', number_format($voucher->price_snapshot_kobo / 100, 2)),
+                        route('sales.index'),
+                        category: 'payment',
+                        organizationId: $organization->uuid,
+                        mobileData: ['screen' => 'sales', 'transaction_id' => $transaction->uuid],
+                        sendMail: false,
+                    ));
+                });
             }
 
             $voucher = $voucher->refresh()->load('credential', 'batch.accessPlan');
             VoucherActivated::dispatch($voucher);
+
             return $voucher;
         });
     }

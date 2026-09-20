@@ -6,9 +6,11 @@ use App\Domain\Enums\PaymentStatus;
 use App\Events\PaymentStatusChanged;
 use App\Models\FeeLedgerEntry;
 use App\Models\Transaction;
+use App\Notifications\HotFiiAlert;
 use App\Services\Billing\TrialManager;
 use App\Services\Radius\RadiusCredentialService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use RuntimeException;
 
 class PaymentProcessor
@@ -75,6 +77,22 @@ class PaymentProcessor
 
             $transaction = $transaction->refresh();
             PaymentStatusChanged::dispatch($transaction);
+            DB::afterCommit(function () use ($transaction): void {
+                $organization = $transaction->organization;
+                $recipients = $organization->users()
+                    ->wherePivotIn('role', ['owner', 'manager', 'accountant'])
+                    ->get();
+                Notification::send($recipients, new HotFiiAlert(
+                    'Payment received',
+                    sprintf('₦%s was received for %s.', number_format($transaction->gross_amount_kobo / 100, 2), $transaction->accessPlan?->name ?? 'hotspot access'),
+                    route('sales.index'),
+                    category: 'payment',
+                    organizationId: $organization->uuid,
+                    mobileData: ['screen' => 'sales', 'transaction_id' => $transaction->uuid],
+                    sendMail: false,
+                ));
+            });
+
             return $transaction;
         });
     }
@@ -85,6 +103,7 @@ class PaymentProcessor
             $transaction->update(['status' => PaymentStatus::Failed, 'provider_response' => $providerData]);
             PaymentStatusChanged::dispatch($transaction->refresh());
         }
+
         return $transaction;
     }
 }

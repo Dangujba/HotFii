@@ -31,7 +31,7 @@ The primary bottom navigation is capped at five destinations: Home, Sales, Netwo
 - Stage 4 (Sales and Customers): complete.
 - Stage 5 (Network and Sessions): complete.
 - Stage 6 (Finance and Reports): implemented and awaiting Muhammad's review/deployment checkpoint.
-- Stage 7: theme selection, fingerprint protection, authenticator 2FA, and secure logout are implemented; notifications and the remaining settings are pending.
+- Stage 7: theme selection, fingerprint protection, authenticator 2FA, secure logout, tenant notification history, push preferences, native Android channels, and FCM installation registration are implemented. Firebase production credentials, device-session management, and the remaining organization settings are pending.
 - Stage 8: not started.
 
 ## API Endpoint Map
@@ -42,6 +42,10 @@ The primary bottom navigation is capped at five destinations: Home, Sales, Netwo
 | GET | `/api/v1/mobile/session` | Restore the authenticated user and organization list | 1 |
 | DELETE | `/api/v1/mobile/auth/logout` | Revoke the current device token | 1 |
 | GET | `/api/v1/mobile/organizations/{organization}/dashboard` | Real dashboard summaries and charts | 2 complete |
+| GET | `/api/v1/mobile/organizations/{organization}/notifications` | Paginated tenant notification history and preferences | 7 complete |
+| PATCH | `/api/v1/mobile/organizations/{organization}/notifications/preferences` | Update router, payment, invoice, and account push preferences | 7 complete |
+| POST | `/api/v1/mobile/organizations/{organization}/notifications/read` | Mark one or all tenant notifications read | 7 complete |
+| PUT/DELETE | `/api/v1/mobile/device` | Register or remove the signed-in Android FCM device | 7 complete |
 | GET/POST/PATCH/DELETE | `/api/v1/mobile/organizations/{organization}/plans` | Plan management | 3 complete |
 | GET/POST/PATCH/DELETE | `/api/v1/mobile/organizations/{organization}/voucher-batches` | Voucher batch management | 3 complete |
 | GET | `/api/v1/mobile/organizations/{organization}/sales` | Sales summaries, filters, transactions, and voucher activations | 4 complete |

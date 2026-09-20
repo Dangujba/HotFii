@@ -81,6 +81,12 @@ class MobileSessionController extends Controller
 
     public function destroy(Request $request): Response
     {
+        $tokenName = (string) $request->user()->currentAccessToken()?->name;
+        if (preg_match('/^android:.*:([a-f0-9]{16})$/', $tokenName, $matches)) {
+            $request->user()->mobileDevices()
+                ->where('device_identifier_hash', 'like', $matches[1].'%')
+                ->delete();
+        }
         $request->user()->currentAccessToken()?->delete();
 
         return response()->noContent();

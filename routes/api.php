@@ -4,10 +4,12 @@ use App\Http\Controllers\Api\IntegrationTestStatusController;
 use App\Http\Controllers\Api\MobileAccessPlanController;
 use App\Http\Controllers\Api\MobileCustomerController;
 use App\Http\Controllers\Api\MobileDashboardController;
+use App\Http\Controllers\Api\MobileDeviceController;
 use App\Http\Controllers\Api\MobileFinanceController;
 use App\Http\Controllers\Api\MobileHotspotSessionController;
 use App\Http\Controllers\Api\MobileInvoicePaymentController;
 use App\Http\Controllers\Api\MobileNetworkController;
+use App\Http\Controllers\Api\MobileNotificationController;
 use App\Http\Controllers\Api\MobileReportController;
 use App\Http\Controllers\Api\MobileSalesController;
 use App\Http\Controllers\Api\MobileSessionController;
@@ -28,6 +30,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::middleware(['auth:sanctum', 'abilities:mobile'])->group(function () {
             Route::get('/session', [MobileSessionController::class, 'show'])->name('session.show');
             Route::delete('/auth/logout', [MobileSessionController::class, 'destroy'])->name('auth.logout');
+            Route::put('/device', [MobileDeviceController::class, 'update'])->name('device.update');
+            Route::delete('/device', [MobileDeviceController::class, 'destroy'])->name('device.destroy');
             Route::post('/auth/two-factor/setup', [MobileTwoFactorController::class, 'store'])->name('auth.two-factor.setup');
             Route::post('/auth/two-factor/confirm', [MobileTwoFactorController::class, 'confirm'])
                 ->middleware('throttle:10,1')
@@ -39,6 +43,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 ->name('organizations.')
                 ->group(function () {
                     Route::get('/dashboard', MobileDashboardController::class)->name('dashboard');
+                    Route::get('/notifications', [MobileNotificationController::class, 'index'])->name('notifications.index');
+                    Route::patch('/notifications/preferences', [MobileNotificationController::class, 'updatePreferences'])->name('notifications.preferences.update');
+                    Route::post('/notifications/read', [MobileNotificationController::class, 'read'])->name('notifications.read');
                     Route::get('/plans', [MobileAccessPlanController::class, 'index'])->name('plans.index');
                     Route::post('/plans', [MobileAccessPlanController::class, 'store'])->name('plans.store');
                     Route::patch('/plans/{plan}', [MobileAccessPlanController::class, 'update'])->name('plans.update');

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +83,7 @@ import com.innobytes.hotfii.ui.sales.SalesScreen
 import com.innobytes.hotfii.ui.workspace.WorkspaceScreen
 import com.innobytes.hotfii.ui.finance.FinanceScreen
 import com.innobytes.hotfii.ui.reports.ReportScreen
+import com.innobytes.hotfii.ui.notifications.NotificationScreen
 
 private enum class MainDestination(val label: String, val icon: ImageVector) {
     Dashboard("Home", Icons.Outlined.Dashboard),
@@ -95,6 +97,7 @@ private enum class MoreDestination {
     Plans,
     Vouchers,
     Reports,
+    Notifications,
     Account,
 }
 
@@ -110,6 +113,9 @@ fun AuthenticatedShell(
     onBiometricMessageDismissed: () -> Unit,
     openFinanceRequest: Int = 0,
     invoicePaymentStatus: String? = null,
+    openNotificationsRequest: Int = 0,
+    onRequestNotificationPermission: () -> Unit,
+    pushNotificationsAvailable: Boolean,
 ) {
     val session = requireNotNull(state.session)
     var destination by rememberSaveable { mutableStateOf(MainDestination.Dashboard) }
@@ -122,6 +128,13 @@ fun AuthenticatedShell(
             destination = MainDestination.Finance
             moreDestination = null
             viewModel.refreshFinanceAfterPayment(invoicePaymentStatus)
+        }
+    }
+
+    LaunchedEffect(openNotificationsRequest) {
+        if (openNotificationsRequest > 0) {
+            destination = MainDestination.More
+            moreDestination = MoreDestination.Notifications
         }
     }
 
@@ -243,6 +256,18 @@ fun AuthenticatedShell(
                         onExportConsumed = viewModel::consumeReportExport,
                         onFeedbackDismissed = viewModel::clearReportFeedback,
                     )
+                    MoreDestination.Notifications -> NotificationScreen(
+                        organizationId = state.selectedOrganizationId,
+                        organizationName = state.selectedOrganization?.name,
+                        state = state.notifications,
+                        onBack = { moreDestination = null },
+                        onLoad = viewModel::loadNotifications,
+                        onUpdatePreferences = viewModel::updateNotificationPreferences,
+                        onMarkRead = viewModel::markNotificationsRead,
+                        onFeedbackDismissed = viewModel::clearNotificationFeedback,
+                        onRequestPermission = onRequestNotificationPermission,
+                        pushAvailable = pushNotificationsAvailable,
+                    )
                     MoreDestination.Account -> AccountScreen(
                         session = session,
                         selectedOrganization = state.selectedOrganization,
@@ -280,6 +305,7 @@ private fun MoreScreen(canViewFinance: Boolean, onOpen: (MoreDestination) -> Uni
             item { MoreRow("Plans", "Create and manage access plans", Icons.Outlined.Tune) { onOpen(MoreDestination.Plans) } }
             item { MoreRow("Vouchers", "Generate, print, and manage voucher batches", Icons.Outlined.ConfirmationNumber) { onOpen(MoreDestination.Vouchers) } }
             if (canViewFinance) item { MoreRow("Reports", "Sales, channels, plans, and network usage", Icons.Outlined.Assessment) { onOpen(MoreDestination.Reports) } }
+            item { MoreRow("Notifications", "Router, payment, invoice, and account alerts", Icons.Outlined.Notifications) { onOpen(MoreDestination.Notifications) } }
             item { MoreRow("Account", "Organization, theme, fingerprint, and security", Icons.Outlined.Person) { onOpen(MoreDestination.Account) } }
         }
     }
