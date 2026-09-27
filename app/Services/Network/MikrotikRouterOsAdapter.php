@@ -165,9 +165,7 @@ ROS, [
 
             :local clientName ""
 
-            :foreach leaseId in=[
-                /ip dhcp-server lease find where mac-address=$clientMac
-            ] do={
+            :foreach leaseId in=[/ip dhcp-server lease find where mac-address=$clientMac] do={
 
                 :if ([:len $clientName] = 0) do={
                     :set clientName [/ip dhcp-server lease get $leaseId host-name]
@@ -176,37 +174,20 @@ ROS, [
 
             # DHCP host names normally contain safe DNS-style characters.
             # Skip JSON-sensitive values rather than break the heartbeat.
-            :if (
-                ([:len $clientName] > 0)
-                && ([:find $clientName "\""] = nil)
-                && ([:find $clientName "\\"] = nil)
-            ) do={
+            :if (([:len $clientName] > 0) && ([:find $clientName "\""] = nil) && ([:find $clientName "\\"] = nil)) do={
 
                 :if ([:len $clientsJson] > 0) do={
                     :set clientsJson ($clientsJson . ",")
                 }
 
-                :set clientsJson (
-                    $clientsJson
-                    . "{\"mac\":\""
-                    . $clientMac
-                    . "\",\"name\":\""
-                    . $clientName
-                    . "\"}"
-                )
+                :set clientsJson ($clientsJson . "{\"mac\":\"" . $clientMac . "\",\"name\":\"" . $clientName . "\"}")
 
                 :set clientCount ($clientCount + 1)
             }
         }
     }
 
-    :local heartbeatBody (
-        "{\"firmware_version\":\""
-        . $firmwareVersion
-        . "\",\"clients\":["
-        . $clientsJson
-        . "]}"
-    )
+    :local heartbeatBody ("{\"firmware_version\":\"" . $firmwareVersion . "\",\"clients\":[" . $clientsJson . "]}")
 
     /tool fetch url="{{HEARTBEAT_URL}}" http-method=post http-header-field="Content-Type: application/json,X-HotFii-Secret: {{RADIUS_SECRET}}" http-data=$heartbeatBody check-certificate=yes-without-crl keep-result=no
 }
