@@ -227,16 +227,15 @@ ROS, [
     :local firmwareVersion [/system resource get version]
     :local heartbeatUrl "{{HEARTBEAT_URL}}"
     :local heartbeatSecret "{{RADIUS_SECRET}}"
-    :local heartbeatHeader ("Content-Type: application/json,X-HotFii-Secret: " . $heartbeatSecret)
-    :local heartbeatBody ("{\"firmware_version\":\"" . $firmwareVersion . "\"}")
+    :local heartbeatBody ("{\"_hotfii_secret\":\"" . $heartbeatSecret . "\",\"firmware_version\":\"" . $firmwareVersion . "\"}")
 
     /tool fetch \
         url=$heartbeatUrl \
         http-method=post \
-        http-header-field=$heartbeatHeader \
+        http-header-field="Content-Type:application/json" \
         http-data=$heartbeatBody \
         check-certificate=yes-without-crl \
-        keep-result=no
+        output=none
 }
 
  /system scheduler add name="hotfii-heartbeat" interval=1m on-event="hotfii-heartbeat" policy=ftp,read,test

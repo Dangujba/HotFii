@@ -18,10 +18,24 @@ class NetworkDeviceHeartbeatController extends Controller
         NetworkDevice $device,
         NetworkDeviceManager $manager
     ): JsonResponse {
+        $providedSecret =
+            (string) $request->header(
+                'X-HotFii-Secret',
+                ''
+            );
+
+        if ($providedSecret === '') {
+            $providedSecret =
+                (string) $request->input(
+                    '_hotfii_secret',
+                    ''
+                );
+        }
+
         abort_unless(
             hash_equals(
                 $device->radius_secret,
-                (string) $request->header('X-HotFii-Secret')
+                $providedSecret
             ),
             401
         );
