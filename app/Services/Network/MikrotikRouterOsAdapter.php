@@ -220,24 +220,15 @@ ROS, [
 /system identity set name="hotfii-{{NAS_ID}}"
 
 # Install a signed one-minute heartbeat.
+# Create the script from a plain source string rather than a nested source
+# block. The heartbeat needs no JSON payload; the device secret alone
+# authenticates this HTTPS POST.
  /system scheduler remove [find where name="hotfii-heartbeat"]
  /system script remove [find where name="hotfii-heartbeat"]
 
- /system script add name="hotfii-heartbeat" policy=ftp,read,test source={
-    :local firmwareVersion [/system resource get version]
-    :local heartbeatUrl "{{HEARTBEAT_URL}}"
-    :local heartbeatSecret "{{RADIUS_SECRET}}"
-    :local heartbeatBody ("{\"_hotfii_secret\":\"" . $heartbeatSecret . "\",\"firmware_version\":\"" . $firmwareVersion . "\"}")
+:local heartbeatSource "/tool fetch url=\"{{HEARTBEAT_URL}}\" http-method=post http-header-field=\"X-HotFii-Secret:{{RADIUS_SECRET}}\" check-certificate=yes-without-crl output=none"
 
-    /tool fetch \
-        url=$heartbeatUrl \
-        http-method=post \
-        http-header-field="Content-Type:application/json" \
-        http-data=$heartbeatBody \
-        check-certificate=yes-without-crl \
-        output=none
-}
-
+ /system script add name="hotfii-heartbeat" policy=ftp,read,test source=$heartbeatSource
  /system scheduler add name="hotfii-heartbeat" interval=1m on-event="hotfii-heartbeat" policy=ftp,read,test
 
 # Send the first heartbeat immediately.
