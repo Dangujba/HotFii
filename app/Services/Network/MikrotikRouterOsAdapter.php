@@ -101,11 +101,24 @@ ROS, [
  /radius add address="{{RADIUS_HOST}}" secret="{{RADIUS_SECRET}}" service=hotspot authentication-port={{AUTH_PORT}} accounting-port={{ACCT_PORT}} timeout=3s require-message-auth=yes-for-request-resp comment=$hotfiiComment
  /radius incoming set accept=yes port={{COA_PORT}}
 
-# Enable HotFii RADIUS on the default profile.
- /ip hotspot profile set [find where name="default"] use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie
+# HotFii always owns the captive-portal profile and login page.
+# Preserve the customer's WAN, LAN, bridge, DHCP and HotSpot address pool,
+# but never reuse legacy MikroTicket/Mikhmon/other portal branding.
+:local hotfiiProfile "hotfii-profile"
+:local hotfiiHtmlDir "hotspot"
 
-# If the router has no HotSpot server yet, create one on the active
-# DHCP/LAN interface without replacing DHCP, the address pool, LAN or WAN.
+# Routers with flash storage must keep portal files under flash so they
+# survive a reboot. Routers without flash use the normal hotspot directory.
+:if ([:len [/file find where name="flash"]] > 0) do={
+    :set hotfiiHtmlDir "flash/hotspot"
+}
+
+:if ([:len [/ip hotspot profile find where name=$hotfiiProfile]] = 0) do={
+    /ip hotspot profile add name=$hotfiiProfile
+}
+
+# If no HotSpot server exists, create one on the active DHCP/LAN interface.
+# Do not replace DHCP, the customer's IP pool, LAN addresses or WAN settings.
 :if ([:len [/ip hotspot find]] = 0) do={
     :local hotspotInterface ""
 
@@ -122,62 +135,79 @@ ROS, [
         :error "HotFii could not detect an active DHCP/LAN interface for HotSpot"
     }
 
-    :local hotspotCidr ""
-    :foreach addressId in=[/ip address find where interface=$hotspotInterface disabled=no] do={
-        :if ([:len $hotspotCidr] = 0) do={
-            :set hotspotCidr [/ip address get $addressId address]
-        }
-    }
-
-    :if ([:len $hotspotCidr] = 0) do={
-        :error "HotFii could not determine the LAN gateway address for HotSpot"
-    }
-
-    :local slashPos [:find $hotspotCidr "/"]
-    :if ([:typeof $slashPos] = "nil") do={
-        :error "HotFii found an invalid LAN address while creating HotSpot"
-    }
-
-    :local hotspotAddress [:pick $hotspotCidr 0 $slashPos]
-
-    /ip hotspot profile set [find where name="default"] hotspot-address=$hotspotAddress use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie dns-name="" html-directory=hotspot html-directory-override=""
-    /ip hotspot add name="hotfii-hotspot" interface=$hotspotInterface profile=default address-pool=none disabled=no comment=$hotfiiComment
+    /ip hotspot add name="hotfii-hotspot" interface=$hotspotInterface profile=$hotfiiProfile address-pool=none disabled=no comment=$hotfiiComment
 }
 
-# Normalize every profile actively used by a HotSpot server.
-# Keep the customer's existing HotSpot server, interface, address pool,
-# DHCP, LAN and WAN configuration, but replace legacy captive-portal
-# branding/files with the HotFii-managed portal.
-:foreach hotspotId in=[/ip hotspot find] do={
-    :local profileName [/ip hotspot get $hotspotId profile]
+# Derive the gateway address from the first active HotSpot interface.
+:local hotfiiHotspotAddress ""
+:foreach hotspotId in=[/ip hotspot find where disabled=no] do={
+    :if ([:len $hotfiiHotspotAddress] = 0) do={
+        :local hotspotInterface [/ip hotspot get $hotspotId interface]
+        :foreach addressId in=[/ip address find where interface=$hotspotInterface disabled=no] do={
+            :if ([:len $hotfiiHotspotAddress] = 0) do={
+                :local hotspotCidr [/ip address get $addressId address]
+                :local slashPos [:find $hotspotCidr "/"]
+                :if ([:typeof $slashPos] != "nil") do={
+                    :set hotfiiHotspotAddress [:pick $hotspotCidr 0 $slashPos]
+                }
+            }
+        }
+    }
+}
 
-    /ip hotspot profile set [find where name=$profileName]         use-radius=yes         radius-accounting=yes         radius-interim-update=1m         login-by=http-pap,cookie         dns-name=""         html-directory=hotspot         html-directory-override=""
+# Configure one HotFii-owned profile. Explicitly clear any legacy DNS name
+# and point RouterOS at the HotFii-managed HTML directory.
+:if ([:len $hotfiiHotspotAddress] > 0) do={
+    /ip hotspot profile set [find where name=$hotfiiProfile] hotspot-address=$hotfiiHotspotAddress use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie dns-name="" html-directory=$hotfiiHtmlDir html-directory-override=""
+} else={
+    /ip hotspot profile set [find where name=$hotfiiProfile] use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie dns-name="" html-directory=$hotfiiHtmlDir html-directory-override=""
+}
+
+# Every HotSpot server is now served by HotFii. Existing server interfaces
+# and address pools are intentionally preserved.
+:foreach hotspotId in=[/ip hotspot find] do={
+    /ip hotspot set $hotspotId profile=$hotfiiProfile
 }
 
  /ip hotspot walled-garden remove [find where comment=$hotfiiComment]
  /ip hotspot walled-garden add dst-host="{{PORTAL_HOST}}" comment=$hotfiiComment
  /ip hotspot walled-garden add dst-host="*.paystack.com" comment=$hotfiiComment
 
-# Install the device-specific HotFii captive portal safely.
-:if ([:len [/ip hotspot find]] > 0) do={
-    :if ([:len [/file find where name="hotspot"]] = 0) do={
-        /file add name="hotspot" type=directory
-    }
+# Install the device-specific HotFii redirect page into the exact directory
+# used by the HotFii profile.
+:if ([:len [/file find where name=$hotfiiHtmlDir]] = 0) do={
+    /file add name=$hotfiiHtmlDir type=directory
+}
 
-    :if ([:len [/file find where name="hotspot/hotfii-login.tmp"]] > 0) do={
-        /file remove [find where name="hotspot/hotfii-login.tmp"]
-    }
+:local hotfiiLoginTmp ($hotfiiHtmlDir . "/hotfii-login.tmp")
+:local hotfiiLoginPath ($hotfiiHtmlDir . "/login.html")
 
-    /tool fetch url="{{PORTAL_LOGIN_URL}}" dst-path="hotspot/hotfii-login.tmp" keep-result=yes check-certificate=yes-without-crl
+:if ([:len [/file find where name=$hotfiiLoginTmp]] > 0) do={
+    /file remove [find where name=$hotfiiLoginTmp]
+}
 
-    :if ([:len [/file find where name="hotspot/hotfii-login.tmp"]] > 0) do={
-        :if ([:len [/file find where name="hotspot/login.html"]] > 0) do={
-            /file remove [find where name="hotspot/login.html"]
-        }
-        /file set [find where name="hotspot/hotfii-login.tmp"] name="hotspot/login.html"
-    } else={
-        :error "HotFii captive portal download failed"
+/tool fetch url="{{PORTAL_LOGIN_URL}}" dst-path=$hotfiiLoginTmp keep-result=yes check-certificate=yes-without-crl
+
+:if ([:len [/file find where name=$hotfiiLoginTmp]] = 0) do={
+    :error "HotFii captive portal download failed"
+}
+
+:if ([:len [/file find where name=$hotfiiLoginPath]] > 0) do={
+    /file remove [find where name=$hotfiiLoginPath]
+}
+
+/file set [find where name=$hotfiiLoginTmp] name=$hotfiiLoginPath
+
+# Fail provisioning instead of reporting success if HotFii is not actually
+# the profile serving every HotSpot server or the login page is missing.
+:foreach hotspotId in=[/ip hotspot find] do={
+    :if ([/ip hotspot get $hotspotId profile] != $hotfiiProfile) do={
+        :error "HotFii failed to take ownership of an active HotSpot server"
     }
+}
+
+:if ([:len [/file find where name=$hotfiiLoginPath]] = 0) do={
+    :error "HotFii login page verification failed"
 }
 
 # Restricted monitoring account.
