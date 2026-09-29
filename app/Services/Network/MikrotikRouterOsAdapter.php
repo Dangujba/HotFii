@@ -104,6 +104,46 @@ ROS, [
 # Enable HotFii RADIUS on the default profile.
  /ip hotspot profile set [find where name="default"] use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie
 
+# If the router has no HotSpot server yet, create one on the active
+# DHCP/LAN interface without replacing DHCP, the address pool, LAN or WAN.
+:if ([:len [/ip hotspot find]] = 0) do={
+    :local hotspotInterface ""
+
+    :foreach dhcpId in=[/ip dhcp-server find where disabled=no] do={
+        :if ([:len $hotspotInterface] = 0) do={
+            :local candidateInterface [/ip dhcp-server get $dhcpId interface]
+            :if ([:len [/ip address find where interface=$candidateInterface disabled=no]] > 0) do={
+                :set hotspotInterface $candidateInterface
+            }
+        }
+    }
+
+    :if ([:len $hotspotInterface] = 0) do={
+        :error "HotFii could not detect an active DHCP/LAN interface for HotSpot"
+    }
+
+    :local hotspotCidr ""
+    :foreach addressId in=[/ip address find where interface=$hotspotInterface disabled=no] do={
+        :if ([:len $hotspotCidr] = 0) do={
+            :set hotspotCidr [/ip address get $addressId address]
+        }
+    }
+
+    :if ([:len $hotspotCidr] = 0) do={
+        :error "HotFii could not determine the LAN gateway address for HotSpot"
+    }
+
+    :local slashPos [:find $hotspotCidr "/"]
+    :if ([:typeof $slashPos] = "nil") do={
+        :error "HotFii found an invalid LAN address while creating HotSpot"
+    }
+
+    :local hotspotAddress [:pick $hotspotCidr 0 $slashPos]
+
+    /ip hotspot profile set [find where name="default"] hotspot-address=$hotspotAddress use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-pap,cookie dns-name="" html-directory=hotspot html-directory-override=""
+    /ip hotspot add name="hotfii-hotspot" interface=$hotspotInterface profile=default address-pool=none disabled=no comment=$hotfiiComment
+}
+
 # Normalize every profile actively used by a HotSpot server.
 # Keep the customer's existing HotSpot server, interface, address pool,
 # DHCP, LAN and WAN configuration, but replace legacy captive-portal
@@ -120,6 +160,10 @@ ROS, [
 
 # Install the device-specific HotFii captive portal safely.
 :if ([:len [/ip hotspot find]] > 0) do={
+    :if ([:len [/file find where name="hotspot"]] = 0) do={
+        /file add name="hotspot" type=directory
+    }
+
     :if ([:len [/file find where name="hotspot/hotfii-login.tmp"]] > 0) do={
         /file remove [find where name="hotspot/hotfii-login.tmp"]
     }
