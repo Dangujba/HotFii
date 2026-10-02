@@ -167,6 +167,45 @@ class MobileFinanceAndReportTest extends TestCase
             'output_bytes' => 2048,
             'started_at' => now(),
         ]);
+        $batch = $this->organization->voucherBatches()->create([
+            'access_plan_id' => $plan->id,
+            'network_device_id' => $this->router->id,
+            'reference' => 'VB-REPORT-MAIN',
+            'quantity' => 4,
+            'retail_price_kobo' => 500_00,
+            'status' => 'printed',
+        ]);
+        foreach (['printed', 'active', 'expired', 'revoked'] as $index => $status) {
+            $this->organization->vouchers()->create([
+                'network_device_id' => $this->router->id,
+                'activated_network_device_id' => $status === 'printed' ? null : $this->router->id,
+                'voucher_batch_id' => $batch->id,
+                'code_lookup' => hash('sha256', "report-voucher-${index}"),
+                'code_cipher' => "report-voucher-${index}",
+                'code_last_four' => str_pad((string) $index, 4, '0', STR_PAD_LEFT),
+                'status' => $status,
+                'price_snapshot_kobo' => 500_00,
+            ]);
+        }
+        $otherRouter = $this->router($this->organization, 'Report annex');
+        $otherBatch = $this->organization->voucherBatches()->create([
+            'access_plan_id' => $plan->id,
+            'network_device_id' => $otherRouter->id,
+            'reference' => 'VB-REPORT-ANNEX',
+            'quantity' => 1,
+            'retail_price_kobo' => 500_00,
+            'status' => 'printed',
+        ]);
+        $this->organization->vouchers()->create([
+            'network_device_id' => $otherRouter->id,
+            'activated_network_device_id' => $otherRouter->id,
+            'voucher_batch_id' => $otherBatch->id,
+            'code_lookup' => hash('sha256', 'report-voucher-annex'),
+            'code_cipher' => 'report-voucher-annex',
+            'code_last_four' => '9999',
+            'status' => 'active',
+            'price_snapshot_kobo' => 500_00,
+        ]);
         $token = $this->token($this->owner);
         $parameters = [
             'organization' => $this->organization,
@@ -180,6 +219,11 @@ class MobileFinanceAndReportTest extends TestCase
             ->assertJsonPath('data.summary.sales', 3)
             ->assertJsonPath('data.summary.gross_kobo', 175_000)
             ->assertJsonPath('data.usage.sessions', 1)
+            ->assertJsonPath('data.voucher_status.total', 4)
+            ->assertJsonPath('data.voucher_status.unused', 1)
+            ->assertJsonPath('data.voucher_status.active', 1)
+            ->assertJsonPath('data.voucher_status.expired', 1)
+            ->assertJsonPath('data.voucher_status.revoked', 1)
             ->assertJsonPath('data.channels.0.total_kobo', 100_000)
             ->assertJsonPath('data.channels.1.total_kobo', 50_000)
             ->assertJsonPath('data.channels.2.total_kobo', 25_000)

@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +42,7 @@ fun ReportScreen(
     onFeedbackDismissed: () -> Unit,
 ) {
     var showFilters by rememberSaveable { mutableStateOf(false) }
+    var showExportMenu by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     BackHandler(onBack = onBack)
 
@@ -64,12 +66,30 @@ fun ReportScreen(
             navigationIcon = { IconButton(onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
             actions = {
                 IconButton({ showFilters = true }) { Icon(Icons.Outlined.FilterList, "Filter reports") }
-                IconButton({ onExport("csv") }, enabled = !state.isActionRunning) { Icon(Icons.Outlined.TableView, "Share CSV") }
-                IconButton({ onExport("pdf") }, enabled = !state.isActionRunning) { Icon(Icons.Outlined.PictureAsPdf, "Share PDF") }
+                Box {
+                    IconButton({ showExportMenu = true }, enabled = !state.isActionRunning) {
+                        Icon(Icons.Outlined.MoreVert, "Export report")
+                    }
+                    DropdownMenu(showExportMenu, { showExportMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Share PDF") },
+                            leadingIcon = { Icon(Icons.Outlined.PictureAsPdf, null) },
+                            onClick = { showExportMenu = false; onExport("pdf") },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Share CSV") },
+                            leadingIcon = { Icon(Icons.Outlined.TableView, null) },
+                            onClick = { showExportMenu = false; onExport("csv") },
+                        )
+                    }
+                }
             },
         )
     }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).clipToBounds(),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
             if (state.isLoading || state.isActionRunning) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             state.error?.let { item { Feedback(it, true, onFeedbackDismissed) } }
             state.notice?.let { item { Feedback(it, false, onFeedbackDismissed) } }
@@ -77,27 +97,21 @@ fun ReportScreen(
             if (report != null) {
                 item {
                     Text("${report.from} to ${report.to}", Modifier.padding(16.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Metric("Sales", report.summary.sales.toString(), Icons.AutoMirrored.Outlined.ReceiptLong, Modifier.weight(1f))
-                        Metric("Revenue", money(report.summary.grossKobo), Icons.Outlined.Payments, Modifier.weight(1f))
-                    }
-                    Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Metric("Sessions", report.usage.sessions.toString(), Icons.Outlined.Wifi, Modifier.weight(1f))
-                        Metric("Usage", dataSize(report.usage.bytes), Icons.Outlined.DataUsage, Modifier.weight(1f))
-                    }
+                    ReportMetrics(report)
                 }
+                item { ChartSection("Voucher status", "Current voucher inventory") { VoucherStatusChart(report.voucherStatus) } }
                 item { ChartSection("Sales trend", "Online, voucher, and direct cash revenue") { SalesTrendChart(report.salesTrend) } }
                 item { ChartSection("Sales channels", "Revenue by payment channel") { ChannelChart(report.channels) } }
                 item {
                     report.channels.forEach { channel ->
-                        ListItem(headlineContent = { Text(channel.label) }, supportingContent = { Text("${channel.sales} sales") }, trailingContent = { Text(money(channel.totalKobo), fontWeight = FontWeight.SemiBold) })
+                        ListItem(headlineContent = { Text(channel.label) }, supportingContent = { Text("${channel.sales} sales") }, trailingContent = { Text(money(channel.totalKobo), Modifier.widthIn(max = 120.dp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) })
                         HorizontalDivider(Modifier.padding(start = 16.dp))
                     }
                 }
                 item { ChartSection("Top plans", "Highest-grossing access plans") { PlanChart(report.topPlans) } }
                 item {
                     report.topPlans.forEach { plan ->
-                        ListItem(headlineContent = { Text(plan.name) }, supportingContent = { Text("${plan.sales} sales") }, trailingContent = { Text(money(plan.totalKobo), fontWeight = FontWeight.SemiBold) })
+                        ListItem(headlineContent = { Text(plan.name, maxLines = 2, overflow = TextOverflow.Ellipsis) }, supportingContent = { Text("${plan.sales} sales") }, trailingContent = { Text(money(plan.totalKobo), Modifier.widthIn(max = 120.dp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) })
                         HorizontalDivider(Modifier.padding(start = 16.dp))
                     }
                 }
@@ -112,7 +126,7 @@ fun ReportScreen(
 }
 
 @Composable private fun ChartSection(title: String, subtitle: String, chart: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 20.dp).clipToBounds()) {
         Text(title, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(subtitle, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         chart()
@@ -120,8 +134,22 @@ fun ReportScreen(
     }
 }
 
+@Composable
+private fun ReportMetrics(report: ReportData) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Metric("Sales", report.summary.sales.toString(), Icons.AutoMirrored.Outlined.ReceiptLong, Modifier.weight(1f))
+            Metric("Revenue", money(report.summary.grossKobo), Icons.Outlined.Payments, Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Metric("Sessions", report.usage.sessions.toString(), Icons.Outlined.Wifi, Modifier.weight(1f))
+            Metric("Usage", dataSize(report.usage.bytes), Icons.Outlined.DataUsage, Modifier.weight(1f))
+        }
+    }
+}
+
 @Composable private fun Metric(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier) {
-    Surface(modifier, shape = MaterialTheme.shapes.small, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+    Surface(modifier.widthIn(min = 0.dp), shape = MaterialTheme.shapes.small, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(12.dp)) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary); Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(label, style = MaterialTheme.typography.labelSmall) }
     }
 }

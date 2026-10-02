@@ -37,6 +37,24 @@ final class OrganizationReportService
             ->whereBetween(DB::raw('COALESCE(started_at, created_at)'), $window)
             ->selectRaw('COUNT(*) as sessions, COALESCE(SUM(input_bytes + output_bytes), 0) as bytes')
             ->first();
+        $voucherStatus = $organization->vouchers()
+            ->when($router, fn (Builder $query) => $query->where(function (Builder $scope) use ($router) {
+                $scope->where(function (Builder $unused) use ($router) {
+                    $unused->whereIn('status', ['generated', 'printed', 'assigned', 'sold'])
+                        ->where('network_device_id', $router->id);
+                })->orWhere(function (Builder $used) use ($router) {
+                    $used->whereIn('status', ['active', 'expired', 'revoked'])
+                        ->where('activated_network_device_id', $router->id);
+                });
+            }))
+            ->selectRaw(
+                "COUNT(*) as total,
+                 COALESCE(SUM(CASE WHEN status IN ('generated', 'printed', 'assigned', 'sold') THEN 1 ELSE 0 END), 0) as unused,
+                 COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) as active,
+                 COALESCE(SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END), 0) as expired,
+                 COALESCE(SUM(CASE WHEN status = 'revoked' THEN 1 ELSE 0 END), 0) as revoked"
+            )
+            ->first();
         $dailyRows = $transactions()
             ->selectRaw("$day as day, $channel as sale_channel, SUM(gross_amount_kobo) as total")
             ->groupBy(DB::raw($day), DB::raw($channel))
@@ -104,6 +122,13 @@ final class OrganizationReportService
             'usage' => [
                 'sessions' => (int) ($usage?->sessions ?? 0),
                 'bytes' => (int) ($usage?->bytes ?? 0),
+            ],
+            'voucher_status' => [
+                'total' => (int) ($voucherStatus?->total ?? 0),
+                'unused' => (int) ($voucherStatus?->unused ?? 0),
+                'active' => (int) ($voucherStatus?->active ?? 0),
+                'expired' => (int) ($voucherStatus?->expired ?? 0),
+                'revoked' => (int) ($voucherStatus?->revoked ?? 0),
             ],
             'sales_trend' => [
                 'dates' => $dates,

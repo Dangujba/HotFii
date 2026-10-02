@@ -100,6 +100,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
+    implementation(libs.compose.charts)
     implementation(libs.androidx.biometric)
     implementation(libs.firebase.messaging)
 
