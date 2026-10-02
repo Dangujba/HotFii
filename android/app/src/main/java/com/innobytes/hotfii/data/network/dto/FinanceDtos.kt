@@ -26,11 +26,14 @@ data class FinanceInvoiceDetailDto(val invoice: FinanceInvoiceDto, val permissio
 data class FinanceInvoiceDetailPermissionsDto(val canPay: Boolean)
 data class InvoiceCheckoutDto(val authorizationUrl: String, val reference: String) { fun toDomain() = InvoiceCheckout(authorizationUrl, reference) }
 
-data class ReportDataDto(val from: String, val to: String, val routerId: String?, val summary: ReportSummaryDto, val usage: ReportUsageDto, val salesTrend: ReportSalesTrendDto, val channels: List<ReportChannelDto>, val topPlans: List<ReportPlanDto>, val usageTrend: ReportUsageTrendDto, val options: ReportOptionsDto) {
-    fun toDomain() = ReportData(from, to, routerId, summary.toDomain(), usage.toDomain(), salesTrend.toDomain(), channels.map(ReportChannelDto::toDomain), topPlans.map(ReportPlanDto::toDomain), usageTrend.toDomain(), options.routers.map(FinanceRouterOptionDto::toDomain))
+data class ReportDataDto(val from: String, val to: String, val routerId: String?, val summary: ReportSummaryDto, val usage: ReportUsageDto, val voucherStatus: ReportVoucherStatusDto?, val salesTrend: ReportSalesTrendDto, val channels: List<ReportChannelDto>, val topPlans: List<ReportPlanDto>, val usageTrend: ReportUsageTrendDto, val options: ReportOptionsDto) {
+    fun toDomain() = ReportData(from, to, routerId, summary.toDomain(), usage.toDomain(), voucherStatus?.toDomain() ?: ReportVoucherStatus(0, 0, 0, 0, 0), salesTrend.toDomain(), channels.map(ReportChannelDto::toDomain), topPlans.map(ReportPlanDto::toDomain), usageTrend.toDomain(), options.routers.map(FinanceRouterOptionDto::toDomain))
 }
 data class ReportSummaryDto(val sales: Int, val grossKobo: Long) { fun toDomain() = ReportSummary(sales, grossKobo) }
 data class ReportUsageDto(val sessions: Int, val bytes: Long) { fun toDomain() = ReportUsage(sessions, bytes) }
+data class ReportVoucherStatusDto(val total: Int, val unused: Int, val active: Int, val expired: Int, val revoked: Int) {
+    fun toDomain() = ReportVoucherStatus(total, unused, active, expired, revoked)
+}
 data class ReportSalesTrendDto(val dates: List<String>, val labels: List<String>, val series: Map<String, List<Long>>) {
     fun toDomain() = ReportSalesTrend(dates, labels, series["online"].orEmpty(), series["voucher"].orEmpty(), series["cash"].orEmpty())
 }

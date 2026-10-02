@@ -78,6 +78,7 @@ import com.innobytes.hotfii.domain.ReportSalesTrend
 import com.innobytes.hotfii.domain.ReportSummary
 import com.innobytes.hotfii.domain.ReportUsage
 import com.innobytes.hotfii.domain.ReportUsageTrend
+import com.innobytes.hotfii.domain.ReportVoucherStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -498,6 +499,7 @@ private class FakeFinanceRepository : FinanceRepository {
             routerId = filters.routerId,
             summary = ReportSummary(0, 0),
             usage = ReportUsage(0, 0),
+            voucherStatus = ReportVoucherStatus(0, 0, 0, 0, 0),
             salesTrend = ReportSalesTrend(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()),
             channels = emptyList(),
             topPlans = emptyList(),
